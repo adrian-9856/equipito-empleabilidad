@@ -57,7 +57,9 @@ Para graduados empleados:
 - Token de API de KoboToolbox
 - URL de exportación CSV del formulario
 
-### Pasos de Instalación
+### Instalación Rápida (Solo 3 Archivos) ⚡
+
+El sistema está **completamente unificado** en solo **3 archivos**:
 
 1. **Crear hoja de Google Sheets**
    - Crea una nueva hoja en Google Sheets
@@ -66,17 +68,10 @@ Para graduados empleados:
 2. **Abrir el editor de Apps Script**
    - Ve a: Extensiones → Apps Script
 
-3. **Copiar los archivos del script**
-   - Crea los siguientes archivos en Apps Script:
-     - `Code.gs`
-     - `KoboToolboxAPI.gs`
-     - `SheetManager.gs`
-     - `FollowUpTracker.gs`
-     - `Config.gs`
-     - `Utils.gs`
-     - `FormularioClasificacion.html`
-     - `ConfiguracionKobo.html`
-   - Copia el contenido de cada archivo desde la carpeta `google-apps-script/`
+3. **Copiar los 3 archivos** (desde la carpeta `google-apps-script-unified/`):
+   - ✅ `Code.gs` - Todo el código en un solo archivo (1,500+ líneas)
+   - ✅ `FormularioClasificacion.html` - Interfaz de clasificación
+   - ✅ `ConfiguracionKobo.html` - Interfaz de configuración
 
 4. **Guardar y autorizar**
    - Guarda el proyecto
@@ -96,11 +91,14 @@ Para graduados empleados:
 7. **Importar datos iniciales**
    - Ve al menú: 📊 Seguimiento Graduados → 🔄 Importar desde KoboToolbox
 
-**📖 Guía detallada:** Ver [docs/INSTALACION.md](docs/INSTALACION.md)
+**📖 Guías de instalación:**
+- [Instalación Simplificada (3 archivos)](docs/INSTALACION_SIMPLIFICADA.md) - **⭐ Recomendada**
+- [Instalación Detallada](docs/INSTALACION.md) - Paso a paso completo
 
 ## 📖 Documentación
 
-- **[Guía de Instalación](docs/INSTALACION.md)**: Instalación paso a paso completa
+- **[Instalación Simplificada (3 archivos)](docs/INSTALACION_SIMPLIFICADA.md)**: Instalación rápida ⚡ **⭐ Recomendada**
+- **[Guía de Instalación Completa](docs/INSTALACION.md)**: Instalación paso a paso detallada
 - **[Manual de Uso](docs/MANUAL_USO.md)**: Cómo usar el sistema día a día
 - **[Flujo de Trabajo](docs/FLUJO.md)**: Descripción detallada del flujo de seguimiento
 
@@ -129,7 +127,12 @@ Para graduados empleados:
 
 ```
 equipito-empleabilidad/
-├── google-apps-script/
+├── google-apps-script-unified/           ⭐ RECOMENDADO (Solo 3 archivos)
+│   ├── Code.gs                           # TODO el código en 1 archivo
+│   ├── FormularioClasificacion.html      # Interfaz de clasificación
+│   └── ConfiguracionKobo.html            # Interfaz de configuración
+│
+├── google-apps-script/                   (Versión modular - 8 archivos)
 │   ├── Code.gs                           # Archivo principal
 │   ├── KoboToolboxAPI.gs                 # Integración con KoboToolbox
 │   ├── SheetManager.gs                   # Gestión de hojas
@@ -138,12 +141,16 @@ equipito-empleabilidad/
 │   ├── Utils.gs                          # Utilidades
 │   ├── FormularioClasificacion.html      # Interfaz de clasificación
 │   └── ConfiguracionKobo.html            # Interfaz de configuración
+│
 ├── docs/
-│   ├── INSTALACION.md                    # Guía de instalación
+│   ├── INSTALACION_SIMPLIFICADA.md       # Guía rápida (3 archivos)
+│   ├── INSTALACION.md                    # Guía detallada completa
 │   ├── MANUAL_USO.md                     # Manual de uso
 │   └── FLUJO.md                          # Descripción del flujo
 └── README.md                             # Este archivo
 ```
+
+**Nota:** Ambas versiones son funcionalmente idénticas. La versión unificada es más fácil de copiar (solo 3 archivos vs 8).
 
 ## 🔧 Tecnologías Utilizadas
 
