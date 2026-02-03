@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 20px;
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    h2 {
+      color: #f5576c;
+      margin-bottom: 10px;
+      font-size: 24px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 25px;
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #555;
+      font-size: 14px;
+    }
+
+    .required {
+      color: #e74c3c;
+    }
+
+    input[type="text"], input[type="email"], input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      font-family: inherit;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #f5576c;
+      box-shadow: 0 0 0 3px rgba(245, 87, 108, 0.1);
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #888;
+      margin-top: 5px;
+      font-style: italic;
+    }
+
+    .info-box {
+      background: #e8f4fd;
+      border-left: 4px solid #2196F3;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+
+    .info-box strong {
+      color: #1976d2;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 15px 0;
+    }
+
+    input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 25px;
+    }
+
+    button {
+      flex: 1;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
+    }
+
+    .btn-secondary {
+      background: #e0e0e0;
+      color: #666;
+    }
+
+    .btn-secondary:hover {
+      background: #d0d0d0;
+    }
+
+    .btn-test {
+      background: #4CAF50;
+      color: white;
+      margin-top: 10px;
+    }
+
+    .btn-test:hover {
+      background: #45a049;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #f5576c;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .mensaje {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      display: none;
+    }
+
+    .mensaje.exito {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .mensaje.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .divider {
+      height: 1px;
+      background: #e0e0e0;
+      margin: 25px 0;
+    }
+
+    .section-title {
+      color: #f5576c;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 15px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="mensaje" class="mensaje"></div>
+
+    <div id="formulario">
+      <h2>⚙️ Configuración</h2>
+      <p class="subtitle">Configura la conexión con KoboToolbox y las notificaciones</p>
+
+      <div class="info-box">
+        <strong>ℹ️ ¿Dónde encontrar tus credenciales?</strong><br>
+        1. Inicia sesión en KoboToolbox<br>
+        2. Ve a tu proyecto y haz clic en "Descargas"<br>
+        3. Busca la opción "API" y copia el enlace de exportación CSV<br>
+        4. Para el token, ve a tu cuenta > Configuración > API Token
+      </div>
+
+      <!-- Configuración de KoboToolbox -->
+      <div class="section-title">🔗 KoboToolbox</div>
+
+      <div class="form-group">
+        <label for="koboExportUrl">URL de Exportación CSV <span class="required">*</span></label>
+        <input type="text" id="koboExportUrl" placeholder="https://kf.kobotoolbox.org/api/v2/assets/...">
+        <p class="help-text">URL completa del endpoint de exportación de tu formulario</p>
+      </div>
+
+      <div class="form-group">
+        <label for="koboToken">Token de API <span class="required">*</span></label>
+        <input type="password" id="koboToken" placeholder="Tu token de autenticación">
+        <p class="help-text">Token de autenticación de tu cuenta de KoboToolbox</p>
+      </div>
+
+      <button type="button" class="btn-test" onclick="probarConexion()">
+        🔍 Probar Conexión
+      </button>
+
+      <div class="divider"></div>
+
+      <!-- Configuración de Notificaciones -->
+      <div class="section-title">📧 Notificaciones</div>
+
+      <div class="form-group">
+        <label for="emailNotificaciones">Email para Notificaciones</label>
+        <input type="email" id="emailNotificaciones" placeholder="tu@email.com">
+        <p class="help-text">Recibirás alertas de nuevos graduados y seguimientos pendientes</p>
+      </div>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="activarNotificaciones">
+        <label for="activarNotificaciones" style="margin-bottom: 0;">
+          Activar notificaciones automáticas diarias
+        </label>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Sincronización Automática -->
+      <div class="section-title">🔄 Sincronización</div>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="sincronizacionAuto">
+        <label for="sincronizacionAuto" style="margin-bottom: 0;">
+          Sincronizar datos automáticamente cada hora
+        </label>
+      </div>
+      <p class="help-text">Los datos se importarán de KoboToolbox automáticamente</p>
+
+      <div class="button-group">
+        <button type="button" class="btn-secondary" onclick="cerrar()">Cancelar</button>
+        <button type="button" class="btn-primary" onclick="guardarConfiguracion()">Guardar Configuración</button>
+      </div>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Guardando configuración...</p>
+    </div>
+  </div>
+
+  <script>
+    // Cargar configuración actual al iniciar
+    google.script.run
+      .withSuccessHandler(cargarConfiguracion)
+      .obtenerTodasLasConfiguraciones();
+
+    function cargarConfiguracion(config) {
+      if (config.koboExportUrl) {
+        document.getElementById('koboExportUrl').value = config.koboExportUrl;
+      }
+
+      if (config.koboToken) {
+        document.getElementById('koboToken').value = config.koboToken;
+      }
+
+      if (config.emailNotificaciones) {
+        document.getElementById('emailNotificaciones').value = config.emailNotificaciones;
+      }
+
+      document.getElementById('sincronizacionAuto').checked = config.sincronizacionAuto || false;
+    }
+
+    function guardarConfiguracion() {
+      const koboExportUrl = document.getElementById('koboExportUrl').value.trim();
+      const koboToken = document.getElementById('koboToken').value.trim();
+      const emailNotificaciones = document.getElementById('emailNotificaciones').value.trim();
+      const activarNotificaciones = document.getElementById('activarNotificaciones').checked;
+      const sincronizacionAuto = document.getElementById('sincronizacionAuto').checked;
+
+      // Validaciones
+      if (!koboExportUrl || !koboToken) {
+        mostrarMensaje('⚠️ La URL y el Token de KoboToolbox son obligatorios', 'error');
+        return;
+      }
+
+      if (!koboExportUrl.includes('kobotoolbox.org')) {
+        mostrarMensaje('⚠️ La URL debe ser de KoboToolbox', 'error');
+        return;
+      }
+
+      if (activarNotificaciones && !emailNotificaciones) {
+        mostrarMensaje('⚠️ Debes ingresar un email para activar notificaciones', 'error');
+        return;
+      }
+
+      // Mostrar loading
+      document.getElementById('formulario').style.display = 'none';
+      document.getElementById('loading').style.display = 'block';
+
+      // Preparar datos
+      const datos = {
+        koboExportUrl: koboExportUrl,
+        koboToken: koboToken,
+        emailNotificaciones: emailNotificaciones,
+        activarNotificaciones: activarNotificaciones,
+        sincronizacionAuto: sincronizacionAuto
+      };
+
+      // Llamar a la función del backend
+      google.script.run
+        .withSuccessHandler(onExito)
+        .withFailureHandler(onError)
+        .guardarConfiguracionDesdeFormulario(datos);
+    }
+
+    function probarConexion() {
+      const koboExportUrl = document.getElementById('koboExportUrl').value.trim();
+      const koboToken = document.getElementById('koboToken').value.trim();
+
+      if (!koboExportUrl || !koboToken) {
+        mostrarMensaje('⚠️ Ingresa la URL y el Token antes de probar', 'error');
+        return;
+      }
+
+      // Guardar temporalmente para probar
+      const props = PropertiesService.getScriptProperties();
+      props.setProperty('KOBO_EXPORT_URL', koboExportUrl);
+      props.setProperty('KOBO_TOKEN', koboToken);
+
+      mostrarMensaje('🔍 Probando conexión...', 'exito');
+
+      google.script.run
+        .withSuccessHandler(onResultadoPrueba)
+        .withFailureHandler(onErrorPrueba)
+        .probarConexionKobo();
+    }
+
+    function onResultadoPrueba(resultado) {
+      if (resultado.exito) {
+        mostrarMensaje('✅ ' + resultado.mensaje, 'exito');
+      } else {
+        mostrarMensaje('❌ ' + resultado.mensaje, 'error');
+      }
+    }
+
+    function onErrorPrueba(error) {
+      mostrarMensaje('❌ Error al probar conexión: ' + error.message, 'error');
+    }
+
+    function onExito(resultado) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('formulario').style.display = 'block';
+
+      if (resultado.exito) {
+        mostrarMensaje('✅ ' + resultado.mensaje, 'exito');
+        setTimeout(() => {
+          google.script.host.close();
+        }, 2000);
+      } else {
+        mostrarMensaje('❌ ' + resultado.mensaje, 'error');
+      }
+    }
+
+    function onError(error) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('formulario').style.display = 'block';
+      mostrarMensaje('❌ Error: ' + error.message, 'error');
+    }
+
+    function mostrarMensaje(texto, tipo) {
+      const mensaje = document.getElementById('mensaje');
+      mensaje.textContent = texto;
+      mensaje.className = 'mensaje ' + tipo;
+      mensaje.style.display = 'block';
+
+      setTimeout(() => {
+        mensaje.style.display = 'none';
+      }, 5000);
+    }
+
+    function cerrar() {
+      google.script.host.close();
+    }
+  </script>
+</body>
+</html>
