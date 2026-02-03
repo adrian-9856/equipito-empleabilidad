@@ -221,70 +221,84 @@
       <div class="form-group">
         <label>Clasificación <span class="required">*</span></label>
         <div class="clasificacion-options">
-          <div class="clasificacion-option" data-clasificacion="Habilidades">
-            🎯 Habilidades
+          <div class="clasificacion-option" data-clasificacion="Entrevista/Seguimiento General">
+            📝 Entrevista/Seguimiento
           </div>
-          <div class="clasificacion-option" data-clasificacion="GlobalGorros">
-            🌍 GlobalGorros
+          <div class="clasificacion-option" data-clasificacion="Aliados">
+            🤝 Aliados
           </div>
-          <div class="clasificacion-option" data-clasificacion="Conexión">
-            🤝 Conexión/Relación
+          <div class="clasificacion-option" data-clasificacion="Plataforma">
+            💻 Plataforma
+          </div>
+          <div class="clasificacion-option" data-clasificacion="Conexiones Laborales">
+            🌐 Conexiones Laborales
           </div>
           <div class="clasificacion-option" data-clasificacion="Por su Cuenta">
             👤 Por su Cuenta
           </div>
-          <div class="clasificacion-option" data-clasificacion="No Hace Falta">
-            ⛔ No Hace Falta
+          <div class="clasificacion-option" data-clasificacion="Busca Trabajo">
+            🔍 Busca Trabajo (Fito)
           </div>
           <div class="clasificacion-option" data-clasificacion="Empleado">
-            💼 Empleado
+            💼 Empleado 🎉
           </div>
         </div>
       </div>
 
       <!-- Campos adicionales para cada clasificación -->
-      <div id="campos-habilidades" class="campos-adicionales">
-        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Habilidades</h4>
+      <div id="campos-entrevista" class="campos-adicionales">
+        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Entrevista/Seguimiento General</h4>
         <div class="form-group">
-          <label for="habilidad">Habilidad Principal</label>
-          <input type="text" id="habilidad" placeholder="Ej: Programación, Diseño, Marketing...">
+          <label for="tipoEntrevista">Tipo de Entrevista</label>
+          <input type="text" id="tipoEntrevista" placeholder="Ej: Inicial, Seguimiento, Evaluación...">
         </div>
         <div class="form-group">
-          <label for="nivel">Nivel</label>
-          <select id="nivel">
-            <option value="">Seleccionar...</option>
-            <option value="Básico">Básico</option>
-            <option value="Intermedio">Intermedio</option>
-            <option value="Avanzado">Avanzado</option>
-          </select>
+          <label for="resultadoEntrevista">Resultado</label>
+          <textarea id="resultadoEntrevista" placeholder="Resultado de la entrevista..."></textarea>
         </div>
       </div>
 
-      <div id="campos-globalgorros" class="campos-adicionales">
-        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - GlobalGorros</h4>
+      <div id="campos-aliados" class="campos-adicionales">
+        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Aliados</h4>
         <div class="form-group">
-          <label for="proyecto">Proyecto Asignado</label>
-          <input type="text" id="proyecto" placeholder="Nombre del proyecto">
+          <label for="aliadoAsignado">Aliado Asignado</label>
+          <input type="text" id="aliadoAsignado" placeholder="Nombre del aliado">
         </div>
         <div class="form-group">
-          <label for="responsable">Responsable</label>
-          <input type="text" id="responsable" placeholder="Nombre del responsable">
+          <label for="contactoAliado">Contacto del Aliado</label>
+          <input type="text" id="contactoAliado" placeholder="Email o teléfono del aliado">
         </div>
       </div>
 
-      <div id="campos-conexion" class="campos-adicionales">
-        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Conexión/Relación</h4>
+      <div id="campos-plataforma" class="campos-adicionales">
+        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Plataforma</h4>
         <div class="form-group">
-          <label for="lider">Líder Asignado</label>
-          <input type="text" id="lider" placeholder="Nombre del líder">
+          <label for="plataformaAsignada">Plataforma Asignada</label>
+          <input type="text" id="plataformaAsignada" placeholder="Nombre de la plataforma">
         </div>
         <div class="form-group">
-          <label for="tipoRelacion">Tipo de Relación</label>
-          <select id="tipoRelacion">
+          <label for="usuarioPlataforma">Usuario</label>
+          <input type="text" id="usuarioPlataforma" placeholder="Usuario o email en la plataforma">
+        </div>
+      </div>
+
+      <div id="campos-conexioneslaborales" class="campos-adicionales">
+        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Conexiones Laborales</h4>
+        <div class="form-group">
+          <label for="contactoLaboral">Contacto</label>
+          <input type="text" id="contactoLaboral" placeholder="Nombre del contacto">
+        </div>
+        <div class="form-group">
+          <label for="empresaArea">Empresa/Área</label>
+          <input type="text" id="empresaArea" placeholder="Nombre de la empresa o área">
+        </div>
+        <div class="form-group">
+          <label for="tipoConexion">Tipo de Conexión</label>
+          <select id="tipoConexion">
             <option value="">Seleccionar...</option>
-            <option value="Mentoría">Mentoría</option>
             <option value="Referencia">Referencia</option>
             <option value="Networking">Networking</option>
+            <option value="Contacto directo">Contacto directo</option>
           </select>
         </div>
       </div>
@@ -295,14 +309,19 @@
           <label for="actividad">Actividad</label>
           <input type="text" id="actividad" placeholder="¿Qué está haciendo?">
         </div>
+        <div class="form-group">
+          <label for="progreso">Progreso</label>
+          <textarea id="progreso" placeholder="Describe el progreso o avances..."></textarea>
+        </div>
       </div>
 
-      <div id="campos-nohacefalta" class="campos-adicionales">
-        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - No Hace Falta</h4>
+      <div id="campos-buscatrabajo" class="campos-adicionales">
+        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Busca Trabajo (Enviar a Fito)</h4>
         <div class="form-group">
-          <label for="razon">Razón</label>
-          <textarea id="razon" placeholder="¿Por qué no requiere seguimiento?"></textarea>
+          <label for="motivoDerivacion">Motivo de Derivación</label>
+          <textarea id="motivoDerivacion" placeholder="¿Por qué se deriva a Fito?"></textarea>
         </div>
+        <p class="help-text">💡 Este graduado será enviado a la hoja de Fito para seguimiento especializado</p>
       </div>
 
       <div id="campos-empleado" class="campos-adicionales">
@@ -410,23 +429,29 @@
       };
 
       switch(clasificacionSeleccionada) {
-        case 'Habilidades':
-          datosAdicionales.campo1 = document.getElementById('habilidad').value;
-          datosAdicionales.campo2 = document.getElementById('nivel').value;
+        case 'Entrevista/Seguimiento General':
+          datosAdicionales.campo1 = document.getElementById('tipoEntrevista').value;
+          datosAdicionales.campo2 = document.getElementById('resultadoEntrevista').value;
           break;
-        case 'GlobalGorros':
-          datosAdicionales.campo1 = document.getElementById('proyecto').value;
-          datosAdicionales.campo3 = document.getElementById('responsable').value;
+        case 'Aliados':
+          datosAdicionales.campo1 = document.getElementById('aliadoAsignado').value;
+          datosAdicionales.campo2 = document.getElementById('contactoAliado').value;
           break;
-        case 'Conexión':
-          datosAdicionales.campo1 = document.getElementById('lider').value;
-          datosAdicionales.campo2 = document.getElementById('tipoRelacion').value;
+        case 'Plataforma':
+          datosAdicionales.campo1 = document.getElementById('plataformaAsignada').value;
+          datosAdicionales.campo2 = document.getElementById('usuarioPlataforma').value;
+          break;
+        case 'Conexiones Laborales':
+          datosAdicionales.campo1 = document.getElementById('contactoLaboral').value;
+          datosAdicionales.campo2 = document.getElementById('empresaArea').value;
+          datosAdicionales.campo3 = document.getElementById('tipoConexion').value;
           break;
         case 'Por su Cuenta':
           datosAdicionales.campo1 = document.getElementById('actividad').value;
+          datosAdicionales.campo2 = document.getElementById('progreso').value;
           break;
-        case 'No Hace Falta':
-          datosAdicionales.campo1 = document.getElementById('razon').value;
+        case 'Busca Trabajo':
+          datosAdicionales.campo1 = document.getElementById('motivoDerivacion').value;
           break;
         case 'Empleado':
           datosAdicionales.campo1 = document.getElementById('empresa').value;

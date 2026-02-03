@@ -7,32 +7,31 @@ Este documento describe el flujo completo del proceso de seguimiento de graduado
 ## 📊 Diagrama del Flujo
 
 ```
-┌─────────────┐
-│  GRADUADOS  │ ← Datos desde KoboToolbox
-└──────┬──────┘
-       │
-       ├─────────────────┬──────────────────┬──────────────────┐
-       │                 │                  │                  │
-       ▼                 ▼                  ▼                  ▼
-┌──────────────┐  ┌─────────────┐  ┌───────────────┐  ┌─────────────┐
-│ Entrevista + │  │ Seguimiento │  │   Por su      │  │  No Hace    │
-│  Formación   │  │   General   │  │    Cuenta     │  │   Falta     │
-└──────┬───────┘  └──────┬──────┘  └───────┬───────┘  └─────────────┘
-       │                 │                  │
-       │                 │                  │
-       │         ┌───────┴─────────┬────────┴────────────┐
-       │         │                 │                     │
-       │         ▼                 ▼                     ▼
-       │  ┌────────────┐   ┌─────────────┐   ┌──────────────────┐
-       │  │Habilidades │   │ GlobalGorros│   │ Conexión/Relación│
-       │  └────────────┘   └─────────────┘   └──────────────────┘
-       │         │                 │                     │
-       │         └────────┬────────┴─────────────────────┘
-       │                  │
-       │                  ▼
-       │          ┌──────────────┐
-       └─────────►│   EMPLEADO   │ 🎉
-                  └───────┬──────┘
+┌──────────────────┐
+│    GRADUADOS     │ ← Datos desde KoboToolbox
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│   Entrevista /   │
+│   Seguimiento    │
+│     General      │
+└────────┬─────────┘
+         │
+    ┌────┴────┬─────────────────┬─────────────────┬──────────────────┐
+    │         │                 │                 │                  │
+    ▼         ▼                 ▼                 ▼                  ▼
+┌────────┐ ┌───────────┐ ┌────────────────┐ ┌────────────┐ ┌──────────────┐
+│Aliados │ │Plataforma │ │  Conexiones    │ │  Por su    │ │Busca Trabajo │
+│        │ │           │ │   Laborales    │ │   Cuenta   │ │    (Fito)    │
+└───┬────┘ └─────┬─────┘ └────────┬───────┘ └─────┬──────┘ └──────────────┘
+    │            │                 │                │
+    └────────────┴────────┬────────┴────────────────┘
+                          │
+                          ▼
+                   ┌─────────────┐
+                   │  EMPLEADO   │ 🎉
+                   └──────┬──────┘
                           │
                   ┌───────┴───────┐
                   │ Seguimientos  │
@@ -43,13 +42,13 @@ Este documento describe el flujo completo del proceso de seguimiento de graduado
                   │                 │
                   ▼                 ▼
            ┌─────────────┐   ┌─────────────┐
-           │  Llamada 1  │   │  Llamada 3  │
+           │  Llamada 1  │   │  Llamada 2  │
            │  (Semanal)  │   │  (3 meses)  │
            └─────────────┘   └─────────────┘
                   │
                   ▼
            ┌─────────────┐
-           │  Llamada 6  │
+           │  Llamada 3  │
            │  (6 meses)  │
            └─────────────┘
                   │
@@ -79,293 +78,281 @@ Este documento describe el flujo completo del proceso de seguimiento de graduado
 - Experiencia previa
 
 **Proceso:**
-1. Los graduados completan el formulario en KoboToolbox
-2. El sistema importa los datos automáticamente (cada hora) o manualmente
-3. Se crean registros nuevos en la hoja "Graduados"
-4. Los graduados inician con estado "Nuevo" y sin clasificación
+1. Los datos se importan automáticamente desde KoboToolbox cada hora (opcional)
+2. O manualmente desde el menú: 📊 Seguimiento Graduados → 🔄 Importar desde KoboToolbox
+3. Los graduados se almacenan en la hoja "Graduados" sin clasificar
 
 ---
 
-### 2️⃣ **Clasificación Inicial**
+### 2️⃣ **Clasificación Inicial: Entrevista/Seguimiento General**
 
-Después de importar, cada graduado debe clasificarse según su situación:
+**Descripción:** Punto de entrada para todos los graduados. Evaluación inicial y seguimiento general.
 
-#### 🎯 **Opción A: Habilidades**
-**¿Cuándo?** El graduado necesita desarrollar o reforzar habilidades específicas
+**Datos requeridos:**
+- Tipo de entrevista (Inicial, Seguimiento, Evaluación)
+- Resultado de la entrevista
+- Siguiente paso recomendado
 
-**Características:**
-- Identificación de habilidad principal a trabajar
-- Nivel actual (Básico, Intermedio, Avanzado)
-- Plan de desarrollo
-- Puede incluir certificaciones
+**Acción:**
+- Los graduados pasan por esta etapa para determinar su ruta específica
+- Se documenta el resultado de la entrevista
+- Se decide la siguiente clasificación apropiada
 
-**Próximo paso:** Desarrollo de habilidades → Seguimiento General
-
----
-
-#### 🌍 **Opción B: GlobalGorros**
-**¿Cuándo?** El graduado participa en proyectos de GlobalGorros
-
-**Características:**
-- Asignación a proyecto específico
-- Responsable asignado
-- Fecha de inicio
-- Seguimiento del proyecto
-
-**Próximo paso:** Participación en proyecto → Empleado o Seguimiento General
+**Hoja:** `Entrevista/Seguimiento General`
 
 ---
 
-#### 🤝 **Opción C: Conexión/Relación con Líderes**
-**¿Cuándo?** El graduado está conectado con un líder o mentor
+### 3️⃣ **Rutas de Seguimiento**
 
-**Características:**
-- Líder o mentor asignado
-- Tipo de relación (Mentoría, Referencia, Networking)
-- Fecha de conexión
-- Objetivos de la relación
+Desde la entrevista inicial, los graduados pueden seguir diferentes caminos:
 
-**Próximo paso:** Desarrollo de la relación → Empleado
+#### 🤝 **Aliados**
 
----
+**Descripción:** Graduados conectados con organizaciones o empresas aliadas.
 
-#### 👤 **Opción D: Por su Cuenta**
-**¿Cuándo?** El graduado busca empleo de forma independiente
+**Datos registrados:**
+- Aliado asignado
+- Contacto del aliado (email/teléfono)
+- Fecha de derivación
+- Notas
 
-**Características:**
-- Actividad actual de búsqueda
-- Progreso autónomo
-- Seguimiento periódico menos frecuente
+**Objetivo:** Facilitar la inserción laboral a través de aliados estratégicos.
 
-**Próximo paso:** Búsqueda activa → Empleado
+**Hoja:** `Aliados`
 
 ---
 
-#### ⛔ **Opción E: No Hace Falta**
-**¿Cuándo?** El graduado no requiere seguimiento activo
+#### 💻 **Plataforma**
 
-**Razones posibles:**
-- Ya tiene empleo (no reportado anteriormente)
-- No está buscando empleo actualmente
-- Se retiró del programa
-- Otra situación que no requiere seguimiento
+**Descripción:** Graduados registrados en plataformas digitales de búsqueda de empleo o capacitación.
 
-**Próximo paso:** Sin seguimiento (puede reactivarse después)
+**Datos registrados:**
+- Plataforma asignada (LinkedIn, Indeed, Computrabajo, etc.)
+- Usuario o email en la plataforma
+- Fecha de registro
+- Notas
 
----
+**Objetivo:** Aprovechar plataformas digitales para búsqueda activa de empleo.
 
-### 3️⃣ **Seguimiento General**
-
-**Para:** Graduados en Habilidades, GlobalGorros, o Conexión/Relación
-
-**Actividades:**
-- Check-ins regulares
-- Evaluación de progreso
-- Apoyo en búsqueda de empleo
-- Conexiones con oportunidades laborales
-- Actualización de información
-
-**Frecuencia:** Según la clasificación y necesidades
-
-**Objetivo:** Llevar al graduado hacia el empleo
+**Hoja:** `Plataforma`
 
 ---
 
-### 4️⃣ **¡EMPLEADO! 🎉**
+#### 🌐 **Conexiones Laborales**
 
-**Meta alcanzada:** El graduado consiguió empleo
+**Descripción:** Graduados con contactos directos en empresas o áreas específicas.
 
-**Información registrada:**
-- Empresa empleadora
-- Puesto/cargo
+**Datos registrados:**
+- Contacto (nombre de la persona)
+- Empresa/Área
+- Tipo de conexión (Referencia, Networking, Contacto directo)
+- Notas
+
+**Objetivo:** Utilizar networking y conexiones para acceder a oportunidades laborales.
+
+**Hoja:** `Conexiones Laborales`
+
+---
+
+#### 👤 **Por su Cuenta**
+
+**Descripción:** Graduados que realizan búsqueda laboral de forma independiente.
+
+**Datos registrados:**
+- Actividad que está realizando
+- Progreso o avances
+- Última actualización
+- Notas
+
+**Objetivo:** Monitorear y apoyar la búsqueda independiente.
+
+**Hoja:** `Por su Cuenta`
+
+---
+
+#### 🔍 **Busca Trabajo (Fito)**
+
+**Descripción:** Graduados derivados a Fito para seguimiento especializado en búsqueda de empleo.
+
+**Datos registrados:**
+- Motivo de derivación a Fito
+- Fecha de derivación
+- Notas
+
+**Objetivo:** Recibir apoyo especializado de Fito en la búsqueda activa de empleo.
+
+**Hoja:** `Busca Trabajo (Fito)`
+
+**Nota:** Esta hoja funciona como punto de derivación a otro responsable (Fito).
+
+---
+
+### 4️⃣ **Meta Alcanzada: EMPLEADO** 🎉
+
+**Descripción:** Graduado que consiguió empleo formal.
+
+**Datos registrados:**
+- Empresa
+- Puesto/Cargo
 - Fecha de contratación
 - Salario (opcional)
-- Notas adicionales
+- Notas
 
-**Sistema de Seguimiento Automatico:**
+**Proceso automático:**
+1. Al clasificar como "Empleado", el sistema automáticamente programa 3 seguimientos:
+   - **Llamada 1**: A la semana (verificación inicial)
+   - **Llamada 2**: A los 3 meses (evaluación de adaptación)
+   - **Llamada 3**: A los 6 meses (permanencia y feedback)
 
-El sistema programa automáticamente 3 llamadas de seguimiento:
+2. Las llamadas se registran en la hoja "Seguimientos"
 
-#### 📞 **Llamada 1 - Semanal**
-**Cuándo:** 7 días después de ser clasificado como empleado
+3. Se envían notificaciones por email cuando hay llamadas pendientes
 
-**Objetivos:**
-- Verificar que todo va bien en la primera semana
-- Detectar problemas tempranos
-- Ofrecer apoyo si es necesario
-
-**Preguntas sugeridas:**
-- ¿Cómo ha sido tu primera semana?
-- ¿Recibiste inducción adecuada?
-- ¿Hay algo en lo que necesites apoyo?
-- ¿Las condiciones corresponden a lo acordado?
+**Hoja:** `Empleados`
 
 ---
 
-#### 📞 **Llamada 2 - 3 Meses**
-**Cuándo:** 90 días (3 meses) después de emplearse
+### 5️⃣ **Seguimientos Programados**
 
-**Objetivos:**
-- Evaluar adaptación al puesto
-- Verificar desarrollo profesional
-- Identificar necesidades de capacitación
-- Evaluar satisfacción laboral
+**Descripción:** Sistema automático de llamadas de seguimiento para graduados empleados.
 
-**Preguntas sugeridas:**
-- ¿Cómo te sientes en tu trabajo?
-- ¿Has enfrentado desafíos significativos?
-- ¿Estás aprendiendo y creciendo?
-- ¿La empresa cumple con sus compromisos?
+**Tipos de seguimiento:**
 
----
+#### 📞 **Llamada 1 - Semanal (7 días después)**
+**Objetivo:** Verificar que el graduado comenzó a trabajar correctamente.
 
-#### 📞 **Llamada 3 - 6 Meses**
-**Cuándo:** 180 días (6 meses) después de emplearse
-
-**Objetivos:**
-- Evaluar permanencia y estabilidad
-- Recopilar aprendizajes
-- Obtener feedback sobre el programa
-- Evaluar plan de carrera a futuro
-
-**Preguntas sugeridas:**
-- ¿Sigues en el mismo empleo?
-- ¿Has tenido ascensos o cambios?
-- ¿Qué aprendiste en estos meses?
-- ¿Cómo podemos mejorar el programa?
-- ¿Recomendarías el programa a otros?
+**Preguntas clave:**
+- ¿Comenzó a trabajar?
+- ¿Cómo fue el primer día/semana?
+- ¿Tiene alguna dificultad inicial?
+- ¿Necesita algún tipo de apoyo?
 
 ---
 
-### 5️⃣ **Reporte Mensual**
+#### 📞 **Llamada 2 - 3 Meses (90 días después)**
+**Objetivo:** Evaluar la adaptación al puesto de trabajo.
 
-**Objetivo:** Medir el impacto del programa
+**Preguntas clave:**
+- ¿Sigue trabajando en la empresa?
+- ¿Cómo ha sido la adaptación?
+- ¿Qué ha aprendido?
+- ¿Está satisfecho con el trabajo?
+- ¿Ha tenido algún problema?
 
-**Métricas sugeridas:**
+---
+
+#### 📞 **Llamada 3 - 6 Meses (180 días después)**
+**Objetivo:** Verificar permanencia y obtener feedback.
+
+**Preguntas clave:**
+- ¿Continúa en el mismo puesto?
+- ¿Ha tenido algún ascenso o cambio?
+- ¿Recomendaría la formación?
+- ¿Qué mejoraría del programa?
+- ¿Considera que la formación le ayudó?
+
+---
+
+### 6️⃣ **Reportes Mensuales**
+
+**Descripción:** Consolidación de estadísticas y métricas del programa.
+
+**Métricas clave:**
 - Total de graduados
-- Graduados por clasificación
-- **Tasa de empleabilidad** (empleados / total)
-- Tiempo promedio hasta el empleo
-- Retención laboral (siguen empleados después de 6 meses)
+- Tasa de empleabilidad: (Empleados / Total Graduados) × 100
+- Distribución por clasificación
 - Seguimientos realizados vs pendientes
-- Empresas empleadoras
-- Sectores de empleo
-
-**Uso:**
-- Evaluación del programa
-- Identificación de áreas de mejora
-- Reportes a donantes/patrocinadores
-- Toma de decisiones estratégicas
-
----
-
-## 🔄 Flujo de Datos en el Sistema
-
-### Entrada de Datos:
-```
-KoboToolbox (Formulario)
-    ↓
-API de Exportación CSV
-    ↓
-Google Apps Script
-    ↓
-Hoja "Graduados"
-```
-
-### Clasificación:
-```
-Hoja "Graduados"
-    ↓
-Formulario de Clasificación (Menús Desplegables)
-    ↓
-Selección de Categoría
-    ↓
-Hoja Específica (Habilidades, GlobalGorros, etc.)
-    ↓
-[Si es Empleado] → Hoja "Empleados" + Programación de Seguimientos
-```
-
-### Seguimientos:
-```
-Clasificación como "Empleado"
-    ↓
-Generación automática de 3 seguimientos
-    ↓
-Hoja "Seguimientos" (con fechas programadas)
-    ↓
-Notificaciones por email (diarias)
-    ↓
-Ejecución de llamada
-    ↓
-Actualización de resultado en hoja
-```
-
----
-
-## ✅ Estados del Graduado
-
-Durante el flujo, un graduado puede tener diferentes estados:
-
-1. **Nuevo** - Recién importado, sin clasificar
-2. **Activo** - Clasificado y en seguimiento
-3. **Empleado** - Consiguió empleo
-4. **Completado** - Terminó todos los seguimientos exitosamente
-5. **Inactivo** - No requiere seguimiento o se retiró
-
----
-
-## 🎯 KPIs (Indicadores Clave)
-
-### Indicadores de Proceso:
-- % de graduados clasificados (objetivo: 100% en 1 semana)
-- Tiempo promedio de clasificación
-- % de seguimientos realizados a tiempo (objetivo: >90%)
-
-### Indicadores de Resultado:
-- **Tasa de empleabilidad** = (Empleados / Total de Graduados) x 100
+- Tasa de retención a 6 meses
 - Tiempo promedio hasta el empleo
-- Tasa de retención a 6 meses = (Siguen empleados / Total empleados) x 100
 
-### Indicadores de Calidad:
-- Satisfacción de graduados (de seguimiento a 6 meses)
-- % de graduados que recomendarían el programa
+**Hoja:** `Reportes Mensuales`
 
 ---
 
-## 🔀 Transiciones Posibles
+## 🔄 Flujo Operativo Diario
 
-Un graduado puede cambiar de clasificación:
+### Para el Equipo de Seguimiento:
 
-```
-Habilidades → GlobalGorros
-Habilidades → Empleado
-GlobalGorros → Empleado
-Conexión → Empleado
-Por su Cuenta → Empleado
-Por su Cuenta → Habilidades
-No Hace Falta → Activo (reactivación)
-Empleado → Por su Cuenta (si pierde el empleo)
-```
+**Cada Día:**
+1. **Revisar notificaciones** por email de seguimientos pendientes
+2. **Realizar llamadas** programadas
+3. **Marcar como realizadas** en la hoja "Seguimientos"
+4. **Actualizar estados** si hay cambios
 
-**Cómo hacerlo:**
-- Clasificar nuevamente con el formulario, o
-- Editar manualmente la columna "Clasificación" y copiar a la hoja correspondiente
+**Cada Semana:**
+1. **Importar nuevos graduados** (si no está automático)
+2. **Clasificar graduados** sin clasificar
+3. **Revisar progreso** de cada categoría
 
----
-
-## 💡 Mejores Prácticas del Flujo
-
-1. **Clasifica rápido:** No dejes graduados sin clasificar más de 1 semana
-2. **Sé consistente:** Usa los mismos criterios para clasificar
-3. **Documenta bien:** Agrega notas en cada seguimiento
-4. **Sigue el calendario:** No dejes pasar las fechas de seguimiento
-5. **Actualiza información:** Si cambia algo, actualízalo de inmediato
-6. **Analiza resultados:** Usa los datos para mejorar el programa
+**Cada Mes:**
+1. **Generar reportes** de estadísticas
+2. **Revisar tasas de empleabilidad**
+3. **Analizar efectividad** de cada ruta
 
 ---
 
-## 📞 Contacto y Soporte
+## 📋 Hojas del Sistema
 
-Para más información sobre el flujo o el sistema:
-- [INSTALACION.md](./INSTALACION.md) - Guía de instalación
-- [MANUAL_USO.md](./MANUAL_USO.md) - Guía de uso del sistema
+| Hoja | Descripción |
+|------|-------------|
+| **Graduados** | Registro central de todos los graduados |
+| **Entrevista/Seguimiento General** | Evaluación inicial y seguimiento general |
+| **Aliados** | Graduados conectados con aliados |
+| **Plataforma** | Graduados en plataformas digitales |
+| **Conexiones Laborales** | Graduados con contactos en empresas |
+| **Por su Cuenta** | Búsqueda independiente |
+| **Busca Trabajo (Fito)** | Derivados a Fito |
+| **Empleados** | Graduados con empleo conseguido |
+| **Seguimientos** | Llamadas programadas (1 semana, 3 meses, 6 meses) |
+| **Reportes Mensuales** | Estadísticas y métricas |
+| **Configuración** | Configuración del sistema |
+
+---
+
+## 💡 Mejores Prácticas
+
+### Clasificación
+- Clasificar a los graduados lo más pronto posible
+- Documentar siempre el resultado de las entrevistas
+- Mantener notas actualizadas
+
+### Seguimientos
+- No dejar pasar las fechas programadas
+- Documentar cada llamada con detalle
+- Si no se contacta, reprogramar
+
+### Reportes
+- Actualizar estadísticas mensualmente
+- Compartir resultados con el equipo
+- Usar datos para mejorar el programa
+
+### Comunicación
+- Mantener información de contacto actualizada
+- Registrar todos los intentos de comunicación
+- Documentar cambios de situación laboral
+
+---
+
+## ❓ Preguntas Frecuentes
+
+**¿Qué pasa si un graduado cambia de clasificación?**
+Puedes reclasificarlo usando el formulario. La información se actualizará en las hojas correspondientes.
+
+**¿Cómo marco un seguimiento como realizado?**
+Ve a la hoja "Seguimientos", busca la fila correspondiente y actualiza los campos: Fecha Realizada, Estado (Realizado), Resultado y Notas.
+
+**¿Qué pasa si un empleado renuncia o es despedido?**
+Actualiza su estado en la hoja "Empleados" y documenta la situación en las notas. Puedes agregar seguimientos adicionales si es necesario.
+
+**¿Puedo agregar más tipos de clasificación?**
+Sí, pero requiere modificar el código. Contacta al administrador del sistema.
+
+**¿Los seguimientos se reprograman automáticamente?**
+No, si no contactas al graduado, debes reprogramar manualmente. Los seguimientos iniciales se programan automáticamente solo cuando clasificas como "Empleado".
+
+---
+
+**📘 Documentación Relacionada:**
+- [Guía de Instalación](./INSTALACION_SIMPLIFICADA.md)
+- [Manual de Uso](./MANUAL_USO.md)
+- [README del Proyecto](../README.md)

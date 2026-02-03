@@ -137,14 +137,15 @@ function crearEstructuraHojas() {
                                 '¿Deseas crear todas las hojas necesarias para el sistema?\n\n' +
                                 'Se crearán las siguientes hojas:\n' +
                                 '• Graduados (datos generales)\n' +
-                                '• Habilidades\n' +
-                                '• GlobalGorros\n' +
-                                '• Conexión/Relación\n' +
+                                '• Entrevista/Seguimiento General\n' +
+                                '• Aliados\n' +
+                                '• Plataforma\n' +
+                                '• Conexiones Laborales\n' +
                                 '• Por su Cuenta\n' +
-                                '• No Hace Falta\n' +
+                                '• Busca Trabajo (Fito)\n' +
                                 '• Empleados\n' +
                                 '• Seguimientos (llamadas programadas)\n' +
-                                '• Reportes\n' +
+                                '• Reportes Mensuales\n' +
                                 '• Configuración',
                                 ui.ButtonSet.YES_NO);
 
@@ -152,17 +153,18 @@ function crearEstructuraHojas() {
       return;
     }
 
-    // Crear todas las hojas necesarias
+    // Crear todas las hojas necesarias según el flujo
     const hojasNecesarias = [
       'Graduados',
-      'Habilidades',
-      'GlobalGorros',
-      'Conexión/Relación',
+      'Entrevista/Seguimiento General',
+      'Aliados',
+      'Plataforma',
+      'Conexiones Laborales',
       'Por su Cuenta',
-      'No Hace Falta',
+      'Busca Trabajo (Fito)',
       'Empleados',
       'Seguimientos',
-      'Reportes',
+      'Reportes Mensuales',
       'Configuración'
     ];
 
@@ -628,11 +630,13 @@ function copiarAHojaClasificacion(datosGraduado, clasificacion, datosAdicionales
  */
 function obtenerNombreHojaClasificacion(clasificacion) {
   const mapeo = {
-    'Habilidades': 'Habilidades',
-    'GlobalGorros': 'GlobalGorros',
-    'Conexión': 'Conexión/Relación',
+    'Entrevista/Seguimiento General': 'Entrevista/Seguimiento General',
+    'Aliados': 'Aliados',
+    'Plataforma': 'Plataforma',
+    'Conexiones Laborales': 'Conexiones Laborales',
     'Por su Cuenta': 'Por su Cuenta',
-    'No Hace Falta': 'No Hace Falta',
+    'Busca Trabajo': 'Busca Trabajo (Fito)',
+    'Fito': 'Busca Trabajo (Fito)',
     'Empleado': 'Empleados'
   };
 
@@ -655,11 +659,13 @@ function crearHeadersParaClasificacion(clasificacion) {
   ];
 
   const headersEspecificos = {
-    'Habilidades': ['Habilidad Principal', 'Nivel', 'Certificación', 'Notas'],
-    'GlobalGorros': ['Proyecto Asignado', 'Fecha Inicio', 'Responsable', 'Notas'],
-    'Conexión': ['Líder Asignado', 'Tipo Relación', 'Fecha Conexión', 'Notas'],
+    'Entrevista/Seguimiento General': ['Tipo Entrevista', 'Resultado', 'Siguiente Paso', 'Notas'],
+    'Aliados': ['Aliado Asignado', 'Contacto del Aliado', 'Fecha Derivación', 'Notas'],
+    'Plataforma': ['Plataforma Asignada', 'Usuario', 'Fecha Registro', 'Notas'],
+    'Conexiones Laborales': ['Contacto', 'Empresa/Área', 'Tipo Conexión', 'Notas'],
     'Por su Cuenta': ['Actividad', 'Progreso', 'Última Actualización', 'Notas'],
-    'No Hace Falta': ['Razón', 'Fecha', 'Observaciones', 'Notas'],
+    'Busca Trabajo': ['Derivado a Fito', 'Fecha Derivación', 'Motivo', 'Notas'],
+    'Fito': ['Derivado a Fito', 'Fecha Derivación', 'Motivo', 'Notas'],
     'Empleado': ['Empresa', 'Puesto', 'Fecha Contratación', 'Salario', 'Notas']
   };
 
@@ -701,11 +707,13 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
  */
 function obtenerColorClasificacion(clasificacion) {
   const colores = {
-    'Habilidades': '#ea4335',
-    'GlobalGorros': '#fbbc04',
-    'Conexión': '#34a853',
+    'Entrevista/Seguimiento General': '#9c27b0',
+    'Aliados': '#3f51b5',
+    'Plataforma': '#00bcd4',
+    'Conexiones Laborales': '#009688',
     'Por su Cuenta': '#4285f4',
-    'No Hace Falta': '#9e9e9e',
+    'Busca Trabajo': '#ff9800',
+    'Fito': '#ff9800',
     'Empleado': '#0f9d58'
   };
 
