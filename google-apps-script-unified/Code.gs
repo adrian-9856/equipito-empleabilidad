@@ -29,7 +29,9 @@ function onOpen() {
     .addItem('📞 Ver Seguimientos Pendientes', 'mostrarSeguimientosPendientes')
     .addSeparator()
     .addItem('⚙️ Configurar Credenciales', 'mostrarConfiguracion')
-    .addItem('📋 Crear Estructura de Hojas', 'crearEstructuraHojas')
+    .addSeparator()
+    .addItem('🚀 Instalar Sistema (primera vez)', 'instalarSistema')
+    .addItem('🔁 Reinstalar Sistema (borra todo)', 'reinstalarSistema')
     .addToUi();
 }
 
@@ -125,38 +127,278 @@ function mostrarConfiguracion() {
   SpreadsheetApp.getUi().showModalDialog(html, 'Configuración');
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ESTRUCTURA EXACTA DE COLUMNAS POR HOJA
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ESTRUCTURA_HOJAS = {
+
+  // ── GRADUADOS ──────────────────────────────────────────────────────────────
+  // Datos vienen de KoboToolbox + se completan manualmente en el flujo
+  'Graduados': {
+    color: '#1a73e8',
+    columnas: [
+      // — Desde KoboToolbox —
+      { nombre: 'ID Kobo',           ancho: 120, nota: 'Auto: KoboToolbox' },
+      { nombre: 'Nombre Completo',   ancho: 200, nota: 'Auto: KoboToolbox' },
+      { nombre: 'Número de Teléfono',ancho: 150, nota: 'Auto: KoboToolbox' },
+      { nombre: 'Email',             ancho: 220, nota: 'Auto: KoboToolbox' },
+      { nombre: 'Formación',         ancho: 180, nota: 'Auto: KoboToolbox' },
+      { nombre: 'Cohorte',           ancho: 100, nota: 'Auto: KoboToolbox' },
+      { nombre: 'Fecha Entrevista',  ancho: 140, nota: 'Auto: KoboToolbox' },
+      { nombre: 'Entrevistador',     ancho: 160, nota: 'Auto: KoboToolbox' },
+      // — Seguimiento General (se llena manualmente) —
+      { nombre: 'Resultado Entrevista', ancho: 220, nota: 'Manual' },
+      { nombre: 'Siguiente Paso',    ancho: 200, nota: 'Manual' },
+      // — Estado en el flujo —
+      { nombre: 'Clasificación',     ancho: 180, nota: 'Auto: al clasificar' },
+      { nombre: 'Fecha Clasificación',ancho: 150, nota: 'Auto: al clasificar' },
+      { nombre: 'Empleado',          ancho: 80,  nota: 'Auto: al clasificar' },
+      { nombre: 'Próxima Llamada',   ancho: 180, nota: 'Auto: al emplearse' },
+      { nombre: 'Notas',             ancho: 300, nota: 'Manual' }
+    ]
+  },
+
+  // ── ALIADOS ────────────────────────────────────────────────────────────────
+  'Aliados': {
+    color: '#3f51b5',
+    columnas: [
+      { nombre: 'ID Kobo',           ancho: 120 },
+      { nombre: 'Nombre Completo',   ancho: 200 },
+      { nombre: 'Número de Teléfono',ancho: 150 },
+      { nombre: 'Email',             ancho: 220 },
+      { nombre: 'Formación',         ancho: 180 },
+      { nombre: 'Cohorte',           ancho: 100 },
+      { nombre: 'Aliado Asignado',   ancho: 200 },
+      { nombre: 'Contacto Aliado',   ancho: 200 },
+      { nombre: 'Fecha Derivación',  ancho: 140 },
+      { nombre: 'Estado',            ancho: 120 },
+      { nombre: 'Notas',             ancho: 300 }
+    ]
+  },
+
+  // ── PLATAFORMA ─────────────────────────────────────────────────────────────
+  'Plataforma': {
+    color: '#00bcd4',
+    columnas: [
+      { nombre: 'ID Kobo',           ancho: 120 },
+      { nombre: 'Nombre Completo',   ancho: 200 },
+      { nombre: 'Número de Teléfono',ancho: 150 },
+      { nombre: 'Email',             ancho: 220 },
+      { nombre: 'Formación',         ancho: 180 },
+      { nombre: 'Cohorte',           ancho: 100 },
+      { nombre: 'Plataforma',        ancho: 180 },
+      { nombre: 'Usuario/Perfil',    ancho: 200 },
+      { nombre: 'Fecha Registro',    ancho: 140 },
+      { nombre: 'Estado',            ancho: 120 },
+      { nombre: 'Notas',             ancho: 300 }
+    ]
+  },
+
+  // ── CONEXIONES LABORALES ───────────────────────────────────────────────────
+  'Conexiones Laborales': {
+    color: '#009688',
+    columnas: [
+      { nombre: 'ID Kobo',           ancho: 120 },
+      { nombre: 'Nombre Completo',   ancho: 200 },
+      { nombre: 'Número de Teléfono',ancho: 150 },
+      { nombre: 'Email',             ancho: 220 },
+      { nombre: 'Formación',         ancho: 180 },
+      { nombre: 'Cohorte',           ancho: 100 },
+      { nombre: 'Contacto',          ancho: 200 },
+      { nombre: 'Empresa / Área',    ancho: 200 },
+      { nombre: 'Tipo Conexión',     ancho: 160 },
+      { nombre: 'Fecha',             ancho: 120 },
+      { nombre: 'Estado',            ancho: 120 },
+      { nombre: 'Notas',             ancho: 300 }
+    ]
+  },
+
+  // ── POR SU CUENTA ──────────────────────────────────────────────────────────
+  'Por su Cuenta': {
+    color: '#4285f4',
+    columnas: [
+      { nombre: 'ID Kobo',              ancho: 120 },
+      { nombre: 'Nombre Completo',      ancho: 200 },
+      { nombre: 'Número de Teléfono',   ancho: 150 },
+      { nombre: 'Email',                ancho: 220 },
+      { nombre: 'Formación',            ancho: 180 },
+      { nombre: 'Cohorte',              ancho: 100 },
+      { nombre: 'Actividad',            ancho: 220 },
+      { nombre: 'Progreso',             ancho: 220 },
+      { nombre: 'Última Actualización', ancho: 160 },
+      { nombre: 'Estado',               ancho: 120 },
+      { nombre: 'Notas',                ancho: 300 }
+    ]
+  },
+
+  // ── BUSCA TRABAJO (FITO) ───────────────────────────────────────────────────
+  'Busca Trabajo (Fito)': {
+    color: '#ff9800',
+    columnas: [
+      { nombre: 'ID Kobo',           ancho: 120 },
+      { nombre: 'Nombre Completo',   ancho: 200 },
+      { nombre: 'Número de Teléfono',ancho: 150 },
+      { nombre: 'Email',             ancho: 220 },
+      { nombre: 'Formación',         ancho: 180 },
+      { nombre: 'Cohorte',           ancho: 100 },
+      { nombre: 'Motivo Derivación', ancho: 250 },
+      { nombre: 'Fecha Derivación',  ancho: 140 },
+      { nombre: 'Estado en Fito',    ancho: 160 },
+      { nombre: 'Notas',             ancho: 300 }
+    ]
+  },
+
+  // ── EMPLEADOS ──────────────────────────────────────────────────────────────
+  'Empleados': {
+    color: '#0f9d58',
+    columnas: [
+      { nombre: 'ID Kobo',              ancho: 120 },
+      { nombre: 'Nombre Completo',      ancho: 200 },
+      { nombre: 'Número de Teléfono',   ancho: 150 },
+      { nombre: 'Email',                ancho: 220 },
+      { nombre: 'Formación',            ancho: 180 },
+      { nombre: 'Cohorte',              ancho: 100 },
+      { nombre: 'Empresa',              ancho: 200 },
+      { nombre: 'Puesto',               ancho: 180 },
+      { nombre: 'Fecha Contratación',   ancho: 150 },
+      { nombre: 'Salario',              ancho: 120 },
+      { nombre: 'Llamada 1 - Semanal',  ancho: 160, nota: 'Auto: fecha programada' },
+      { nombre: 'Estado Llamada 1',     ancho: 130 },
+      { nombre: 'Llamada 2 - 3 Meses',  ancho: 160, nota: 'Auto: fecha programada' },
+      { nombre: 'Estado Llamada 2',     ancho: 130 },
+      { nombre: 'Llamada 3 - 6 Meses',  ancho: 160, nota: 'Auto: fecha programada' },
+      { nombre: 'Estado Llamada 3',     ancho: 130 },
+      { nombre: 'Notas',                ancho: 300 }
+    ]
+  },
+
+  // ── SEGUIMIENTOS ───────────────────────────────────────────────────────────
+  'Seguimientos': {
+    color: '#673ab7',
+    columnas: [
+      { nombre: 'ID Graduado',       ancho: 120 },
+      { nombre: 'Nombre',            ancho: 200 },
+      { nombre: 'Tipo Seguimiento',  ancho: 180 },
+      { nombre: 'Fecha Programada',  ancho: 150 },
+      { nombre: 'Fecha Realizada',   ancho: 150 },
+      { nombre: 'Estado',            ancho: 120 },
+      { nombre: 'Resultado',         ancho: 220 },
+      { nombre: 'Notas',             ancho: 300 },
+      { nombre: 'Próximo Paso',      ancho: 220 }
+    ]
+  },
+
+  // ── REPORTES MENSUALES ─────────────────────────────────────────────────────
+  'Reportes Mensuales': {
+    color: '#e91e63',
+    columnas: [
+      { nombre: 'Mes / Período',         ancho: 150 },
+      { nombre: 'Total Graduados',        ancho: 140 },
+      { nombre: 'Empleados',              ancho: 120 },
+      { nombre: 'Tasa Empleabilidad %',   ancho: 160 },
+      { nombre: 'En Aliados',             ancho: 120 },
+      { nombre: 'En Plataforma',          ancho: 130 },
+      { nombre: 'En Conexiones',          ancho: 130 },
+      { nombre: 'Por su Cuenta',          ancho: 130 },
+      { nombre: 'En Fito',                ancho: 110 },
+      { nombre: 'Llamadas Realizadas',    ancho: 160 },
+      { nombre: 'Llamadas Pendientes',    ancho: 160 },
+      { nombre: 'Retención 6 Meses %',    ancho: 160 },
+      { nombre: 'Notas',                  ancho: 300 }
+    ]
+  }
+};
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FUNCIONES DE INSTALACIÓN Y REINSTALACIÓN
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * Crea la estructura completa de hojas necesarias para el sistema
+ * Instalación inicial: crea las hojas si no existen (no borra nada)
  */
-function crearEstructuraHojas() {
+function instalarSistema() {
+  const ui = SpreadsheetApp.getUi();
+
+  const respuesta = ui.alert(
+    '🚀 Instalar Sistema',
+    'Esto creará todas las hojas del sistema.\n\n' +
+    'Las hojas existentes NO serán modificadas.\n\n' +
+    '¿Continuar?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (respuesta !== ui.Button.YES) return;
+
+  _ejecutarInstalacion(false);
+}
+
+/**
+ * Reinstalación: borra TODAS las hojas existentes y las recrea desde cero
+ */
+function reinstalarSistema() {
+  const ui = SpreadsheetApp.getUi();
+
+  // Primera confirmación
+  const confirm1 = ui.alert(
+    '⚠️ REINSTALAR SISTEMA',
+    '¡ATENCIÓN! Esto borrará TODAS las hojas y datos existentes.\n\n' +
+    'Esta acción NO se puede deshacer.\n\n' +
+    '¿Estás seguro de que quieres continuar?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirm1 !== ui.Button.YES) return;
+
+  // Segunda confirmación de seguridad
+  const confirm2 = ui.alert(
+    '⚠️ CONFIRMAR REINSTALACIÓN',
+    'Última confirmación: se borrarán TODOS los datos.\n\n' +
+    '¿Confirmar reinstalación completa?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirm2 !== ui.Button.YES) return;
+
+  _ejecutarInstalacion(true);
+}
+
+/**
+ * Lógica central de instalación
+ * @param {boolean} borrarExistentes - Si true, elimina todas las hojas primero
+ */
+function _ejecutarInstalacion(borrarExistentes) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const ui = SpreadsheetApp.getUi();
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      borrarExistentes ? 'Eliminando hojas existentes...' : 'Creando hojas...',
+      '⏳ Procesando', -1
+    );
 
-    const respuesta = ui.alert('Crear Estructura de Hojas',
-                                '¿Deseas crear todas las hojas necesarias para el sistema?\n\n' +
-                                'Se crearán las siguientes hojas:\n' +
-                                '• Graduados (datos generales)\n' +
-                                '• Entrevista/Seguimiento General\n' +
-                                '• Aliados\n' +
-                                '• Plataforma\n' +
-                                '• Conexiones Laborales\n' +
-                                '• Por su Cuenta\n' +
-                                '• Busca Trabajo (Fito)\n' +
-                                '• Empleados\n' +
-                                '• Seguimientos (llamadas programadas)\n' +
-                                '• Reportes Mensuales\n' +
-                                '• Configuración',
-                                ui.ButtonSet.YES_NO);
+    // ── 1. Eliminar hojas existentes si se solicita ──────────────────────────
+    if (borrarExistentes) {
+      const hojasDelSistema = [
+        'Graduados', 'Aliados', 'Plataforma', 'Conexiones Laborales',
+        'Por su Cuenta', 'Busca Trabajo (Fito)', 'Empleados',
+        'Seguimientos', 'Reportes Mensuales', 'Configuración'
+      ];
 
-    if (respuesta !== ui.Button.YES) {
-      return;
+      // Crear hoja temporal para no quedar sin hojas
+      let hojaTemp = ss.getSheetByName('_temp_');
+      if (!hojaTemp) hojaTemp = ss.insertSheet('_temp_');
+
+      hojasDelSistema.forEach(nombre => {
+        const h = ss.getSheetByName(nombre);
+        if (h) ss.deleteSheet(h);
+      });
     }
 
-    // Crear todas las hojas necesarias según el flujo
-    const hojasNecesarias = [
+    // ── 2. Crear cada hoja con su estructura exacta ──────────────────────────
+    const ordenHojas = [
       'Graduados',
-      'Entrevista/Seguimiento General',
       'Aliados',
       'Plataforma',
       'Conexiones Laborales',
@@ -164,36 +406,157 @@ function crearEstructuraHojas() {
       'Busca Trabajo (Fito)',
       'Empleados',
       'Seguimientos',
-      'Reportes Mensuales',
-      'Configuración'
+      'Reportes Mensuales'
     ];
 
-    let hojasCreadas = 0;
+    ordenHojas.forEach(nombreHoja => {
+      let hoja = ss.getSheetByName(nombreHoja);
 
-    hojasNecesarias.forEach(nombreHoja => {
-      try {
-        let hoja = ss.getSheetByName(nombreHoja);
-        if (!hoja) {
-          hoja = ss.insertSheet(nombreHoja);
-          configurarHoja(hoja, nombreHoja);
-          hojasCreadas++;
-        }
-      } catch (e) {
-        Logger.log(`Error al crear hoja ${nombreHoja}: ${e}`);
+      // Si no existe, crearla
+      if (!hoja) {
+        hoja = ss.insertSheet(nombreHoja);
+      } else if (!borrarExistentes) {
+        // Ya existe y no se quiere borrar: saltar
+        return;
       }
+
+      _construirHoja(hoja, nombreHoja);
     });
 
-    ui.alert('✅ Estructura Creada',
-             `Se crearon ${hojasCreadas} hojas nuevas.\n\n` +
-             'El sistema está listo para usar.',
-             ui.ButtonSet.OK);
+    // ── 3. Crear hoja Configuración ──────────────────────────────────────────
+    _crearHojaConfiguracion(ss);
+
+    // ── 4. Eliminar hoja temporal si existe ──────────────────────────────────
+    const temp = ss.getSheetByName('_temp_');
+    if (temp) ss.deleteSheet(temp);
+
+    // ── 5. Ordenar hojas en el orden correcto ────────────────────────────────
+    _ordenarHojas(ss, [...ordenHojas, 'Configuración']);
+
+    SpreadsheetApp.getActiveSpreadsheet().toast('', '', 1);
+
+    ui.alert(
+      '✅ Sistema Instalado',
+      `El sistema está listo.\n\n` +
+      `Se crearon ${ordenHojas.length + 1} hojas con sus columnas.\n\n` +
+      'Próximo paso:\n' +
+      '1. Configura las credenciales de KoboToolbox\n' +
+      '2. Importa los graduados\n' +
+      '3. Comienza a clasificar',
+      ui.ButtonSet.OK
+    );
 
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Error',
-                                  'Error al crear estructura: ' + error.message,
-                                  SpreadsheetApp.getUi().ButtonSet.OK);
-    Logger.log('Error en crearEstructuraHojas: ' + error);
+    SpreadsheetApp.getActiveSpreadsheet().toast('', '', 1);
+    ui.alert('❌ Error', 'Error durante la instalación:\n' + error.message, ui.ButtonSet.OK);
+    Logger.log('Error en _ejecutarInstalacion: ' + error);
   }
+}
+
+/**
+ * Construye una hoja con sus headers, formato y anchos de columna
+ * @param {Sheet} hoja - Objeto de la hoja
+ * @param {string} nombreHoja - Nombre para buscar en ESTRUCTURA_HOJAS
+ */
+function _construirHoja(hoja, nombreHoja) {
+  const estructura = ESTRUCTURA_HOJAS[nombreHoja];
+  if (!estructura) return;
+
+  hoja.clearContents();
+  hoja.clearFormats();
+
+  const columnas = estructura.columnas;
+  const headers  = columnas.map(c => c.nombre);
+
+  // ── Escribir headers ──────────────────────────────────────────────────────
+  const rangoHeader = hoja.getRange(1, 1, 1, headers.length);
+  rangoHeader.setValues([headers]);
+
+  // ── Formato de headers ────────────────────────────────────────────────────
+  rangoHeader.setBackground(estructura.color)
+             .setFontColor('#ffffff')
+             .setFontWeight('bold')
+             .setFontSize(11)
+             .setVerticalAlignment('middle')
+             .setHorizontalAlignment('center')
+             .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+
+  hoja.setRowHeight(1, 36);
+
+  // ── Anchos de columna ─────────────────────────────────────────────────────
+  columnas.forEach((col, i) => {
+    hoja.setColumnWidth(i + 1, col.ancho);
+  });
+
+  // ── Congelar primera fila ─────────────────────────────────────────────────
+  hoja.setFrozenRows(1);
+
+  // ── Quitar columnas sobrantes ─────────────────────────────────────────────
+  const totalCols = hoja.getMaxColumns();
+  if (totalCols > headers.length) {
+    hoja.deleteColumns(headers.length + 1, totalCols - headers.length);
+  }
+
+  // ── Agregar filtros ───────────────────────────────────────────────────────
+  rangoHeader.createFilter();
+
+  // ── Color alterno en filas de datos ──────────────────────────────────────
+  const regla = SpreadsheetApp.newBandingTheme ? null : null;
+  try {
+    hoja.getRange(2, 1, 1000, headers.length)
+        .applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false);
+  } catch(e) { /* Las bandas pueden no estar disponibles en todas las versiones */ }
+
+  Logger.log('Hoja construida: ' + nombreHoja);
+}
+
+/**
+ * Crea la hoja de Configuración con los campos del sistema
+ * @param {Spreadsheet} ss - Objeto del Spreadsheet
+ */
+function _crearHojaConfiguracion(ss) {
+  let hoja = ss.getSheetByName('Configuración');
+  if (!hoja) hoja = ss.insertSheet('Configuración');
+
+  hoja.clearContents();
+  hoja.clearFormats();
+
+  // Header
+  const header = hoja.getRange(1, 1, 1, 3);
+  header.setValues([['Parámetro', 'Valor', 'Descripción']]);
+  header.setBackground('#607d8b')
+        .setFontColor('#ffffff')
+        .setFontWeight('bold')
+        .setFontSize(11);
+  hoja.setFrozenRows(1);
+  hoja.setRowHeight(1, 36);
+
+  // Filas de configuración
+  const filas = [
+    ['KOBO_EXPORT_URL', '', 'URL de exportación CSV de KoboToolbox'],
+    ['KOBO_TOKEN',      '', 'Token de autenticación de KoboToolbox'],
+    ['EMAIL_NOTIF',     '', 'Email para recibir notificaciones'],
+    ['SYNC_AUTO',       'false', 'true = sincronizar cada hora automáticamente'],
+    ['NOTIF_AUTO',      'false', 'true = enviar email diario de seguimientos pendientes']
+  ];
+
+  hoja.getRange(2, 1, filas.length, 3).setValues(filas);
+
+  hoja.setColumnWidth(1, 200);
+  hoja.setColumnWidth(2, 350);
+  hoja.setColumnWidth(3, 400);
+}
+
+/**
+ * Ordena las hojas en el orden definido
+ * @param {Spreadsheet} ss
+ * @param {Array} orden - Array con los nombres en el orden deseado
+ */
+function _ordenarHojas(ss, orden) {
+  orden.forEach((nombre, posicion) => {
+    const hoja = ss.getSheetByName(nombre);
+    if (hoja) ss.setActiveSheet(hoja).moveActiveSheet(posicion + 1);
+  });
 }
 
 /**
@@ -494,51 +857,27 @@ function procesarDatosGraduados(datos) {
 function agregarGraduado(graduado) {
   const hoja = obtenerHoja('Graduados');
 
-  // Si la hoja está vacía, agregar headers
-  if (hoja.getLastRow() === 0) {
-    const headers = [
-      'ID',
-      'Nombre',
-      'Teléfono',
-      'Email',
-      'Fecha Entrevista',
-      'Formación',
-      'Habilidades',
-      'Experiencia',
-      'Fecha Registro',
-      'Estado',
-      'Clasificación',
-      'Empleado',
-      'Seguimiento Actual',
-      'Próxima Llamada',
-      'Notas'
-    ];
-    hoja.appendRow(headers);
-
-    // Formatear headers
-    const headerRange = hoja.getRange(1, 1, 1, headers.length);
-    headerRange.setFontWeight('bold');
-    headerRange.setBackground('#4285f4');
-    headerRange.setFontColor('#ffffff');
-  }
-
-  // Agregar el graduado
+  // Agregar el graduado con la estructura exacta de ESTRUCTURA_HOJAS['Graduados']
+  // Columnas: ID Kobo | Nombre Completo | Número de Teléfono | Email | Formación |
+  //           Cohorte | Fecha Entrevista | Entrevistador | Resultado Entrevista |
+  //           Siguiente Paso | Clasificación | Fecha Clasificación | Empleado |
+  //           Próxima Llamada | Notas
   const fila = [
-    graduado.id,
-    graduado.nombre,
-    graduado.telefono,
-    graduado.email,
-    graduado.fechaEntrevista,
-    graduado.formacion,
-    graduado.habilidades,
-    graduado.experiencia,
-    graduado.fechaRegistro,
-    graduado.estado,
-    graduado.clasificacion,
-    graduado.empleado ? 'Sí' : 'No',
-    graduado.seguimientoActual,
-    graduado.proximaLlamada,
-    ''
+    graduado.id,                        // col 1 - ID Kobo
+    graduado.nombre,                    // col 2 - Nombre Completo
+    graduado.telefono,                  // col 3 - Número de Teléfono
+    graduado.email,                     // col 4 - Email
+    graduado.formacion,                 // col 5 - Formación
+    graduado.cohorte || '',             // col 6 - Cohorte
+    graduado.fechaEntrevista,           // col 7 - Fecha Entrevista
+    graduado.entrevistador || '',       // col 8 - Entrevistador
+    '',                                 // col 9 - Resultado Entrevista (manual)
+    '',                                 // col 10 - Siguiente Paso (manual)
+    '',                                 // col 11 - Clasificación (auto al clasificar)
+    '',                                 // col 12 - Fecha Clasificación (auto)
+    'No',                               // col 13 - Empleado
+    '',                                 // col 14 - Próxima Llamada (auto al emplearse)
+    ''                                  // col 15 - Notas (manual)
   ];
 
   hoja.appendRow(fila);
@@ -555,10 +894,14 @@ function actualizarGraduado(graduado) {
 
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduado.id) {
-      // Actualizar solo campos que pueden cambiar
+      // Actualizar campos de KoboToolbox (columnas 2-8)
       hoja.getRange(i + 1, 2).setValue(graduado.nombre);
       hoja.getRange(i + 1, 3).setValue(graduado.telefono);
       hoja.getRange(i + 1, 4).setValue(graduado.email);
+      hoja.getRange(i + 1, 5).setValue(graduado.formacion || datos[i][4]);
+      hoja.getRange(i + 1, 6).setValue(graduado.cohorte || datos[i][5]);
+      hoja.getRange(i + 1, 7).setValue(graduado.fechaEntrevista || datos[i][6]);
+      hoja.getRange(i + 1, 8).setValue(graduado.entrevistador || datos[i][7]);
 
       Logger.log(`Graduado actualizado: ${graduado.nombre} (${graduado.id})`);
       break;
@@ -579,8 +922,13 @@ function clasificarGraduado(graduadoId, clasificacion, datosAdicionales = {}) {
   // Buscar el graduado
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduadoId) {
-      // Actualizar clasificación en hoja principal
-      hojaGraduados.getRange(i + 1, 11).setValue(clasificacion); // Columna de clasificación
+      const fechaHoy = new Date().toLocaleDateString('es-ES');
+      // col 11 - Clasificación
+      hojaGraduados.getRange(i + 1, 11).setValue(clasificacion);
+      // col 12 - Fecha Clasificación
+      hojaGraduados.getRange(i + 1, 12).setValue(fechaHoy);
+      // col 13 - Empleado
+      hojaGraduados.getRange(i + 1, 13).setValue(clasificacion === 'Empleado' ? 'Sí' : 'No');
 
       // Copiar a la hoja correspondiente según el flujo
       copiarAHojaClasificacion(datos[i], clasificacion, datosAdicionales);
@@ -649,24 +997,31 @@ function obtenerNombreHojaClasificacion(clasificacion) {
  * @return {Array} Array con los nombres de las columnas
  */
 function crearHeadersParaClasificacion(clasificacion) {
+  // Headers base compartidos entre todas las sub-hojas
   const headersBase = [
-    'ID',
-    'Nombre',
-    'Teléfono',
+    'ID Kobo',
+    'Nombre Completo',
+    'Número de Teléfono',
     'Email',
-    'Fecha Clasificación',
-    'Estado'
+    'Formación',
+    'Cohorte',
+    'Fecha Entrevista',
+    'Fecha Clasificación'
   ];
 
   const headersEspecificos = {
     'Entrevista/Seguimiento General': ['Tipo Entrevista', 'Resultado', 'Siguiente Paso', 'Notas'],
-    'Aliados': ['Aliado Asignado', 'Contacto del Aliado', 'Fecha Derivación', 'Notas'],
-    'Plataforma': ['Plataforma Asignada', 'Usuario', 'Fecha Registro', 'Notas'],
-    'Conexiones Laborales': ['Contacto', 'Empresa/Área', 'Tipo Conexión', 'Notas'],
-    'Por su Cuenta': ['Actividad', 'Progreso', 'Última Actualización', 'Notas'],
-    'Busca Trabajo': ['Derivado a Fito', 'Fecha Derivación', 'Motivo', 'Notas'],
-    'Fito': ['Derivado a Fito', 'Fecha Derivación', 'Motivo', 'Notas'],
-    'Empleado': ['Empresa', 'Puesto', 'Fecha Contratación', 'Salario', 'Notas']
+    'Aliados': ['Aliado Asignado', 'Contacto del Aliado', 'Notas'],
+    'Plataforma': ['Plataforma Asignada', 'Usuario/Email', 'Notas'],
+    'Conexiones Laborales': ['Contacto', 'Empresa/Área', 'Tipo de Conexión', 'Notas'],
+    'Por su Cuenta': ['Actividad', 'Notas'],
+    'Busca Trabajo': ['Motivo de Derivación', 'Notas'],
+    'Fito': ['Motivo de Derivación', 'Notas'],
+    'Empleado': ['Empresa', 'Puesto', 'Fecha Contratación', 'Salario',
+                 'Llamada 1 - Semanal', 'Estado Llamada 1',
+                 'Llamada 2 - 3 Meses', 'Estado Llamada 2',
+                 'Llamada 3 - 6 Meses', 'Estado Llamada 3',
+                 'Notas']
   };
 
   return headersBase.concat(headersEspecificos[clasificacion] || ['Notas']);
@@ -680,24 +1035,77 @@ function crearHeadersParaClasificacion(clasificacion) {
  * @return {Array} Fila preparada
  */
 function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionales) {
+  // Base: campos de KoboToolbox compartidos entre todas las hojas de clasificación
+  // Indices según ESTRUCTURA_HOJAS['Graduados']:
+  //   0=ID Kobo, 1=Nombre, 2=Teléfono, 3=Email, 4=Formación, 5=Cohorte,
+  //   6=Fecha Entrevista, 7=Entrevistador
   const filaBase = [
-    datosGraduado[0], // ID
-    datosGraduado[1], // Nombre
-    datosGraduado[2], // Teléfono
+    datosGraduado[0], // ID Kobo
+    datosGraduado[1], // Nombre Completo
+    datosGraduado[2], // Número de Teléfono
     datosGraduado[3], // Email
-    new Date().toLocaleDateString('es-ES'),
-    'Activo'
+    datosGraduado[4], // Formación
+    datosGraduado[5], // Cohorte
+    datosGraduado[6], // Fecha Entrevista
+    new Date().toLocaleDateString('es-ES'), // Fecha Clasificación
   ];
 
   // Agregar campos específicos según la clasificación
-  const camposEspecificos = [
-    datosAdicionales.campo1 || '',
-    datosAdicionales.campo2 || '',
-    datosAdicionales.campo3 || '',
-    datosAdicionales.notas || ''
-  ];
-
-  return filaBase.concat(camposEspecificos);
+  switch (clasificacion) {
+    case 'Entrevista/Seguimiento General':
+      return filaBase.concat([
+        datosAdicionales.tipoEntrevista || '',
+        datosAdicionales.resultado || '',
+        datosAdicionales.siguientePaso || '',
+        datosAdicionales.notas || ''
+      ]);
+    case 'Aliados':
+      return filaBase.concat([
+        datosAdicionales.aliado || '',
+        datosAdicionales.contactoAliado || '',
+        datosAdicionales.notas || ''
+      ]);
+    case 'Plataforma':
+      return filaBase.concat([
+        datosAdicionales.plataforma || '',
+        datosAdicionales.usuario || '',
+        datosAdicionales.notas || ''
+      ]);
+    case 'Conexiones Laborales':
+      return filaBase.concat([
+        datosAdicionales.contacto || '',
+        datosAdicionales.empresa || '',
+        datosAdicionales.tipoConexion || '',
+        datosAdicionales.notas || ''
+      ]);
+    case 'Por su Cuenta':
+      return filaBase.concat([
+        datosAdicionales.actividad || '',
+        datosAdicionales.notas || ''
+      ]);
+    case 'Busca Trabajo':
+    case 'Fito':
+      return filaBase.concat([
+        datosAdicionales.motivoDerivacion || '',
+        datosAdicionales.notas || ''
+      ]);
+    case 'Empleado':
+      return filaBase.concat([
+        datosAdicionales.empresa || '',
+        datosAdicionales.puesto || '',
+        datosAdicionales.fechaContratacion || new Date().toLocaleDateString('es-ES'),
+        datosAdicionales.salario || '',
+        '', // Llamada 1 - Semanal (auto)
+        'Pendiente', // Estado Llamada 1
+        '', // Llamada 2 - 3 Meses (auto)
+        'Pendiente', // Estado Llamada 2
+        '', // Llamada 3 - 6 Meses (auto)
+        'Pendiente', // Estado Llamada 3
+        datosAdicionales.notas || ''
+      ]);
+    default:
+      return filaBase.concat([datosAdicionales.notas || '']);
+  }
 }
 
 /**
@@ -916,7 +1324,7 @@ function actualizarProximaLlamada(graduadoId, tipoLlamada) {
 
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduadoId) {
-      hojaGraduados.getRange(i + 1, 13).setValue(tipoLlamada); // Columna Próxima Llamada
+      hojaGraduados.getRange(i + 1, 14).setValue(tipoLlamada); // col 14 - Próxima Llamada
       break;
     }
   }
