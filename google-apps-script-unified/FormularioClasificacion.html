@@ -4,11 +4,7 @@
   <base target="_top">
   <meta charset="utf-8">
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -22,44 +18,31 @@
       border-radius: 12px;
       padding: 30px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-      max-width: 550px;
+      max-width: 580px;
       margin: 0 auto;
     }
 
-    h2 {
-      color: #667eea;
-      margin-bottom: 10px;
-      font-size: 24px;
-    }
+    h2 { color: #667eea; margin-bottom: 8px; font-size: 22px; }
+    .subtitle { color: #666; margin-bottom: 22px; font-size: 13px; }
 
-    .subtitle {
-      color: #666;
-      margin-bottom: 25px;
-      font-size: 14px;
-    }
-
-    .form-group {
-      margin-bottom: 20px;
-    }
+    .form-group { margin-bottom: 16px; }
 
     label {
       display: block;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       font-weight: 600;
       color: #555;
-      font-size: 14px;
+      font-size: 13px;
     }
 
-    .required {
-      color: #e74c3c;
-    }
+    .required { color: #e74c3c; }
 
     select, input[type="text"], textarea {
       width: 100%;
-      padding: 12px;
+      padding: 10px 12px;
       border: 2px solid #e0e0e0;
       border-radius: 8px;
-      font-size: 14px;
+      font-size: 13px;
       transition: all 0.3s ease;
       font-family: inherit;
     }
@@ -67,30 +50,28 @@
     select:focus, input[type="text"]:focus, textarea:focus {
       outline: none;
       border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
     }
 
-    textarea {
-      resize: vertical;
-      min-height: 80px;
-    }
+    textarea { resize: vertical; min-height: 70px; }
 
     .clasificacion-options {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-      margin-top: 10px;
+      gap: 8px;
+      margin-top: 8px;
     }
 
     .clasificacion-option {
-      padding: 15px;
+      padding: 12px 10px;
       border: 2px solid #e0e0e0;
       border-radius: 8px;
       cursor: pointer;
       text-align: center;
-      transition: all 0.3s ease;
-      font-size: 13px;
+      transition: all 0.25s ease;
+      font-size: 12px;
       font-weight: 500;
+      line-height: 1.3;
     }
 
     .clasificacion-option:hover {
@@ -105,31 +86,51 @@
       color: white;
     }
 
+    /* Colors per type */
+    .op-psc.selected    { background: #4285f4; border-color: #4285f4; }
+    .op-aliados.selected{ background: #3f51b5; border-color: #3f51b5; }
+    .op-plat.selected   { background: #00bcd4; border-color: #00bcd4; }
+    .op-deriv.selected  { background: #ff9800; border-color: #ff9800; }
+    .op-nobusca.selected{ background: #9e9e9e; border-color: #9e9e9e; }
+    .op-filtro.selected { background: #795548; border-color: #795548; }
+    .op-revision.selected{ background: #546e7a; border-color: #546e7a; }
+    .op-empleado.selected{ background: #0f9d58; border-color: #0f9d58; }
+
     .campos-adicionales {
       display: none;
-      margin-top: 15px;
-      padding: 15px;
+      margin-top: 14px;
+      padding: 14px;
       background: #f8f9ff;
       border-radius: 8px;
       border: 1px solid #e0e0e0;
     }
 
-    .campos-adicionales.active {
-      display: block;
+    .campos-adicionales.active { display: block; }
+
+    .campos-adicionales h4 {
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #444;
+    }
+
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
     }
 
     .button-group {
       display: flex;
       gap: 10px;
-      margin-top: 25px;
+      margin-top: 22px;
     }
 
     button {
       flex: 1;
-      padding: 14px 24px;
+      padding: 13px 20px;
       border: none;
       border-radius: 8px;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.3s ease;
@@ -142,30 +143,19 @@
 
     .btn-primary:hover {
       transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+      box-shadow: 0 5px 15px rgba(102,126,234,0.4);
     }
 
-    .btn-secondary {
-      background: #e0e0e0;
-      color: #666;
-    }
+    .btn-secondary { background: #e0e0e0; color: #666; }
+    .btn-secondary:hover { background: #d0d0d0; }
 
-    .btn-secondary:hover {
-      background: #d0d0d0;
-    }
-
-    .loading {
-      display: none;
-      text-align: center;
-      padding: 20px;
-    }
+    .loading { display: none; text-align: center; padding: 20px; }
 
     .spinner {
       border: 3px solid #f3f3f3;
       border-top: 3px solid #667eea;
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
+      width: 40px; height: 40px;
       animation: spin 1s linear infinite;
       margin: 0 auto 10px;
     }
@@ -176,29 +166,39 @@
     }
 
     .mensaje {
-      padding: 12px;
+      padding: 10px 12px;
       border-radius: 8px;
-      margin-bottom: 15px;
+      margin-bottom: 12px;
       display: none;
+      font-size: 13px;
     }
 
-    .mensaje.exito {
-      background: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-    }
-
-    .mensaje.error {
-      background: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-    }
+    .mensaje.exito { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .mensaje.error  { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
 
     .help-text {
-      font-size: 12px;
+      font-size: 11px;
       color: #888;
-      margin-top: 5px;
+      margin-top: 4px;
       font-style: italic;
+    }
+
+    .si-no-group {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .si-no-group label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 400;
+      cursor: pointer;
+    }
+
+    .si-no-group input[type="checkbox"] {
+      width: auto;
     }
   </style>
 </head>
@@ -208,12 +208,12 @@
 
     <div id="formulario">
       <h2>📋 Clasificar Graduado</h2>
-      <p class="subtitle">Selecciona el graduado y su clasificación según el flujo de trabajo</p>
+      <p class="subtitle">Selecciona el graduado y la hoja de seguimiento correspondiente</p>
 
       <div class="form-group">
         <label for="graduado">Graduado <span class="required">*</span></label>
         <select id="graduado" required>
-          <option value="">-- Selecciona un graduado --</option>
+          <option value="">-- Cargando graduados... --</option>
         </select>
         <p class="help-text">Solo se muestran graduados sin clasificar</p>
       </div>
@@ -221,127 +221,225 @@
       <div class="form-group">
         <label>Clasificación <span class="required">*</span></label>
         <div class="clasificacion-options">
-          <div class="clasificacion-option" data-clasificacion="Entrevista/Seguimiento General">
-            📝 Entrevista/Seguimiento
-          </div>
-          <div class="clasificacion-option" data-clasificacion="Aliados">
-            🤝 Aliados
-          </div>
-          <div class="clasificacion-option" data-clasificacion="Plataforma">
-            💻 Plataforma
-          </div>
-          <div class="clasificacion-option" data-clasificacion="Conexiones Laborales">
-            🌐 Conexiones Laborales
-          </div>
-          <div class="clasificacion-option" data-clasificacion="Por su Cuenta">
-            👤 Por su Cuenta
-          </div>
-          <div class="clasificacion-option" data-clasificacion="Busca Trabajo">
-            🔍 Busca Trabajo (Fito)
-          </div>
-          <div class="clasificacion-option" data-clasificacion="Empleado">
-            💼 Empleado 🎉
-          </div>
+          <div class="clasificacion-option op-psc"     data-clasificacion="Por su Cuenta">👤 Por su Cuenta</div>
+          <div class="clasificacion-option op-aliados" data-clasificacion="Aliados">🤝 Aliados / Empresas</div>
+          <div class="clasificacion-option op-plat"    data-clasificacion="Plataforma">💻 Plataformas</div>
+          <div class="clasificacion-option op-deriv"   data-clasificacion="Busca Trabajo">🔁 Derivaciones (Fito)</div>
+          <div class="clasificacion-option op-nobusca" data-clasificacion="No Busca Trabajar">🚫 No Busca Trabajar</div>
+          <div class="clasificacion-option op-filtro"  data-clasificacion="Filtro/Papelería">📎 Filtro / Papelería</div>
+          <div class="clasificacion-option op-revision" data-clasificacion="Revisión y Control">📊 Revisión y Control</div>
+          <div class="clasificacion-option op-empleado" data-clasificacion="Empleado">💼 Empleado 🎉</div>
         </div>
       </div>
 
-      <!-- Campos adicionales para cada clasificación -->
-      <div id="campos-entrevista" class="campos-adicionales">
-        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Entrevista/Seguimiento General</h4>
-        <div class="form-group">
-          <label for="tipoEntrevista">Tipo de Entrevista</label>
-          <input type="text" id="tipoEntrevista" placeholder="Ej: Inicial, Seguimiento, Evaluación...">
-        </div>
-        <div class="form-group">
-          <label for="resultadoEntrevista">Resultado</label>
-          <textarea id="resultadoEntrevista" placeholder="Resultado de la entrevista..."></textarea>
-        </div>
-      </div>
-
-      <div id="campos-aliados" class="campos-adicionales">
-        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Aliados</h4>
-        <div class="form-group">
-          <label for="aliadoAsignado">Aliado Asignado</label>
-          <input type="text" id="aliadoAsignado" placeholder="Nombre del aliado">
-        </div>
-        <div class="form-group">
-          <label for="contactoAliado">Contacto del Aliado</label>
-          <input type="text" id="contactoAliado" placeholder="Email o teléfono del aliado">
-        </div>
-      </div>
-
-      <div id="campos-plataforma" class="campos-adicionales">
-        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Plataforma</h4>
-        <div class="form-group">
-          <label for="plataformaAsignada">Plataforma Asignada</label>
-          <input type="text" id="plataformaAsignada" placeholder="Nombre de la plataforma">
-        </div>
-        <div class="form-group">
-          <label for="usuarioPlataforma">Usuario</label>
-          <input type="text" id="usuarioPlataforma" placeholder="Usuario o email en la plataforma">
-        </div>
-      </div>
-
-      <div id="campos-conexioneslaborales" class="campos-adicionales">
-        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Conexiones Laborales</h4>
-        <div class="form-group">
-          <label for="contactoLaboral">Contacto</label>
-          <input type="text" id="contactoLaboral" placeholder="Nombre del contacto">
-        </div>
-        <div class="form-group">
-          <label for="empresaArea">Empresa/Área</label>
-          <input type="text" id="empresaArea" placeholder="Nombre de la empresa o área">
-        </div>
-        <div class="form-group">
-          <label for="tipoConexion">Tipo de Conexión</label>
-          <select id="tipoConexion">
-            <option value="">Seleccionar...</option>
-            <option value="Referencia">Referencia</option>
-            <option value="Networking">Networking</option>
-            <option value="Contacto directo">Contacto directo</option>
-          </select>
-        </div>
-      </div>
-
+      <!-- ── POR SU CUENTA ────────────────────────────────────── -->
       <div id="campos-porsucuenta" class="campos-adicionales">
-        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Por su Cuenta</h4>
-        <div class="form-group">
-          <label for="actividad">Actividad</label>
-          <input type="text" id="actividad" placeholder="¿Qué está haciendo?">
+        <h4>👤 Por su Cuenta</h4>
+        <div class="row-2">
+          <div class="form-group">
+            <label>Área</label>
+            <input type="text" id="psc-area" placeholder="Área de interés">
+          </div>
+          <div class="form-group">
+            <label>Etapa</label>
+            <input type="text" id="psc-etapa" placeholder="Etapa actual">
+          </div>
         </div>
         <div class="form-group">
-          <label for="progreso">Progreso</label>
-          <textarea id="progreso" placeholder="Describe el progreso o avances..."></textarea>
+          <label>Reporte</label>
+          <textarea id="psc-reporte" placeholder="Reporte de actividad..."></textarea>
         </div>
       </div>
 
+      <!-- ── ALIADOS / EMPRESAS ──────────────────────────────── -->
+      <div id="campos-aliados" class="campos-adicionales">
+        <h4>🤝 Aliados / Empresas</h4>
+        <div class="row-2">
+          <div class="form-group">
+            <label>Compañía</label>
+            <input type="text" id="ali-compania" placeholder="Nombre de la empresa">
+          </div>
+          <div class="form-group">
+            <label>Contacto</label>
+            <input type="text" id="ali-contacto" placeholder="Persona de contacto">
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="form-group">
+            <label>Envío de Info</label>
+            <input type="text" id="ali-envioinfo" placeholder="Fecha o descripción">
+          </div>
+          <div class="form-group">
+            <label>Días de Espera</label>
+            <input type="text" id="ali-diasespera" placeholder="Ej: 5 días">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Trámites</label>
+          <input type="text" id="ali-tramites" placeholder="Trámites requeridos">
+        </div>
+        <div class="form-group">
+          <label>Próximos Pasos</label>
+          <textarea id="ali-proximospasos" placeholder="Próximos pasos acordados..."></textarea>
+        </div>
+      </div>
+
+      <!-- ── PLATAFORMAS ─────────────────────────────────────── -->
+      <div id="campos-plataforma" class="campos-adicionales">
+        <h4>💻 Plataformas</h4>
+        <div class="form-group">
+          <label>Plataforma</label>
+          <input type="text" id="plat-nombre" placeholder="LinkedIn, Indeed, Computrabajo...">
+        </div>
+        <div class="form-group">
+          <label>Estado de avance</label>
+          <div class="si-no-group">
+            <label><input type="checkbox" id="plat-cuenta"> Cuenta creada</label>
+            <label><input type="checkbox" id="plat-perfil"> Perfil creado</label>
+            <label><input type="checkbox" id="plat-rrhh">  Contacto RRHH</label>
+            <label><input type="checkbox" id="plat-entrevista"> Entrevista</label>
+            <label><input type="checkbox" id="plat-prueba"> Prueba</label>
+            <label><input type="checkbox" id="plat-confirmacion"> Confirmación</label>
+            <label><input type="checkbox" id="plat-recepcion"> Recepción</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Requisitos</label>
+          <textarea id="plat-requisitos" placeholder="Requisitos de la plataforma..."></textarea>
+        </div>
+      </div>
+
+      <!-- ── DERIVACIONES (FITO) ────────────────────────────── -->
       <div id="campos-buscatrabajo" class="campos-adicionales">
-        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Busca Trabajo (Enviar a Fito)</h4>
-        <div class="form-group">
-          <label for="motivoDerivacion">Motivo de Derivación</label>
-          <textarea id="motivoDerivacion" placeholder="¿Por qué se deriva a Fito?"></textarea>
+        <h4>🔁 Derivaciones (Fito)</h4>
+        <div class="row-2">
+          <div class="form-group">
+            <label>Envío 1</label>
+            <input type="text" id="der-envio1" placeholder="Fecha envío 1">
+          </div>
+          <div class="form-group">
+            <label>Llamada 1</label>
+            <select id="der-llamada1">
+              <option value="No">No</option>
+              <option value="Sí">Sí</option>
+            </select>
+          </div>
         </div>
-        <p class="help-text">💡 Este graduado será enviado a la hoja de Fito para seguimiento especializado</p>
+        <div class="row-2">
+          <div class="form-group">
+            <label>Envío 2</label>
+            <input type="text" id="der-envio2" placeholder="Fecha envío 2">
+          </div>
+          <div class="form-group">
+            <label>Llamada 2</label>
+            <select id="der-llamada2">
+              <option value="No">No</option>
+              <option value="Sí">Sí</option>
+            </select>
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="form-group">
+            <label>Envío 3</label>
+            <input type="text" id="der-envio3" placeholder="Fecha envío 3">
+          </div>
+          <div class="form-group">
+            <label>Llamada 3</label>
+            <select id="der-llamada3">
+              <option value="No">No</option>
+              <option value="Sí">Sí</option>
+            </select>
+          </div>
+        </div>
       </div>
 
+      <!-- ── NO BUSCA TRABAJAR ──────────────────────────────── -->
+      <div id="campos-nobuscatrabajar" class="campos-adicionales">
+        <h4>🚫 No Busca Trabajar</h4>
+        <p class="help-text">Esta persona quedará registrada como inactiva en búsqueda laboral.</p>
+      </div>
+
+      <!-- ── FILTRO / PAPELERÍA ─────────────────────────────── -->
+      <div id="campos-filtropapeleria" class="campos-adicionales">
+        <h4>📎 Filtro / Papelería</h4>
+        <div class="row-2">
+          <div class="form-group">
+            <label>Papelería Completa</label>
+            <select id="filt-completa">
+              <option value="No">No</option>
+              <option value="Sí">Sí</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Fecha</label>
+            <input type="text" id="filt-fecha" placeholder="DD/MM/AAAA">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Observaciones</label>
+          <textarea id="filt-observaciones" placeholder="Observaciones sobre la papelería..."></textarea>
+        </div>
+      </div>
+
+      <!-- ── REVISIÓN Y CONTROL ─────────────────────────────── -->
+      <div id="campos-revisionycontrol" class="campos-adicionales">
+        <h4>📊 Revisión y Control</h4>
+        <div class="form-group">
+          <label>Evidencias</label>
+          <div class="si-no-group">
+            <label><input type="checkbox" id="rev-pretest">    Pre-test</label>
+            <label><input type="checkbox" id="rev-posttest">   Post-test</label>
+            <label><input type="checkbox" id="rev-foto">       Foto</label>
+            <label><input type="checkbox" id="rev-salesforce"> Salesforce</label>
+            <label><input type="checkbox" id="rev-labs">       Laboratorios</label>
+            <label><input type="checkbox" id="rev-tarjetas">   Tarjetas</label>
+            <label><input type="checkbox" id="rev-creamos">    Formulario Creamos</label>
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="form-group">
+            <label>Área</label>
+            <input type="text" id="rev-area" placeholder="Área de formación">
+          </div>
+          <div class="form-group">
+            <label>Empleabilidad</label>
+            <input type="text" id="rev-empleabilidad" placeholder="Estado empleabilidad">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Código</label>
+          <input type="text" id="rev-codigo" placeholder="Ej: 3764-9765">
+        </div>
+      </div>
+
+      <!-- ── EMPLEADO ───────────────────────────────────────── -->
       <div id="campos-empleado" class="campos-adicionales">
-        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Empleado 🎉</h4>
-        <div class="form-group">
-          <label for="empresa">Empresa</label>
-          <input type="text" id="empresa" placeholder="Nombre de la empresa">
+        <h4>💼 Empleado 🎉</h4>
+        <div class="row-2">
+          <div class="form-group">
+            <label>Empresa <span class="required">*</span></label>
+            <input type="text" id="emp-empresa" placeholder="Nombre de la empresa">
+          </div>
+          <div class="form-group">
+            <label>Puesto</label>
+            <input type="text" id="emp-puesto" placeholder="Cargo o posición">
+          </div>
         </div>
-        <div class="form-group">
-          <label for="puesto">Puesto</label>
-          <input type="text" id="puesto" placeholder="Cargo o posición">
+        <div class="row-2">
+          <div class="form-group">
+            <label>Fecha Contratación</label>
+            <input type="text" id="emp-fecha" placeholder="DD/MM/AAAA">
+          </div>
+          <div class="form-group">
+            <label>Salario (opcional)</label>
+            <input type="text" id="emp-salario" placeholder="Salario mensual">
+          </div>
         </div>
-        <div class="form-group">
-          <label for="salario">Salario (opcional)</label>
-          <input type="text" id="salario" placeholder="Salario mensual">
-        </div>
-        <p class="help-text">💡 Se programarán seguimientos automáticos (1 semana, 3 meses, 6 meses)</p>
+        <p class="help-text">💡 Se programarán seguimientos automáticos: 1 semana, 3 meses y 6 meses</p>
       </div>
 
-      <div class="form-group">
+      <!-- Notas generales -->
+      <div class="form-group" style="margin-top:16px;">
         <label for="notas">Notas adicionales</label>
         <textarea id="notas" placeholder="Cualquier información adicional relevante..."></textarea>
       </div>
@@ -364,107 +462,160 @@
     // Cargar graduados al iniciar
     google.script.run
       .withSuccessHandler(cargarGraduados)
+      .withFailureHandler(function(err) {
+        document.getElementById('graduado').innerHTML =
+          '<option value="">Error al cargar graduados</option>';
+      })
       .obtenerGraduadosSinClasificar();
 
     function cargarGraduados(graduados) {
       const select = document.getElementById('graduado');
-
-      if (graduados.length === 0) {
+      if (!graduados || graduados.length === 0) {
         select.innerHTML = '<option value="">No hay graduados sin clasificar</option>';
         return;
       }
-
       select.innerHTML = '<option value="">-- Selecciona un graduado --</option>';
-
-      graduados.forEach(grad => {
-        const option = document.createElement('option');
-        option.value = grad.id;
-        option.textContent = `${grad.nombre} - ${grad.email}`;
-        select.appendChild(option);
+      graduados.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g.id;
+        opt.textContent = g.nombre + (g.email ? ' – ' + g.email : '');
+        select.appendChild(opt);
       });
     }
 
-    // Manejar selección de clasificación
-    document.querySelectorAll('.clasificacion-option').forEach(option => {
-      option.addEventListener('click', function() {
-        // Remover selección anterior
-        document.querySelectorAll('.clasificacion-option').forEach(opt => {
-          opt.classList.remove('selected');
+    // Mapa: clasificacion → id del div de campos adicionales
+    const CAMPOS_MAP = {
+      'Por su Cuenta':      'campos-porsucuenta',
+      'Aliados':            'campos-aliados',
+      'Plataforma':         'campos-plataforma',
+      'Busca Trabajo':      'campos-buscatrabajo',
+      'No Busca Trabajar':  'campos-nobuscatrabajar',
+      'Filtro/Papelería':   'campos-filtropapeleria',
+      'Revisión y Control': 'campos-revisionycontrol',
+      'Empleado':           'campos-empleado'
+    };
+
+    document.querySelectorAll('.clasificacion-option').forEach(function(opt) {
+      opt.addEventListener('click', function() {
+        document.querySelectorAll('.clasificacion-option').forEach(function(o) {
+          o.classList.remove('selected');
+        });
+        document.querySelectorAll('.campos-adicionales').forEach(function(c) {
+          c.classList.remove('active');
         });
 
-        // Ocultar todos los campos adicionales
-        document.querySelectorAll('.campos-adicionales').forEach(campo => {
-          campo.classList.remove('active');
-        });
-
-        // Seleccionar nuevo
         this.classList.add('selected');
         clasificacionSeleccionada = this.dataset.clasificacion;
 
-        // Mostrar campos adicionales correspondientes
-        const campoId = 'campos-' + clasificacionSeleccionada.toLowerCase().replace(/ /g, '').replace(/\//g, '');
-        const campoAdicional = document.getElementById(campoId);
-        if (campoAdicional) {
-          campoAdicional.classList.add('active');
+        const campoId = CAMPOS_MAP[clasificacionSeleccionada];
+        if (campoId) {
+          const el = document.getElementById(campoId);
+          if (el) el.classList.add('active');
         }
       });
     });
 
-    function guardarClasificacion() {
-      const graduadoId = document.getElementById('graduado').value;
+    function chk(id) {
+      const el = document.getElementById(id);
+      return el && el.checked ? 'Sí' : 'No';
+    }
 
+    function val(id) {
+      const el = document.getElementById(id);
+      return el ? el.value : '';
+    }
+
+    function guardarClasificacion() {
+      const graduadoId = val('graduado');
       if (!graduadoId) {
         mostrarMensaje('Por favor selecciona un graduado', 'error');
         return;
       }
-
       if (!clasificacionSeleccionada) {
         mostrarMensaje('Por favor selecciona una clasificación', 'error');
         return;
       }
 
-      // Recopilar datos adicionales según la clasificación
-      const datosAdicionales = {
-        notas: document.getElementById('notas').value
-      };
+      const datosAdicionales = { notas: val('notas') };
 
-      switch(clasificacionSeleccionada) {
-        case 'Entrevista/Seguimiento General':
-          datosAdicionales.campo1 = document.getElementById('tipoEntrevista').value;
-          datosAdicionales.campo2 = document.getElementById('resultadoEntrevista').value;
-          break;
-        case 'Aliados':
-          datosAdicionales.campo1 = document.getElementById('aliadoAsignado').value;
-          datosAdicionales.campo2 = document.getElementById('contactoAliado').value;
-          break;
-        case 'Plataforma':
-          datosAdicionales.campo1 = document.getElementById('plataformaAsignada').value;
-          datosAdicionales.campo2 = document.getElementById('usuarioPlataforma').value;
-          break;
-        case 'Conexiones Laborales':
-          datosAdicionales.campo1 = document.getElementById('contactoLaboral').value;
-          datosAdicionales.campo2 = document.getElementById('empresaArea').value;
-          datosAdicionales.campo3 = document.getElementById('tipoConexion').value;
-          break;
+      switch (clasificacionSeleccionada) {
         case 'Por su Cuenta':
-          datosAdicionales.campo1 = document.getElementById('actividad').value;
-          datosAdicionales.campo2 = document.getElementById('progreso').value;
+          datosAdicionales.mensaje = 'No';
+          datosAdicionales.llamada = 'No';
+          datosAdicionales.activo  = 'Sí';
+          datosAdicionales.area    = val('psc-area');
+          datosAdicionales.etapa   = val('psc-etapa');
+          datosAdicionales.reporte = val('psc-reporte');
           break;
+
+        case 'Aliados':
+          datosAdicionales.compania      = val('ali-compania');
+          datosAdicionales.contacto      = val('ali-contacto');
+          datosAdicionales.llamada       = 'No';
+          datosAdicionales.tramites      = val('ali-tramites');
+          datosAdicionales.envioInfo     = val('ali-envioinfo');
+          datosAdicionales.diasEspera    = val('ali-diasespera');
+          datosAdicionales.proximosPasos = val('ali-proximospasos');
+          datosAdicionales.activo        = 'Sí';
+          break;
+
+        case 'Plataforma':
+          datosAdicionales.plataforma    = val('plat-nombre');
+          datosAdicionales.cuentaCreada  = chk('plat-cuenta');
+          datosAdicionales.perfilCreado  = chk('plat-perfil');
+          datosAdicionales.contactoRrhh  = chk('plat-rrhh');
+          datosAdicionales.entrevista    = chk('plat-entrevista');
+          datosAdicionales.prueba        = chk('plat-prueba');
+          datosAdicionales.confirmacion  = chk('plat-confirmacion');
+          datosAdicionales.recepcion     = chk('plat-recepcion');
+          datosAdicionales.requisitos    = val('plat-requisitos');
+          datosAdicionales.activo        = 'Sí';
+          break;
+
         case 'Busca Trabajo':
-          datosAdicionales.campo1 = document.getElementById('motivoDerivacion').value;
+          datosAdicionales.envio1   = val('der-envio1');
+          datosAdicionales.llamada1 = val('der-llamada1');
+          datosAdicionales.envio2   = val('der-envio2');
+          datosAdicionales.llamada2 = val('der-llamada2');
+          datosAdicionales.envio3   = val('der-envio3');
+          datosAdicionales.llamada3 = val('der-llamada3');
+          datosAdicionales.activo   = 'Sí';
           break;
+
+        case 'No Busca Trabajar':
+          datosAdicionales.activo = 'No';
+          break;
+
+        case 'Filtro/Papelería':
+          datosAdicionales.papeleriaCompleta = val('filt-completa');
+          datosAdicionales.fecha             = val('filt-fecha');
+          datosAdicionales.observaciones     = val('filt-observaciones');
+          break;
+
+        case 'Revisión y Control':
+          datosAdicionales.preTest           = chk('rev-pretest');
+          datosAdicionales.postTest          = chk('rev-posttest');
+          datosAdicionales.foto              = chk('rev-foto');
+          datosAdicionales.salesforce        = chk('rev-salesforce');
+          datosAdicionales.laboratorios      = chk('rev-labs');
+          datosAdicionales.tarjetas          = chk('rev-tarjetas');
+          datosAdicionales.formularioCreamos = chk('rev-creamos');
+          datosAdicionales.area              = val('rev-area');
+          datosAdicionales.empleabilidad     = val('rev-empleabilidad');
+          datosAdicionales.codigo            = val('rev-codigo');
+          break;
+
         case 'Empleado':
-          datosAdicionales.campo1 = document.getElementById('empresa').value;
-          datosAdicionales.campo2 = document.getElementById('puesto').value;
-          datosAdicionales.campo4 = document.getElementById('salario').value;
+          datosAdicionales.empresa           = val('emp-empresa');
+          datosAdicionales.puesto            = val('emp-puesto');
+          datosAdicionales.fechaContratacion = val('emp-fecha');
+          datosAdicionales.salario           = val('emp-salario');
           break;
       }
 
-      // Mostrar loading
       document.getElementById('formulario').style.display = 'none';
       document.getElementById('loading').style.display = 'block';
 
-      // Llamar a la función del backend
       google.script.run
         .withSuccessHandler(onExito)
         .withFailureHandler(onError)
@@ -474,10 +625,7 @@
     function onExito() {
       document.getElementById('loading').style.display = 'none';
       mostrarMensaje('✅ Graduado clasificado correctamente', 'exito');
-
-      setTimeout(() => {
-        google.script.host.close();
-      }, 2000);
+      setTimeout(function() { google.script.host.close(); }, 2000);
     }
 
     function onError(error) {
@@ -487,19 +635,14 @@
     }
 
     function mostrarMensaje(texto, tipo) {
-      const mensaje = document.getElementById('mensaje');
-      mensaje.textContent = texto;
-      mensaje.className = 'mensaje ' + tipo;
-      mensaje.style.display = 'block';
-
-      setTimeout(() => {
-        mensaje.style.display = 'none';
-      }, 5000);
+      const msg = document.getElementById('mensaje');
+      msg.textContent = texto;
+      msg.className = 'mensaje ' + tipo;
+      msg.style.display = 'block';
+      setTimeout(function() { msg.style.display = 'none'; }, 5000);
     }
 
-    function cerrar() {
-      google.script.host.close();
-    }
+    function cerrar() { google.script.host.close(); }
   </script>
 </body>
 </html>

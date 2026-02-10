@@ -159,7 +159,29 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── ALIADOS ────────────────────────────────────────────────────────────────
+  // ── POR SU CUENTA ──────────────────────────────────────────────────────────
+  // Personas que aplican solas / búsqueda independiente
+  'Por su Cuenta': {
+    color: '#4285f4',
+    columnas: [
+      { nombre: 'ID Kobo',           ancho: 120 },
+      { nombre: 'Nombre Completo',   ancho: 200 },
+      { nombre: 'Número de Teléfono',ancho: 150 },
+      { nombre: 'Email',             ancho: 220 },
+      { nombre: 'Formación',         ancho: 180 },
+      { nombre: 'Cohorte',           ancho: 100 },
+      { nombre: 'Mensaje',           ancho: 100, nota: 'Sí / No' },
+      { nombre: 'Llamada',           ancho: 100, nota: 'Sí / No' },
+      { nombre: 'Activo',            ancho: 100, nota: 'Sí / No' },
+      { nombre: 'Área',              ancho: 160 },
+      { nombre: 'Etapa',             ancho: 160 },
+      { nombre: 'Reporte',           ancho: 220 },
+      { nombre: 'Notas',             ancho: 300 }
+    ]
+  },
+
+  // ── ALIADOS / EMPRESAS ─────────────────────────────────────────────────────
+  // Gestión de contactos institucionales y empresas aliadas
   'Aliados': {
     color: '#3f51b5',
     columnas: [
@@ -169,15 +191,20 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Email',             ancho: 220 },
       { nombre: 'Formación',         ancho: 180 },
       { nombre: 'Cohorte',           ancho: 100 },
-      { nombre: 'Aliado Asignado',   ancho: 200 },
-      { nombre: 'Contacto Aliado',   ancho: 200 },
-      { nombre: 'Fecha Derivación',  ancho: 140 },
-      { nombre: 'Estado',            ancho: 120 },
+      { nombre: 'Compañía',          ancho: 200 },
+      { nombre: 'Contacto',          ancho: 200 },
+      { nombre: 'Llamada',           ancho: 100, nota: 'Sí / No' },
+      { nombre: 'Trámites',          ancho: 200 },
+      { nombre: 'Envío de Info',     ancho: 160 },
+      { nombre: 'Días de Espera',    ancho: 130 },
+      { nombre: 'Próximos Pasos',    ancho: 250 },
+      { nombre: 'Activo',            ancho: 100, nota: 'Sí / No' },
       { nombre: 'Notas',             ancho: 300 }
     ]
   },
 
-  // ── PLATAFORMA ─────────────────────────────────────────────────────────────
+  // ── PLATAFORMAS ────────────────────────────────────────────────────────────
+  // Control de plataformas de empleo digitales
   'Plataforma': {
     color: '#00bcd4',
     columnas: [
@@ -188,51 +215,21 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Formación',         ancho: 180 },
       { nombre: 'Cohorte',           ancho: 100 },
       { nombre: 'Plataforma',        ancho: 180 },
-      { nombre: 'Usuario/Perfil',    ancho: 200 },
-      { nombre: 'Fecha Registro',    ancho: 140 },
-      { nombre: 'Estado',            ancho: 120 },
+      { nombre: 'Cuenta Creada',     ancho: 130, nota: 'Sí / No' },
+      { nombre: 'Perfil Creado',     ancho: 130, nota: 'Sí / No' },
+      { nombre: 'Contacto RRHH',     ancho: 130, nota: 'Sí / No' },
+      { nombre: 'Requisitos',        ancho: 220 },
+      { nombre: 'Entrevista',        ancho: 130, nota: 'Sí / No' },
+      { nombre: 'Prueba',            ancho: 120, nota: 'Sí / No' },
+      { nombre: 'Confirmación',      ancho: 130, nota: 'Sí / No' },
+      { nombre: 'Recepción',         ancho: 130, nota: 'Sí / No' },
+      { nombre: 'Activo',            ancho: 100, nota: 'Sí / No' },
       { nombre: 'Notas',             ancho: 300 }
     ]
   },
 
-  // ── CONEXIONES LABORALES ───────────────────────────────────────────────────
-  'Conexiones Laborales': {
-    color: '#009688',
-    columnas: [
-      { nombre: 'ID Kobo',           ancho: 120 },
-      { nombre: 'Nombre Completo',   ancho: 200 },
-      { nombre: 'Número de Teléfono',ancho: 150 },
-      { nombre: 'Email',             ancho: 220 },
-      { nombre: 'Formación',         ancho: 180 },
-      { nombre: 'Cohorte',           ancho: 100 },
-      { nombre: 'Contacto',          ancho: 200 },
-      { nombre: 'Empresa / Área',    ancho: 200 },
-      { nombre: 'Tipo Conexión',     ancho: 160 },
-      { nombre: 'Fecha',             ancho: 120 },
-      { nombre: 'Estado',            ancho: 120 },
-      { nombre: 'Notas',             ancho: 300 }
-    ]
-  },
-
-  // ── POR SU CUENTA ──────────────────────────────────────────────────────────
-  'Por su Cuenta': {
-    color: '#4285f4',
-    columnas: [
-      { nombre: 'ID Kobo',              ancho: 120 },
-      { nombre: 'Nombre Completo',      ancho: 200 },
-      { nombre: 'Número de Teléfono',   ancho: 150 },
-      { nombre: 'Email',                ancho: 220 },
-      { nombre: 'Formación',            ancho: 180 },
-      { nombre: 'Cohorte',              ancho: 100 },
-      { nombre: 'Actividad',            ancho: 220 },
-      { nombre: 'Progreso',             ancho: 220 },
-      { nombre: 'Última Actualización', ancho: 160 },
-      { nombre: 'Estado',               ancho: 120 },
-      { nombre: 'Notas',                ancho: 300 }
-    ]
-  },
-
-  // ── BUSCA TRABAJO (FITO) ───────────────────────────────────────────────────
+  // ── DERIVACIONES ──────────────────────────────────────────────────────────
+  // Seguimiento de personas derivadas (Busca Trabajo / Fito)
   'Busca Trabajo (Fito)': {
     color: '#ff9800',
     columnas: [
@@ -242,10 +239,72 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Email',             ancho: 220 },
       { nombre: 'Formación',         ancho: 180 },
       { nombre: 'Cohorte',           ancho: 100 },
-      { nombre: 'Motivo Derivación', ancho: 250 },
-      { nombre: 'Fecha Derivación',  ancho: 140 },
-      { nombre: 'Estado en Fito',    ancho: 160 },
+      { nombre: 'Envío 1',           ancho: 140 },
+      { nombre: 'Llamada 1',         ancho: 120, nota: 'Sí / No' },
+      { nombre: 'Envío 2',           ancho: 140 },
+      { nombre: 'Llamada 2',         ancho: 120, nota: 'Sí / No' },
+      { nombre: 'Envío 3',           ancho: 140 },
+      { nombre: 'Llamada 3',         ancho: 120, nota: 'Sí / No' },
+      { nombre: 'Activo',            ancho: 100, nota: 'Sí / No' },
       { nombre: 'Notas',             ancho: 300 }
+    ]
+  },
+
+  // ── NO BUSCA TRABAJAR ──────────────────────────────────────────────────────
+  // Registro de personas que no están en búsqueda activa
+  'No Busca Trabajar': {
+    color: '#9e9e9e',
+    columnas: [
+      { nombre: 'ID Kobo',           ancho: 120 },
+      { nombre: 'Nombre Completo',   ancho: 200 },
+      { nombre: 'Número de Teléfono',ancho: 150 },
+      { nombre: 'Email',             ancho: 220 },
+      { nombre: 'Formación',         ancho: 180 },
+      { nombre: 'Cohorte',           ancho: 100 },
+      { nombre: 'Activo',            ancho: 100, nota: 'Sí / No' },
+      { nombre: 'Notas',             ancho: 300 }
+    ]
+  },
+
+  // ── FILTRO / PAPELERÍA ─────────────────────────────────────────────────────
+  // Validación documental de graduados
+  'Filtro/Papelería': {
+    color: '#795548',
+    columnas: [
+      { nombre: 'ID Kobo',              ancho: 120 },
+      { nombre: 'Nombre Completo',      ancho: 200 },
+      { nombre: 'Número de Teléfono',   ancho: 150 },
+      { nombre: 'Email',                ancho: 220 },
+      { nombre: 'Formación',            ancho: 180 },
+      { nombre: 'Cohorte',              ancho: 100 },
+      { nombre: 'Papelería Completa',   ancho: 150, nota: 'Sí / No' },
+      { nombre: 'Fecha',                ancho: 130 },
+      { nombre: 'Observaciones',        ancho: 350 }
+    ]
+  },
+
+  // ── REVISIÓN Y CONTROL ─────────────────────────────────────────────────────
+  // Control de calidad y evidencia por graduado
+  'Revisión y Control': {
+    color: '#546e7a',
+    columnas: [
+      { nombre: 'ID Kobo',              ancho: 120 },
+      { nombre: 'Nombre Completo',      ancho: 200 },
+      { nombre: 'Número de Teléfono',   ancho: 150 },
+      { nombre: 'Email',                ancho: 220 },
+      { nombre: 'Formación',            ancho: 180 },
+      { nombre: 'Cohorte',              ancho: 100 },
+      { nombre: 'Pre-test',             ancho: 120, nota: 'Sí / No' },
+      { nombre: 'Post-test',            ancho: 120, nota: 'Sí / No' },
+      { nombre: 'Foto',                 ancho: 100, nota: 'Sí / No' },
+      { nombre: 'Salesforce',           ancho: 120, nota: 'Sí / No' },
+      { nombre: 'Laboratorios',         ancho: 130, nota: 'Sí / No' },
+      { nombre: 'Tarjetas',             ancho: 120, nota: 'Sí / No' },
+      { nombre: 'Formulario Creamos',   ancho: 160, nota: 'Sí / No' },
+      { nombre: 'Área',                 ancho: 160 },
+      { nombre: 'Formación RC',         ancho: 180 },
+      { nombre: 'Empleabilidad',        ancho: 160 },
+      { nombre: 'Código',               ancho: 150 }
     ]
   },
 
@@ -299,9 +358,9 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Tasa Empleabilidad %',   ancho: 160 },
       { nombre: 'En Aliados',             ancho: 120 },
       { nombre: 'En Plataforma',          ancho: 130 },
-      { nombre: 'En Conexiones',          ancho: 130 },
       { nombre: 'Por su Cuenta',          ancho: 130 },
-      { nombre: 'En Fito',                ancho: 110 },
+      { nombre: 'En Derivaciones',        ancho: 140 },
+      { nombre: 'No Busca Trabajar',      ancho: 150 },
       { nombre: 'Llamadas Realizadas',    ancho: 160 },
       { nombre: 'Llamadas Pendientes',    ancho: 160 },
       { nombre: 'Retención 6 Meses %',    ancho: 160 },
@@ -381,9 +440,12 @@ function _ejecutarInstalacion(borrarExistentes) {
     // ── 1. Eliminar hojas existentes si se solicita ──────────────────────────
     if (borrarExistentes) {
       const hojasDelSistema = [
-        'Graduados', 'Aliados', 'Plataforma', 'Conexiones Laborales',
-        'Por su Cuenta', 'Busca Trabajo (Fito)', 'Empleados',
-        'Seguimientos', 'Reportes Mensuales', 'Configuración'
+        'Graduados', 'Por su Cuenta', 'Aliados', 'Plataforma',
+        'Busca Trabajo (Fito)', 'No Busca Trabajar', 'Filtro/Papelería',
+        'Revisión y Control', 'Empleados', 'Seguimientos',
+        'Reportes Mensuales', 'Configuración',
+        // nombres legacy (por si acaso existen)
+        'Conexiones Laborales', 'Entrevista/Seguimiento General'
       ];
 
       // Crear hoja temporal para no quedar sin hojas
@@ -399,11 +461,13 @@ function _ejecutarInstalacion(borrarExistentes) {
     // ── 2. Crear cada hoja con su estructura exacta ──────────────────────────
     const ordenHojas = [
       'Graduados',
+      'Por su Cuenta',
       'Aliados',
       'Plataforma',
-      'Conexiones Laborales',
-      'Por su Cuenta',
       'Busca Trabajo (Fito)',
+      'No Busca Trabajar',
+      'Filtro/Papelería',
+      'Revisión y Control',
       'Empleados',
       'Seguimientos',
       'Reportes Mensuales'
@@ -978,14 +1042,19 @@ function copiarAHojaClasificacion(datosGraduado, clasificacion, datosAdicionales
  */
 function obtenerNombreHojaClasificacion(clasificacion) {
   const mapeo = {
-    'Entrevista/Seguimiento General': 'Entrevista/Seguimiento General',
-    'Aliados': 'Aliados',
-    'Plataforma': 'Plataforma',
-    'Conexiones Laborales': 'Conexiones Laborales',
-    'Por su Cuenta': 'Por su Cuenta',
-    'Busca Trabajo': 'Busca Trabajo (Fito)',
-    'Fito': 'Busca Trabajo (Fito)',
-    'Empleado': 'Empleados'
+    'Por su Cuenta':       'Por su Cuenta',
+    'Aliados':             'Aliados',
+    'Plataforma':          'Plataforma',
+    'Busca Trabajo':       'Busca Trabajo (Fito)',
+    'Fito':                'Busca Trabajo (Fito)',
+    'Derivaciones':        'Busca Trabajo (Fito)',
+    'No Busca Trabajar':   'No Busca Trabajar',
+    'Filtro/Papelería':    'Filtro/Papelería',
+    'Revisión y Control':  'Revisión y Control',
+    'Empleado':            'Empleados',
+    // legacy
+    'Entrevista/Seguimiento General': 'Graduados',
+    'Conexiones Laborales':           'Graduados'
   };
 
   return mapeo[clasificacion] || 'Graduados';
@@ -1010,18 +1079,28 @@ function crearHeadersParaClasificacion(clasificacion) {
   ];
 
   const headersEspecificos = {
-    'Entrevista/Seguimiento General': ['Tipo Entrevista', 'Resultado', 'Siguiente Paso', 'Notas'],
-    'Aliados': ['Aliado Asignado', 'Contacto del Aliado', 'Notas'],
-    'Plataforma': ['Plataforma Asignada', 'Usuario/Email', 'Notas'],
-    'Conexiones Laborales': ['Contacto', 'Empresa/Área', 'Tipo de Conexión', 'Notas'],
-    'Por su Cuenta': ['Actividad', 'Notas'],
-    'Busca Trabajo': ['Motivo de Derivación', 'Notas'],
-    'Fito': ['Motivo de Derivación', 'Notas'],
-    'Empleado': ['Empresa', 'Puesto', 'Fecha Contratación', 'Salario',
-                 'Llamada 1 - Semanal', 'Estado Llamada 1',
-                 'Llamada 2 - 3 Meses', 'Estado Llamada 2',
-                 'Llamada 3 - 6 Meses', 'Estado Llamada 3',
-                 'Notas']
+    'Por su Cuenta':      ['Mensaje', 'Llamada', 'Activo', 'Área', 'Etapa', 'Reporte', 'Notas'],
+    'Aliados':            ['Compañía', 'Contacto', 'Llamada', 'Trámites', 'Envío de Info',
+                           'Días de Espera', 'Próximos Pasos', 'Activo', 'Notas'],
+    'Plataforma':         ['Plataforma', 'Cuenta Creada', 'Perfil Creado', 'Contacto RRHH',
+                           'Requisitos', 'Entrevista', 'Prueba', 'Confirmación', 'Recepción',
+                           'Activo', 'Notas'],
+    'Busca Trabajo':      ['Envío 1', 'Llamada 1', 'Envío 2', 'Llamada 2',
+                           'Envío 3', 'Llamada 3', 'Activo', 'Notas'],
+    'Fito':               ['Envío 1', 'Llamada 1', 'Envío 2', 'Llamada 2',
+                           'Envío 3', 'Llamada 3', 'Activo', 'Notas'],
+    'Derivaciones':       ['Envío 1', 'Llamada 1', 'Envío 2', 'Llamada 2',
+                           'Envío 3', 'Llamada 3', 'Activo', 'Notas'],
+    'No Busca Trabajar':  ['Activo', 'Notas'],
+    'Filtro/Papelería':   ['Papelería Completa', 'Fecha', 'Observaciones'],
+    'Revisión y Control': ['Pre-test', 'Post-test', 'Foto', 'Salesforce', 'Laboratorios',
+                           'Tarjetas', 'Formulario Creamos', 'Área', 'Formación RC',
+                           'Empleabilidad', 'Código'],
+    'Empleado':           ['Empresa', 'Puesto', 'Fecha Contratación', 'Salario',
+                           'Llamada 1 - Semanal', 'Estado Llamada 1',
+                           'Llamada 2 - 3 Meses', 'Estado Llamada 2',
+                           'Llamada 3 - 6 Meses', 'Estado Llamada 3',
+                           'Notas']
   };
 
   return headersBase.concat(headersEspecificos[clasificacion] || ['Notas']);
@@ -1052,55 +1131,92 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
 
   // Agregar campos específicos según la clasificación
   switch (clasificacion) {
-    case 'Entrevista/Seguimiento General':
+    case 'Por su Cuenta':
       return filaBase.concat([
-        datosAdicionales.tipoEntrevista || '',
-        datosAdicionales.resultado || '',
-        datosAdicionales.siguientePaso || '',
-        datosAdicionales.notas || ''
+        datosAdicionales.mensaje      || 'No',
+        datosAdicionales.llamada      || 'No',
+        datosAdicionales.activo       || 'Sí',
+        datosAdicionales.area         || '',
+        datosAdicionales.etapa        || '',
+        datosAdicionales.reporte      || '',
+        datosAdicionales.notas        || ''
       ]);
     case 'Aliados':
       return filaBase.concat([
-        datosAdicionales.aliado || '',
-        datosAdicionales.contactoAliado || '',
-        datosAdicionales.notas || ''
+        datosAdicionales.compania      || '',
+        datosAdicionales.contacto      || '',
+        datosAdicionales.llamada       || 'No',
+        datosAdicionales.tramites      || '',
+        datosAdicionales.envioInfo     || '',
+        datosAdicionales.diasEspera    || '',
+        datosAdicionales.proximosPasos || '',
+        datosAdicionales.activo        || 'Sí',
+        datosAdicionales.notas         || ''
       ]);
     case 'Plataforma':
       return filaBase.concat([
-        datosAdicionales.plataforma || '',
-        datosAdicionales.usuario || '',
-        datosAdicionales.notas || ''
-      ]);
-    case 'Conexiones Laborales':
-      return filaBase.concat([
-        datosAdicionales.contacto || '',
-        datosAdicionales.empresa || '',
-        datosAdicionales.tipoConexion || '',
-        datosAdicionales.notas || ''
-      ]);
-    case 'Por su Cuenta':
-      return filaBase.concat([
-        datosAdicionales.actividad || '',
-        datosAdicionales.notas || ''
+        datosAdicionales.plataforma    || '',
+        datosAdicionales.cuentaCreada  || 'No',
+        datosAdicionales.perfilCreado  || 'No',
+        datosAdicionales.contactoRrhh  || 'No',
+        datosAdicionales.requisitos    || '',
+        datosAdicionales.entrevista    || 'No',
+        datosAdicionales.prueba        || 'No',
+        datosAdicionales.confirmacion  || 'No',
+        datosAdicionales.recepcion     || 'No',
+        datosAdicionales.activo        || 'Sí',
+        datosAdicionales.notas         || ''
       ]);
     case 'Busca Trabajo':
     case 'Fito':
+    case 'Derivaciones':
       return filaBase.concat([
-        datosAdicionales.motivoDerivacion || '',
-        datosAdicionales.notas || ''
+        datosAdicionales.envio1   || '',
+        datosAdicionales.llamada1 || 'No',
+        datosAdicionales.envio2   || '',
+        datosAdicionales.llamada2 || 'No',
+        datosAdicionales.envio3   || '',
+        datosAdicionales.llamada3 || 'No',
+        datosAdicionales.activo   || 'Sí',
+        datosAdicionales.notas    || ''
+      ]);
+    case 'No Busca Trabajar':
+      return filaBase.concat([
+        datosAdicionales.activo || 'No',
+        datosAdicionales.notas  || ''
+      ]);
+    case 'Filtro/Papelería':
+      return filaBase.concat([
+        datosAdicionales.papeleriaCompleta || 'No',
+        datosAdicionales.fecha             || new Date().toLocaleDateString('es-ES'),
+        datosAdicionales.observaciones     || ''
+      ]);
+    case 'Revisión y Control':
+      return filaBase.concat([
+        datosAdicionales.preTest           || 'No',
+        datosAdicionales.postTest          || 'No',
+        datosAdicionales.foto              || 'No',
+        datosAdicionales.salesforce        || 'No',
+        datosAdicionales.laboratorios      || 'No',
+        datosAdicionales.tarjetas          || 'No',
+        datosAdicionales.formularioCreamos || 'No',
+        datosAdicionales.area              || '',
+        datosAdicionales.formacion         || '',
+        datosAdicionales.empleabilidad     || '',
+        datosAdicionales.codigo            || ''
       ]);
     case 'Empleado':
       return filaBase.concat([
-        datosAdicionales.empresa || '',
-        datosAdicionales.puesto || '',
-        datosAdicionales.fechaContratacion || new Date().toLocaleDateString('es-ES'),
-        datosAdicionales.salario || '',
+        datosAdicionales.empresa             || '',
+        datosAdicionales.puesto              || '',
+        datosAdicionales.fechaContratacion   || new Date().toLocaleDateString('es-ES'),
+        datosAdicionales.salario             || '',
         '', // Llamada 1 - Semanal (auto)
-        'Pendiente', // Estado Llamada 1
+        'Pendiente',
         '', // Llamada 2 - 3 Meses (auto)
-        'Pendiente', // Estado Llamada 2
+        'Pendiente',
         '', // Llamada 3 - 6 Meses (auto)
-        'Pendiente', // Estado Llamada 3
+        'Pendiente',
         datosAdicionales.notas || ''
       ]);
     default:
