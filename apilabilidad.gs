@@ -120,12 +120,12 @@ function mostrarConfiguracion() {
  * tipo: 'texto' | 'fecha' | 'siNo' | 'checkbox' | 'dropdown'
  */
 const COLUMNAS_COMUNES = [
-  { nombre: 'Fecha de ingreso',  ancho: 140, tipo: 'fecha'  },
-  { nombre: 'Nombre completo',   ancho: 200, tipo: 'texto'  },
-  { nombre: 'ID Creamos',        ancho: 130, tipo: 'texto'  },
-  { nombre: 'Género',            ancho: 100, tipo: 'texto'  },
-  { nombre: 'Edad',              ancho: 80,  tipo: 'texto'  },
-  { nombre: 'Nivel educativo',   ancho: 160, tipo: 'texto'  }
+  { nombre: 'Fecha de ingreso',  ancho: 140, tipo: 'fecha' },
+  { nombre: 'Creamos ID',        ancho: 130, tipo: 'texto' },  // antes de Nombre
+  { nombre: 'Nombre completo',   ancho: 200, tipo: 'texto' },
+  { nombre: 'Género',            ancho: 100, tipo: 'texto' },
+  { nombre: 'Edad',              ancho: 80,  tipo: 'texto' },
+  { nombre: 'Nivel educativo',   ancho: 160, tipo: 'texto' }
 ];
 
 // Etapas del flujo — usadas como opciones de dropdown en varias hojas
@@ -161,15 +161,16 @@ const ESTRUCTURA_HOJAS = {
 
   // ── GRADUADOS ──────────────────────────────────────────────────────────────
   // Columnas:
-  //  1=ID Kobo | 2=Fecha de envío | 3=Nombre completo | 4=Número de teléfono |
-  //  5=Formación | 6=Cohorte | 7=Fecha de entrevista | 8=Entrevistador |
-  //  9=Resultado entrevista | 10=Siguiente paso | 11=Clasificación |
-  //  12=Empleado | 13=Próxima llamada | 14=Notas | 15=Etapa
+  //  1=No. | 2=Fecha de envío | 3=Creamos ID | 4=Nombre completo |
+  //  5=Número de teléfono | 6=Formación | 7=Cohorte | 8=Fecha de entrevista |
+  //  9=Entrevistador | 10=Resultado entrevista | 11=Siguiente paso |
+  //  12=Clasificación | 13=Empleado | 14=Próxima llamada | 15=Notas | 16=Etapa
   'Graduados': {
     color: '#1a73e8',
     columnas: [
-      { nombre: 'ID Kobo',              ancho: 120, tipo: 'texto'  },
+      { nombre: 'No.',                  ancho: 60,  tipo: 'texto'  },  // era ID Kobo
       { nombre: 'Fecha de envío',       ancho: 140, tipo: 'fecha'  },  // auto al importar
+      { nombre: 'Creamos ID',           ancho: 130, tipo: 'texto'  },  // antes de Nombre
       { nombre: 'Nombre completo',      ancho: 200, tipo: 'texto'  },
       { nombre: 'Número de teléfono',   ancho: 150, tipo: 'texto'  },
       { nombre: 'Formación',            ancho: 180, tipo: 'texto'  },
@@ -275,7 +276,8 @@ const ESTRUCTURA_HOJAS = {
   'Seguimientos': {
     color: '#673ab7',
     columnas: [
-      { nombre: 'ID Graduado',      ancho: 120, tipo: 'texto' },
+      { nombre: 'No.',              ancho: 60,  tipo: 'texto' },  // número de registro
+      { nombre: 'Creamos ID',       ancho: 130, tipo: 'texto' },  // antes de Nombre
       { nombre: 'Nombre',           ancho: 200, tipo: 'texto' },
       { nombre: 'Tipo seguimiento', ancho: 180, tipo: 'texto' },
       { nombre: 'Fecha programada', ancho: 150, tipo: 'fecha' },
@@ -293,8 +295,8 @@ const ESTRUCTURA_HOJAS = {
     color: '#e91e63',
     columnas: [
       { nombre: 'Fecha de registro', ancho: 150, tipo: 'fecha'    },
+      { nombre: 'Creamos ID',        ancho: 130, tipo: 'texto'    },  // antes de Nombre
       { nombre: 'Nombre completo',   ancho: 200, tipo: 'texto'    },
-      { nombre: 'ID Creamos',        ancho: 130, tipo: 'texto'    },
       { nombre: 'Etapa',             ancho: 200, tipo: 'dropdown', opciones: ETAPAS_FLUJO },
       { nombre: 'Nota',              ancho: 300, tipo: 'texto'    }
     ]
@@ -600,9 +602,9 @@ function obtenerGraduadosSinClasificar() {
 
     const sin = [];
     for (let i = 1; i < datos.length; i++) {
-      const clasificacion = datos[i][10]; // col 11 = Clasificación
+      const clasificacion = datos[i][11]; // col 12 = Clasificación
       if (!clasificacion || clasificacion.trim() === '') {
-        sin.push({ id: datos[i][0], nombre: datos[i][2] }); // col 3 = Nombre completo
+        sin.push({ id: datos[i][0], nombre: datos[i][3] }); // [3] = Nombre completo
       }
     }
     return sin;
@@ -795,19 +797,20 @@ function procesarDatosGraduados(datos) {
 /**
  * Agrega un nuevo graduado a la hoja Graduados
  * Columnas (según ESTRUCTURA_HOJAS['Graduados']):
- *   1=ID Kobo | 2=Fecha de envío (auto) | 3=Nombre completo |
- *   4=Número de teléfono | 5=Formación | 6=Cohorte |
- *   7=Fecha de entrevista | 8=Entrevistador | 9=Resultado entrevista |
- *   10=Siguiente paso | 11=Clasificación | 12=Empleado |
- *   13=Próxima llamada | 14=Notas | 15=Etapa
+ *   1=No. | 2=Fecha de envío (auto) | 3=Creamos ID | 4=Nombre completo |
+ *   5=Número de teléfono | 6=Formación | 7=Cohorte |
+ *   8=Fecha de entrevista | 9=Entrevistador | 10=Resultado entrevista |
+ *   11=Siguiente paso | 12=Clasificación | 13=Empleado |
+ *   14=Próxima llamada | 15=Notas | 16=Etapa
  * @param {Object} graduado
  */
 function agregarGraduado(graduado) {
   const hoja = obtenerHoja('Graduados');
   const fila = [
-    graduado.id,
+    graduado.id,                            // No. (referencia KoboToolbox)
     new Date().toLocaleDateString('es-ES'), // Fecha de envío — auto al importar
-    graduado.nombre,
+    '',                                     // Creamos ID (se llena manualmente)
+    graduado.nombre,                        // Nombre completo
     graduado.telefono,
     graduado.formacion,
     graduado.cohorte || '',
@@ -835,13 +838,13 @@ function actualizarGraduado(graduado) {
   const datos = hoja.getDataRange().getValues();
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduado.id) {
-      // col 2 (Fecha de envío) = no tocar
-      hoja.getRange(i + 1, 3).setValue(graduado.nombre);
-      hoja.getRange(i + 1, 4).setValue(graduado.telefono);
-      hoja.getRange(i + 1, 5).setValue(graduado.formacion       || datos[i][4]);
-      hoja.getRange(i + 1, 6).setValue(graduado.cohorte         || datos[i][5]);
-      hoja.getRange(i + 1, 7).setValue(graduado.fechaEntrevista || datos[i][6]);
-      hoja.getRange(i + 1, 8).setValue(graduado.entrevistador   || datos[i][7]);
+      // col 1=No. | col 2=Fecha de envío | col 3=Creamos ID → no tocar
+      hoja.getRange(i + 1, 4).setValue(graduado.nombre);
+      hoja.getRange(i + 1, 5).setValue(graduado.telefono);
+      hoja.getRange(i + 1, 6).setValue(graduado.formacion       || datos[i][5]);
+      hoja.getRange(i + 1, 7).setValue(graduado.cohorte         || datos[i][6]);
+      hoja.getRange(i + 1, 8).setValue(graduado.fechaEntrevista || datos[i][7]);
+      hoja.getRange(i + 1, 9).setValue(graduado.entrevistador   || datos[i][8]);
       Logger.log(`Graduado actualizado: ${graduado.nombre} (${graduado.id})`);
       break;
     }
@@ -860,20 +863,20 @@ function clasificarGraduado(graduadoId, clasificacion, datosAdicionales = {}) {
 
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduadoId) {
-      // Índices actualizados (sin Email, sin Fecha clasificación):
-      //   col 11=Clasificación | col 12=Empleado | col 13=Próxima llamada |
-      //   col 14=Notas | col 15=Etapa
-      hojaGraduados.getRange(i + 1, 11).setValue(clasificacion);             // Clasificación
-      hojaGraduados.getRange(i + 1, 12).setValue(
+      // Índices con nueva estructura (No. | Fecha envío | Creamos ID | Nombre...):
+      //   col 12=Clasificación | col 13=Empleado | col 14=Próxima llamada |
+      //   col 15=Notas | col 16=Etapa
+      hojaGraduados.getRange(i + 1, 12).setValue(clasificacion);             // Clasificación
+      hojaGraduados.getRange(i + 1, 13).setValue(
         clasificacion === 'Activamente busca trabajo' ? 'Sí' : 'No'          // Empleado
       );
-      hojaGraduados.getRange(i + 1, 15).setValue(clasificacion);             // Etapa (dropdown)
+      hojaGraduados.getRange(i + 1, 16).setValue(clasificacion);             // Etapa (dropdown)
       copiarAHojaClasificacion(datos[i], clasificacion, datosAdicionales);
-      registrarMovimientoEtapa(datos[i][2], clasificacion, datosAdicionales.nota || ''); // col 2=Nombre
+      registrarMovimientoEtapa(datos[i][2], datos[i][3], clasificacion, datosAdicionales.nota || '');
       if (clasificacion === 'Activamente busca trabajo') {
-        programarSeguimientos(graduadoId, datos[i][2]);
+        programarSeguimientos(graduadoId, datos[i][3]); // [3] = Nombre completo
       }
-      Logger.log(`Graduado ${datos[i][2]} clasificado como: ${clasificacion}`);
+      Logger.log(`Graduado ${datos[i][3]} clasificado como: ${clasificacion}`);
       break;
     }
   }
@@ -920,11 +923,11 @@ function obtenerNombreHojaClasificacion(clasificacion) {
  * Base = columnas comunes (información principal) mapeadas desde Graduados.
  *
  * Índices en datosGraduado (hoja Graduados):
- *   0=ID Kobo | 1=Fecha de envío | 2=Nombre completo | 3=Teléfono |
- *   4=Formación | 5=Cohorte | 6=Fecha entrevista | 7=Entrevistador
+ *   0=No. | 1=Fecha de envío | 2=Creamos ID | 3=Nombre completo |
+ *   4=Teléfono | 5=Formación | 6=Cohorte | 7=Fecha entrevista | 8=Entrevistador
  *
  * Columnas comunes que van en las 6 hojas de apilabilidad:
- *   Fecha de ingreso | Nombre completo | ID Creamos | Género | Edad | Nivel educativo
+ *   Fecha de ingreso | Creamos ID | Nombre completo | Género | Edad | Nivel educativo
  *
  * @param {Array}  datosGraduado
  * @param {string} clasificacion
@@ -934,11 +937,11 @@ function obtenerNombreHojaClasificacion(clasificacion) {
 function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionales) {
   const filaBase = [
     new Date().toLocaleDateString('es-ES'), // Fecha de ingreso
-    datosGraduado[2],                        // Nombre completo (col 3)
-    datosAdicionales.idCreamos  || '',       // ID Creamos
-    datosAdicionales.genero     || '',       // Género
-    datosAdicionales.edad       || '',       // Edad
-    datosAdicionales.nivelEdu   || ''        // Nivel educativo
+    datosGraduado[2],                        // Creamos ID (índice 2)
+    datosGraduado[3],                        // Nombre completo (índice 3)
+    datosAdicionales.genero   || '',         // Género
+    datosAdicionales.edad     || '',         // Edad
+    datosAdicionales.nivelEdu || ''          // Nivel educativo
   ];
 
   switch (clasificacion) {
@@ -993,9 +996,9 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
     case 'Fito':
       return filaBase.concat([
         datosAdicionales.dpi       || '',
-        datosAdicionales.telefono  || datosGraduado[3] || '',  // col 4 = Teléfono
-        datosAdicionales.formacion || datosGraduado[4] || '',  // col 5 = Formación
-        datosAdicionales.cohorte   || datosGraduado[5] || '',  // col 6 = Cohorte
+        datosAdicionales.telefono  || datosGraduado[4] || '',  // índice 4 = Teléfono
+        datosAdicionales.formacion || datosGraduado[5] || '',  // índice 5 = Formación
+        datosAdicionales.cohorte   || datosGraduado[6] || '',  // índice 6 = Cohorte
         datosAdicionales.nota      || '',
         datosAdicionales.activo    || 'No'
       ]);
@@ -1051,16 +1054,18 @@ function programarSeguimientos(graduadoId, nombreGraduado) {
     const fechaProgramada = new Date(fechaBase);
     fechaProgramada.setDate(fechaProgramada.getDate() + seg.diasDespues);
 
+    // Columnas Seguimientos: No. | Creamos ID | Nombre | Tipo | Fecha prog. | Fecha real. | Estado | Resultado | Notas | Próximo paso
     hojaSeguimientos.appendRow([
-      graduadoId,
-      nombreGraduado,
+      graduadoId,     // No. (referencia)
+      '',             // Creamos ID (se completa manualmente)
+      nombreGraduado, // Nombre
       seg.tipo,
       fechaProgramada.toLocaleDateString('es-ES'),
-      '',          // Fecha realizada
+      '',             // Fecha realizada
       'Pendiente',
-      '',          // Resultado
+      '',             // Resultado
       seg.descripcion,
-      ''           // Próximo paso
+      ''              // Próximo paso
     ]);
   });
 
@@ -1081,19 +1086,21 @@ function obtenerSeguimientosPendientes() {
   hoy.setHours(0, 0, 0, 0);
 
   const pendientes = [];
+  // Seguimientos: [0]=No. | [1]=Creamos ID | [2]=Nombre | [3]=Tipo | [4]=Fecha prog. |
+  //              [5]=Fecha real. | [6]=Estado | [7]=Resultado | [8]=Notas | [9]=Próximo paso
   for (let i = 1; i < datos.length; i++) {
-    const estado           = datos[i][5];
-    const fechaProgramadaStr = datos[i][3];
+    const estado             = datos[i][6];
+    const fechaProgramadaStr = datos[i][4];
     if (estado === 'Pendiente' && fechaProgramadaStr) {
       const fechaProgramada = parsearFecha(fechaProgramadaStr);
       if (fechaProgramada && fechaProgramada <= hoy) {
         pendientes.push({
-          fila: i + 1,
-          id:   datos[i][0],
-          nombre: datos[i][1],
-          tipo:   datos[i][2],
+          fila:            i + 1,
+          id:              datos[i][0],
+          nombre:          datos[i][2],  // [2] = Nombre
+          tipo:            datos[i][3],  // [3] = Tipo seguimiento
           fechaProgramada: fechaProgramadaStr,
-          notas: datos[i][7]
+          notas:           datos[i][8]   // [8] = Notas
         });
       }
     }
@@ -1109,13 +1116,15 @@ function obtenerSeguimientosPendientes() {
  * @param {string} proximoPaso
  */
 function marcarSeguimientoRealizado(fila, resultado, notas, proximoPaso) {
+  // Seguimientos: col 1=No. | 2=Creamos ID | 3=Nombre | 4=Tipo | 5=Fecha prog. |
+  //              6=Fecha real. | 7=Estado | 8=Resultado | 9=Notas | 10=Próximo paso
   const hoja = obtenerHoja('Seguimientos');
-  hoja.getRange(fila, 5).setValue(new Date().toLocaleDateString('es-ES'));
-  hoja.getRange(fila, 6).setValue('Realizado');
-  hoja.getRange(fila, 7).setValue(resultado);
-  hoja.getRange(fila, 8).setValue(notas);
-  hoja.getRange(fila, 9).setValue(proximoPaso);
-  hoja.getRange(fila, 1, 1, 9).setBackground('#d9ead3');
+  hoja.getRange(fila, 6).setValue(new Date().toLocaleDateString('es-ES')); // Fecha realizada
+  hoja.getRange(fila, 7).setValue('Realizado');                             // Estado
+  hoja.getRange(fila, 8).setValue(resultado);                               // Resultado
+  hoja.getRange(fila, 9).setValue(notas);                                   // Notas
+  hoja.getRange(fila, 10).setValue(proximoPaso);                            // Próximo paso
+  hoja.getRange(fila, 1, 1, 10).setBackground('#d9ead3');
   Logger.log(`Seguimiento marcado como realizado en fila ${fila}`);
 }
 
@@ -1422,18 +1431,20 @@ function parsearFecha(fechaStr) {
 /**
  * Registra un movimiento de etapa en la hoja "Estado actual del participante"
  * y actualiza el resumen de conteos al final de esa hoja.
- * @param {string} nombreCompleto
+ * @param {string} creamosId     - ID Creamos del participante (índice [2] en Graduados)
+ * @param {string} nombreCompleto - Nombre del participante (índice [3] en Graduados)
  * @param {string} etapa
  * @param {string} nota
  */
-function registrarMovimientoEtapa(nombreCompleto, etapa, nota) {
+function registrarMovimientoEtapa(creamosId, nombreCompleto, etapa, nota) {
   const hoja = obtenerHoja('Estado actual del participante');
 
   // Agregar la fila de historial
+  // Orden: Fecha de registro | Creamos ID | Nombre completo | Etapa | Nota
   hoja.appendRow([
     new Date().toLocaleDateString('es-ES'), // Fecha de registro
-    nombreCompleto,
-    '',    // ID Creamos (completar manualmente)
+    creamosId     || '',                    // Creamos ID
+    nombreCompleto,                         // Nombre completo
     etapa,
     nota || ''
   ]);
@@ -1455,10 +1466,11 @@ function actualizarResumenEstado(hoja) {
   // Contar cuántas personas hay actualmente en cada etapa
   // (se toma la etapa más reciente de cada participante por nombre)
   const ultimaEtapaPorNombre = {};
+  // Columnas de Estado actual: [0]=Fecha | [1]=Creamos ID | [2]=Nombre | [3]=Etapa | [4]=Nota
   for (let i = 1; i < datos.length; i++) {
-    const nombre = datos[i][1];
-    const etapa  = datos[i][3];
-    // Si la fila tiene nombre y etapa válidos (no es parte del resumen)
+    const nombre = datos[i][2];  // Nombre completo
+    const etapa  = datos[i][3];  // Etapa
+    // Solo filas válidas (no parte del bloque de resumen)
     if (nombre && etapa && ETAPAS_FLUJO.indexOf(etapa) !== -1) {
       ultimaEtapaPorNombre[nombre] = etapa;
     }
@@ -1536,7 +1548,7 @@ function obtenerEstadisticasGenerales() {
     stats.totalGraduados = hojaGraduados.getLastRow() - 1;
     const datos = hojaGraduados.getDataRange().getValues();
     for (let i = 1; i < datos.length; i++) {
-      const c = datos[i][10]; // col 11 = Clasificación
+      const c = datos[i][11]; // col 12 = Clasificación
       if (c) stats.porClasificacion[c] = (stats.porClasificacion[c] || 0) + 1;
     }
   }
