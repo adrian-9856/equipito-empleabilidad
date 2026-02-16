@@ -117,7 +117,7 @@ function mostrarConfiguracion() {
 
 /**
  * Columnas que aparecen en TODAS las hojas de apilabilidad (información principal)
- * tipo: 'texto' | 'fecha' | 'siNo' | 'checkbox'
+ * tipo: 'texto' | 'fecha' | 'siNo' | 'checkbox' | 'dropdown'
  */
 const COLUMNAS_COMUNES = [
   { nombre: 'Fecha de ingreso',  ancho: 140, tipo: 'fecha'  },
@@ -128,6 +128,31 @@ const COLUMNAS_COMUNES = [
   { nombre: 'Nivel educativo',   ancho: 160, tipo: 'texto'  }
 ];
 
+// Etapas del flujo — usadas como opciones de dropdown en varias hojas
+const ETAPAS_FLUJO = [
+  'Aliados',
+  'Plataforma',
+  'Derivaciones',
+  'Por su cuenta',
+  'No busca trabajo - Fito',
+  'Activamente busca trabajo'
+];
+
+// Áreas de trabajo — opciones del dropdown Área en Aliados
+const AREAS_TRABAJO = [
+  'Tecnología',
+  'Manufactura',
+  'Servicios al cliente',
+  'Administración',
+  'Ventas',
+  'Logística',
+  'Salud',
+  'Construcción',
+  'Educación',
+  'Finanzas',
+  'Otro'
+];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ESTRUCTURA EXACTA DE COLUMNAS POR HOJA
 // ─────────────────────────────────────────────────────────────────────────────
@@ -135,25 +160,29 @@ const COLUMNAS_COMUNES = [
 const ESTRUCTURA_HOJAS = {
 
   // ── GRADUADOS ──────────────────────────────────────────────────────────────
-  // Datos vienen de KoboToolbox + seguimiento general
+  // Columnas:
+  //  1=ID Kobo | 2=Fecha de envío | 3=Nombre completo | 4=Número de teléfono |
+  //  5=Formación | 6=Cohorte | 7=Fecha de entrevista | 8=Entrevistador |
+  //  9=Resultado entrevista | 10=Siguiente paso | 11=Clasificación |
+  //  12=Empleado | 13=Próxima llamada | 14=Notas | 15=Etapa
   'Graduados': {
     color: '#1a73e8',
     columnas: [
-      { nombre: 'ID Kobo',              ancho: 120, tipo: 'texto' },
-      { nombre: 'Nombre completo',      ancho: 200, tipo: 'texto' },
-      { nombre: 'Número de teléfono',   ancho: 150, tipo: 'texto' },
-      { nombre: 'Email',                ancho: 220, tipo: 'texto' },
-      { nombre: 'Formación',            ancho: 180, tipo: 'texto' },
-      { nombre: 'Cohorte',              ancho: 100, tipo: 'texto' },
-      { nombre: 'Fecha de entrevista',  ancho: 140, tipo: 'fecha' },
-      { nombre: 'Entrevistador',        ancho: 160, tipo: 'texto' },
-      { nombre: 'Resultado entrevista', ancho: 220, tipo: 'texto' },
-      { nombre: 'Siguiente paso',       ancho: 200, tipo: 'texto' },
-      { nombre: 'Clasificación',        ancho: 180, tipo: 'texto' },
-      { nombre: 'Fecha clasificación',  ancho: 150, tipo: 'fecha' },
-      { nombre: 'Empleado',             ancho: 90,  tipo: 'siNo'  },
-      { nombre: 'Próxima llamada',      ancho: 180, tipo: 'texto' },
-      { nombre: 'Notas',                ancho: 300, tipo: 'texto' }
+      { nombre: 'ID Kobo',              ancho: 120, tipo: 'texto'  },
+      { nombre: 'Fecha de envío',       ancho: 140, tipo: 'fecha'  },  // auto al importar
+      { nombre: 'Nombre completo',      ancho: 200, tipo: 'texto'  },
+      { nombre: 'Número de teléfono',   ancho: 150, tipo: 'texto'  },
+      { nombre: 'Formación',            ancho: 180, tipo: 'texto'  },
+      { nombre: 'Cohorte',              ancho: 100, tipo: 'texto'  },
+      { nombre: 'Fecha de entrevista',  ancho: 140, tipo: 'fecha'  },
+      { nombre: 'Entrevistador',        ancho: 160, tipo: 'texto'  },
+      { nombre: 'Resultado entrevista', ancho: 220, tipo: 'texto'  },
+      { nombre: 'Siguiente paso',       ancho: 200, tipo: 'texto'  },
+      { nombre: 'Clasificación',        ancho: 180, tipo: 'texto'  },
+      { nombre: 'Empleado',             ancho: 90,  tipo: 'siNo'   },
+      { nombre: 'Próxima llamada',      ancho: 180, tipo: 'texto'  },
+      { nombre: 'Notas',                ancho: 300, tipo: 'texto'  },
+      { nombre: 'Etapa',                ancho: 200, tipo: 'dropdown', opciones: ETAPAS_FLUJO }
     ]
   },
 
@@ -162,13 +191,13 @@ const ESTRUCTURA_HOJAS = {
     color: '#3f51b5',
     columnas: [
       ...COLUMNAS_COMUNES,
-      { nombre: 'Pendiente',                ancho: 120, tipo: 'siNo'  },  // nombre por definir
-      { nombre: 'Trámites',                  ancho: 200, tipo: 'texto' },
-      { nombre: 'Entrevista',                ancho: 130, tipo: 'texto' },
-      { nombre: 'Día de prueba',             ancho: 130, tipo: 'texto' },
-      { nombre: 'Confirmación de recepción', ancho: 200, tipo: 'texto' },
-      { nombre: 'Notas',                     ancho: 300, tipo: 'texto' },
-      { nombre: 'Activo',                    ancho: 90,  tipo: 'siNo'  }
+      { nombre: 'Compartió el CV',          ancho: 140, tipo: 'siNo'     },
+      { nombre: 'Área',                      ancho: 160, tipo: 'dropdown', opciones: AREAS_TRABAJO },
+      { nombre: 'Entrevista',                ancho: 130, tipo: 'texto'    },
+      { nombre: 'Día de prueba',             ancho: 130, tipo: 'texto'    },
+      { nombre: 'Confirmación de recepción', ancho: 200, tipo: 'siNo'     },
+      { nombre: 'Notas',                     ancho: 300, tipo: 'texto'    },
+      { nombre: 'Activo',                    ancho: 90,  tipo: 'siNo'     }
     ]
   },
 
@@ -178,7 +207,7 @@ const ESTRUCTURA_HOJAS = {
     columnas: [
       ...COLUMNAS_COMUNES,
       { nombre: 'Cita',              ancho: 90,  tipo: 'checkbox' },
-      { nombre: 'Creación de perfil',ancho: 160, tipo: 'texto'    },
+      { nombre: 'Creación de perfil',ancho: 160, tipo: 'checkbox' },  // cambio: checkbox
       { nombre: 'Contacto',          ancho: 90,  tipo: 'checkbox' },
       { nombre: 'Trámites',          ancho: 200, tipo: 'texto'    },
       { nombre: 'Entrevista',        ancho: 130, tipo: 'texto'    },
@@ -258,23 +287,16 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── REPORTES MENSUALES ─────────────────────────────────────────────────────
-  'Reportes mensuales': {
+  // ── ESTADO ACTUAL DEL PARTICIPANTE ────────────────────────────────────────
+  // Historial de movimientos entre etapas + resumen de conteos al final
+  'Estado actual del participante': {
     color: '#e91e63',
     columnas: [
-      { nombre: 'Mes / Período',            ancho: 150, tipo: 'texto' },
-      { nombre: 'Total graduados',           ancho: 140, tipo: 'texto' },
-      { nombre: 'Empleados',                 ancho: 120, tipo: 'texto' },
-      { nombre: 'Tasa empleabilidad %',      ancho: 160, tipo: 'texto' },
-      { nombre: 'En Aliados',                ancho: 120, tipo: 'texto' },
-      { nombre: 'En Plataforma',             ancho: 130, tipo: 'texto' },
-      { nombre: 'Por su cuenta',             ancho: 130, tipo: 'texto' },
-      { nombre: 'En Derivaciones',           ancho: 140, tipo: 'texto' },
-      { nombre: 'No busca trabajo',          ancho: 150, tipo: 'texto' },
-      { nombre: 'Activamente busca trabajo', ancho: 180, tipo: 'texto' },
-      { nombre: 'Llamadas realizadas',       ancho: 160, tipo: 'texto' },
-      { nombre: 'Llamadas pendientes',       ancho: 160, tipo: 'texto' },
-      { nombre: 'Notas',                     ancho: 300, tipo: 'texto' }
+      { nombre: 'Fecha de registro', ancho: 150, tipo: 'fecha'    },
+      { nombre: 'Nombre completo',   ancho: 200, tipo: 'texto'    },
+      { nombre: 'ID Creamos',        ancho: 130, tipo: 'texto'    },
+      { nombre: 'Etapa',             ancho: 200, tipo: 'dropdown', opciones: ETAPAS_FLUJO },
+      { nombre: 'Nota',              ancho: 300, tipo: 'texto'    }
     ]
   }
 };
@@ -350,16 +372,17 @@ function _ejecutarInstalacion(borrarExistentes) {
         'No busca trabajo - Fito',
         'Activamente busca trabajo',
         'Seguimientos',
-        'Reportes mensuales',
+        'Estado actual del participante',
         'Configuración',
         // Nombres legacy (por si acaso existen)
+        'Reportes mensuales',
+        'Reportes Mensuales',
         'Por su Cuenta',
         'Busca Trabajo (Fito)',
         'No Busca Trabajar',
         'Filtro/Papelería',
         'Revisión y Control',
         'Empleados',
-        'Reportes Mensuales',
         'Conexiones Laborales',
         'Entrevista/Seguimiento General'
       ];
@@ -384,7 +407,7 @@ function _ejecutarInstalacion(borrarExistentes) {
       'No busca trabajo - Fito',
       'Activamente busca trabajo',
       'Seguimientos',
-      'Reportes mensuales'
+      'Estado actual del participante'
     ];
 
     ordenHojas.forEach(nombreHoja => {
@@ -487,6 +510,14 @@ function _construirHoja(hoja, nombreHoja) {
         .build();
       rango.setDataValidation(regla);
 
+    } else if (col.tipo === 'dropdown' && col.opciones && col.opciones.length) {
+      // Dropdown con lista de opciones personalizada
+      const regla = SpreadsheetApp.newDataValidation()
+        .requireValueInList(col.opciones, true)
+        .setAllowInvalid(false)
+        .build();
+      rango.setDataValidation(regla);
+
     } else if (col.tipo === 'checkbox') {
       const regla = SpreadsheetApp.newDataValidation()
         .requireCheckbox()
@@ -550,7 +581,10 @@ function _crearHojaConfiguracion(ss) {
 function _ordenarHojas(ss, orden) {
   orden.forEach((nombre, posicion) => {
     const hoja = ss.getSheetByName(nombre);
-    if (hoja) ss.setActiveSheet(hoja).moveActiveSheet(posicion + 1);
+    if (hoja) {
+      ss.setActiveSheet(hoja);
+      ss.moveActiveSheet(posicion + 1);
+    }
   });
 }
 
@@ -568,7 +602,7 @@ function obtenerGraduadosSinClasificar() {
     for (let i = 1; i < datos.length; i++) {
       const clasificacion = datos[i][10]; // col 11 = Clasificación
       if (!clasificacion || clasificacion.trim() === '') {
-        sin.push({ id: datos[i][0], nombre: datos[i][1], email: datos[i][3] });
+        sin.push({ id: datos[i][0], nombre: datos[i][2] }); // col 3 = Nombre completo
       }
     }
     return sin;
@@ -761,19 +795,20 @@ function procesarDatosGraduados(datos) {
 /**
  * Agrega un nuevo graduado a la hoja Graduados
  * Columnas (según ESTRUCTURA_HOJAS['Graduados']):
- *   1=ID Kobo | 2=Nombre completo | 3=Teléfono | 4=Email | 5=Formación |
- *   6=Cohorte | 7=Fecha entrevista | 8=Entrevistador | 9=Resultado entrevista |
- *   10=Siguiente paso | 11=Clasificación | 12=Fecha clasificación | 13=Empleado |
- *   14=Próxima llamada | 15=Notas
+ *   1=ID Kobo | 2=Fecha de envío (auto) | 3=Nombre completo |
+ *   4=Número de teléfono | 5=Formación | 6=Cohorte |
+ *   7=Fecha de entrevista | 8=Entrevistador | 9=Resultado entrevista |
+ *   10=Siguiente paso | 11=Clasificación | 12=Empleado |
+ *   13=Próxima llamada | 14=Notas | 15=Etapa
  * @param {Object} graduado
  */
 function agregarGraduado(graduado) {
   const hoja = obtenerHoja('Graduados');
   const fila = [
     graduado.id,
+    new Date().toLocaleDateString('es-ES'), // Fecha de envío — auto al importar
     graduado.nombre,
     graduado.telefono,
-    graduado.email,
     graduado.formacion,
     graduado.cohorte || '',
     graduado.fechaEntrevista,
@@ -781,10 +816,10 @@ function agregarGraduado(graduado) {
     '',    // Resultado entrevista (manual)
     '',    // Siguiente paso (manual)
     '',    // Clasificación (auto al clasificar)
-    '',    // Fecha clasificación (auto)
     'No',  // Empleado
     '',    // Próxima llamada (auto al emplearse)
-    ''     // Notas (manual)
+    '',    // Notas (manual)
+    ''     // Etapa (dropdown — se llena al clasificar)
   ];
   hoja.appendRow(fila);
   Logger.log(`Graduado agregado: ${graduado.nombre} (${graduado.id})`);
@@ -792,6 +827,7 @@ function agregarGraduado(graduado) {
 
 /**
  * Actualiza los datos de KoboToolbox de un graduado existente
+ * Nota: la Fecha de envío (col 2) NO se actualiza — conserva la original
  * @param {Object} graduado
  */
 function actualizarGraduado(graduado) {
@@ -799,9 +835,9 @@ function actualizarGraduado(graduado) {
   const datos = hoja.getDataRange().getValues();
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduado.id) {
-      hoja.getRange(i + 1, 2).setValue(graduado.nombre);
-      hoja.getRange(i + 1, 3).setValue(graduado.telefono);
-      hoja.getRange(i + 1, 4).setValue(graduado.email);
+      // col 2 (Fecha de envío) = no tocar
+      hoja.getRange(i + 1, 3).setValue(graduado.nombre);
+      hoja.getRange(i + 1, 4).setValue(graduado.telefono);
       hoja.getRange(i + 1, 5).setValue(graduado.formacion       || datos[i][4]);
       hoja.getRange(i + 1, 6).setValue(graduado.cohorte         || datos[i][5]);
       hoja.getRange(i + 1, 7).setValue(graduado.fechaEntrevista || datos[i][6]);
@@ -824,17 +860,20 @@ function clasificarGraduado(graduadoId, clasificacion, datosAdicionales = {}) {
 
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduadoId) {
-      const fechaHoy = new Date().toLocaleDateString('es-ES');
+      // Índices actualizados (sin Email, sin Fecha clasificación):
+      //   col 11=Clasificación | col 12=Empleado | col 13=Próxima llamada |
+      //   col 14=Notas | col 15=Etapa
       hojaGraduados.getRange(i + 1, 11).setValue(clasificacion);             // Clasificación
-      hojaGraduados.getRange(i + 1, 12).setValue(fechaHoy);                  // Fecha clasificación
-      hojaGraduados.getRange(i + 1, 13).setValue(
+      hojaGraduados.getRange(i + 1, 12).setValue(
         clasificacion === 'Activamente busca trabajo' ? 'Sí' : 'No'          // Empleado
       );
+      hojaGraduados.getRange(i + 1, 15).setValue(clasificacion);             // Etapa (dropdown)
       copiarAHojaClasificacion(datos[i], clasificacion, datosAdicionales);
+      registrarMovimientoEtapa(datos[i][2], clasificacion, datosAdicionales.nota || ''); // col 2=Nombre
       if (clasificacion === 'Activamente busca trabajo') {
-        programarSeguimientos(graduadoId, datos[i][1]);
+        programarSeguimientos(graduadoId, datos[i][2]);
       }
-      Logger.log(`Graduado ${datos[i][1]} clasificado como: ${clasificacion}`);
+      Logger.log(`Graduado ${datos[i][2]} clasificado como: ${clasificacion}`);
       break;
     }
   }
@@ -881,8 +920,8 @@ function obtenerNombreHojaClasificacion(clasificacion) {
  * Base = columnas comunes (información principal) mapeadas desde Graduados.
  *
  * Índices en datosGraduado (hoja Graduados):
- *   0=ID Kobo | 1=Nombre completo | 2=Teléfono | 3=Email | 4=Formación |
- *   5=Cohorte | 6=Fecha entrevista | 7=Entrevistador
+ *   0=ID Kobo | 1=Fecha de envío | 2=Nombre completo | 3=Teléfono |
+ *   4=Formación | 5=Cohorte | 6=Fecha entrevista | 7=Entrevistador
  *
  * Columnas comunes que van en las 6 hojas de apilabilidad:
  *   Fecha de ingreso | Nombre completo | ID Creamos | Género | Edad | Nivel educativo
@@ -895,7 +934,7 @@ function obtenerNombreHojaClasificacion(clasificacion) {
 function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionales) {
   const filaBase = [
     new Date().toLocaleDateString('es-ES'), // Fecha de ingreso
-    datosGraduado[1],                        // Nombre completo
+    datosGraduado[2],                        // Nombre completo (col 3)
     datosAdicionales.idCreamos  || '',       // ID Creamos
     datosAdicionales.genero     || '',       // Género
     datosAdicionales.edad       || '',       // Edad
@@ -953,12 +992,12 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
     case 'No busca trabajo':
     case 'Fito':
       return filaBase.concat([
-        datosAdicionales.dpi      || '',
-        datosAdicionales.telefono || datosGraduado[2] || '',
-        datosAdicionales.formacion || datosGraduado[4] || '',
-        datosAdicionales.cohorte  || datosGraduado[5] || '',
-        datosAdicionales.nota     || '',
-        datosAdicionales.activo   || 'No'
+        datosAdicionales.dpi       || '',
+        datosAdicionales.telefono  || datosGraduado[3] || '',  // col 4 = Teléfono
+        datosAdicionales.formacion || datosGraduado[4] || '',  // col 5 = Formación
+        datosAdicionales.cohorte   || datosGraduado[5] || '',  // col 6 = Cohorte
+        datosAdicionales.nota      || '',
+        datosAdicionales.activo    || 'No'
       ]);
 
     case 'Activamente busca trabajo':
@@ -1090,7 +1129,7 @@ function actualizarProximaLlamada(graduadoId, tipoLlamada) {
   const datos = hoja.getDataRange().getValues();
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduadoId) {
-      hoja.getRange(i + 1, 14).setValue(tipoLlamada); // col 14 = Próxima llamada
+      hoja.getRange(i + 1, 13).setValue(tipoLlamada); // col 13 = Próxima llamada
       break;
     }
   }
@@ -1381,6 +1420,110 @@ function parsearFecha(fechaStr) {
 }
 
 /**
+ * Registra un movimiento de etapa en la hoja "Estado actual del participante"
+ * y actualiza el resumen de conteos al final de esa hoja.
+ * @param {string} nombreCompleto
+ * @param {string} etapa
+ * @param {string} nota
+ */
+function registrarMovimientoEtapa(nombreCompleto, etapa, nota) {
+  const hoja = obtenerHoja('Estado actual del participante');
+
+  // Agregar la fila de historial
+  hoja.appendRow([
+    new Date().toLocaleDateString('es-ES'), // Fecha de registro
+    nombreCompleto,
+    '',    // ID Creamos (completar manualmente)
+    etapa,
+    nota || ''
+  ]);
+
+  // Actualizar el resumen de conteos
+  actualizarResumenEstado(hoja);
+}
+
+/**
+ * Escribe/actualiza el bloque de resumen de conteos por etapa
+ * al final de la hoja "Estado actual del participante".
+ * Siempre se reescribe para mantenerlo actualizado.
+ * @param {Sheet} hoja
+ */
+function actualizarResumenEstado(hoja) {
+  const datos       = hoja.getDataRange().getValues();
+  const ultimaFila  = hoja.getLastRow();
+
+  // Contar cuántas personas hay actualmente en cada etapa
+  // (se toma la etapa más reciente de cada participante por nombre)
+  const ultimaEtapaPorNombre = {};
+  for (let i = 1; i < datos.length; i++) {
+    const nombre = datos[i][1];
+    const etapa  = datos[i][3];
+    // Si la fila tiene nombre y etapa válidos (no es parte del resumen)
+    if (nombre && etapa && ETAPAS_FLUJO.indexOf(etapa) !== -1) {
+      ultimaEtapaPorNombre[nombre] = etapa;
+    }
+  }
+
+  // Calcular conteos
+  const conteos = {};
+  ETAPAS_FLUJO.forEach(e => { conteos[e] = 0; });
+  Object.values(ultimaEtapaPorNombre).forEach(etapa => {
+    if (conteos[etapa] !== undefined) conteos[etapa]++;
+  });
+
+  // Buscar dónde empieza el bloque de resumen (si ya existe)
+  let inicioResumen = -1;
+  for (let i = 1; i < datos.length; i++) {
+    if (datos[i][0] === '── RESUMEN ──') {
+      inicioResumen = i + 1; // fila en Sheet (1-based)
+      break;
+    }
+  }
+
+  // Borrar resumen anterior si existe
+  if (inicioResumen > 0) {
+    const filasResumen = ETAPAS_FLUJO.length + 2; // separador + filas + total
+    hoja.deleteRows(inicioResumen, filasResumen);
+  }
+
+  // Escribir nuevo bloque de resumen al final
+  const filaInicio = hoja.getLastRow() + 2; // dejar una fila vacía
+
+  // Separador visual
+  const rangoSep = hoja.getRange(filaInicio, 1, 1, 5);
+  rangoSep.merge();
+  rangoSep.setValue('── RESUMEN ──');
+  rangoSep.setBackground('#e91e63')
+          .setFontColor('#ffffff')
+          .setFontWeight('bold')
+          .setHorizontalAlignment('center');
+
+  // Encabezado del resumen
+  hoja.getRange(filaInicio + 1, 1, 1, 2)
+      .setValues([['Etapa', 'Total personas']])
+      .setFontWeight('bold')
+      .setBackground('#fce4ec');
+
+  // Filas de conteo
+  let totalGeneral = 0;
+  ETAPAS_FLUJO.forEach((etapa, idx) => {
+    const fila = filaInicio + 2 + idx;
+    hoja.getRange(fila, 1).setValue(etapa);
+    hoja.getRange(fila, 2).setValue(conteos[etapa]);
+    totalGeneral += conteos[etapa];
+  });
+
+  // Fila de total
+  const filaTotalIdx = filaInicio + 2 + ETAPAS_FLUJO.length;
+  hoja.getRange(filaTotalIdx, 1, 1, 2)
+      .setValues([['TOTAL', totalGeneral]])
+      .setFontWeight('bold')
+      .setBackground('#fce4ec');
+
+  Logger.log('Resumen de estado actualizado');
+}
+
+/**
  * Obtiene estadísticas generales del sistema
  * @return {Object}
  */
@@ -1393,7 +1536,7 @@ function obtenerEstadisticasGenerales() {
     stats.totalGraduados = hojaGraduados.getLastRow() - 1;
     const datos = hojaGraduados.getDataRange().getValues();
     for (let i = 1; i < datos.length; i++) {
-      const c = datos[i][10];
+      const c = datos[i][10]; // col 11 = Clasificación
       if (c) stats.porClasificacion[c] = (stats.porClasificacion[c] || 0) + 1;
     }
   }
