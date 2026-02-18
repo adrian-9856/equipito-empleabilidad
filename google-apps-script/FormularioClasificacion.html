@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      max-width: 550px;
+      margin: 0 auto;
+    }
+
+    h2 {
+      color: #667eea;
+      margin-bottom: 10px;
+      font-size: 24px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 25px;
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #555;
+      font-size: 14px;
+    }
+
+    .required {
+      color: #e74c3c;
+    }
+
+    select, input[type="text"], textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      font-family: inherit;
+    }
+
+    select:focus, input[type="text"]:focus, textarea:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .clasificacion-options {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .clasificacion-option {
+      padding: 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.3s ease;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .clasificacion-option:hover {
+      border-color: #667eea;
+      background: #f8f9ff;
+      transform: translateY(-2px);
+    }
+
+    .clasificacion-option.selected {
+      border-color: #667eea;
+      background: #667eea;
+      color: white;
+    }
+
+    .campos-adicionales {
+      display: none;
+      margin-top: 15px;
+      padding: 15px;
+      background: #f8f9ff;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .campos-adicionales.active {
+      display: block;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 25px;
+    }
+
+    button {
+      flex: 1;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+      background: #e0e0e0;
+      color: #666;
+    }
+
+    .btn-secondary:hover {
+      background: #d0d0d0;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .mensaje {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      display: none;
+    }
+
+    .mensaje.exito {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .mensaje.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #888;
+      margin-top: 5px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="mensaje" class="mensaje"></div>
+
+    <div id="formulario">
+      <h2>📋 Clasificar Graduado</h2>
+      <p class="subtitle">Selecciona el graduado y su clasificación según el flujo de trabajo</p>
+
+      <div class="form-group">
+        <label for="graduado">Graduado <span class="required">*</span></label>
+        <select id="graduado" required>
+          <option value="">-- Selecciona un graduado --</option>
+        </select>
+        <p class="help-text">Solo se muestran graduados sin clasificar</p>
+      </div>
+
+      <div class="form-group">
+        <label>Clasificación <span class="required">*</span></label>
+        <div class="clasificacion-options">
+          <div class="clasificacion-option" data-clasificacion="Habilidades">
+            🎯 Habilidades
+          </div>
+          <div class="clasificacion-option" data-clasificacion="GlobalGorros">
+            🌍 GlobalGorros
+          </div>
+          <div class="clasificacion-option" data-clasificacion="Conexión">
+            🤝 Conexión/Relación
+          </div>
+          <div class="clasificacion-option" data-clasificacion="Por su Cuenta">
+            👤 Por su Cuenta
+          </div>
+          <div class="clasificacion-option" data-clasificacion="No Hace Falta">
+            ⛔ No Hace Falta
+          </div>
+          <div class="clasificacion-option" data-clasificacion="Empleado">
+            💼 Empleado
+          </div>
+        </div>
+      </div>
+
+      <!-- Campos adicionales para cada clasificación -->
+      <div id="campos-habilidades" class="campos-adicionales">
+        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Habilidades</h4>
+        <div class="form-group">
+          <label for="habilidad">Habilidad Principal</label>
+          <input type="text" id="habilidad" placeholder="Ej: Programación, Diseño, Marketing...">
+        </div>
+        <div class="form-group">
+          <label for="nivel">Nivel</label>
+          <select id="nivel">
+            <option value="">Seleccionar...</option>
+            <option value="Básico">Básico</option>
+            <option value="Intermedio">Intermedio</option>
+            <option value="Avanzado">Avanzado</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="campos-globalgorros" class="campos-adicionales">
+        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - GlobalGorros</h4>
+        <div class="form-group">
+          <label for="proyecto">Proyecto Asignado</label>
+          <input type="text" id="proyecto" placeholder="Nombre del proyecto">
+        </div>
+        <div class="form-group">
+          <label for="responsable">Responsable</label>
+          <input type="text" id="responsable" placeholder="Nombre del responsable">
+        </div>
+      </div>
+
+      <div id="campos-conexion" class="campos-adicionales">
+        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Conexión/Relación</h4>
+        <div class="form-group">
+          <label for="lider">Líder Asignado</label>
+          <input type="text" id="lider" placeholder="Nombre del líder">
+        </div>
+        <div class="form-group">
+          <label for="tipoRelacion">Tipo de Relación</label>
+          <select id="tipoRelacion">
+            <option value="">Seleccionar...</option>
+            <option value="Mentoría">Mentoría</option>
+            <option value="Referencia">Referencia</option>
+            <option value="Networking">Networking</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="campos-porsucuenta" class="campos-adicionales">
+        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Por su Cuenta</h4>
+        <div class="form-group">
+          <label for="actividad">Actividad</label>
+          <input type="text" id="actividad" placeholder="¿Qué está haciendo?">
+        </div>
+      </div>
+
+      <div id="campos-nohacefalta" class="campos-adicionales">
+        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - No Hace Falta</h4>
+        <div class="form-group">
+          <label for="razon">Razón</label>
+          <textarea id="razon" placeholder="¿Por qué no requiere seguimiento?"></textarea>
+        </div>
+      </div>
+
+      <div id="campos-empleado" class="campos-adicionales">
+        <h4 style="margin-bottom: 10px; color: #667eea;">Detalles - Empleado 🎉</h4>
+        <div class="form-group">
+          <label for="empresa">Empresa</label>
+          <input type="text" id="empresa" placeholder="Nombre de la empresa">
+        </div>
+        <div class="form-group">
+          <label for="puesto">Puesto</label>
+          <input type="text" id="puesto" placeholder="Cargo o posición">
+        </div>
+        <div class="form-group">
+          <label for="salario">Salario (opcional)</label>
+          <input type="text" id="salario" placeholder="Salario mensual">
+        </div>
+        <p class="help-text">💡 Se programarán seguimientos automáticos (1 semana, 3 meses, 6 meses)</p>
+      </div>
+
+      <div class="form-group">
+        <label for="notas">Notas adicionales</label>
+        <textarea id="notas" placeholder="Cualquier información adicional relevante..."></textarea>
+      </div>
+
+      <div class="button-group">
+        <button type="button" class="btn-secondary" onclick="cerrar()">Cancelar</button>
+        <button type="button" class="btn-primary" onclick="guardarClasificacion()">Guardar Clasificación</button>
+      </div>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Guardando clasificación...</p>
+    </div>
+  </div>
+
+  <script>
+    let clasificacionSeleccionada = '';
+
+    // Cargar graduados al iniciar
+    google.script.run
+      .withSuccessHandler(cargarGraduados)
+      .obtenerGraduadosSinClasificar();
+
+    function cargarGraduados(graduados) {
+      const select = document.getElementById('graduado');
+
+      if (graduados.length === 0) {
+        select.innerHTML = '<option value="">No hay graduados sin clasificar</option>';
+        return;
+      }
+
+      select.innerHTML = '<option value="">-- Selecciona un graduado --</option>';
+
+      graduados.forEach(grad => {
+        const option = document.createElement('option');
+        option.value = grad.id;
+        option.textContent = `${grad.nombre} - ${grad.email}`;
+        select.appendChild(option);
+      });
+    }
+
+    // Manejar selección de clasificación
+    document.querySelectorAll('.clasificacion-option').forEach(option => {
+      option.addEventListener('click', function() {
+        // Remover selección anterior
+        document.querySelectorAll('.clasificacion-option').forEach(opt => {
+          opt.classList.remove('selected');
+        });
+
+        // Ocultar todos los campos adicionales
+        document.querySelectorAll('.campos-adicionales').forEach(campo => {
+          campo.classList.remove('active');
+        });
+
+        // Seleccionar nuevo
+        this.classList.add('selected');
+        clasificacionSeleccionada = this.dataset.clasificacion;
+
+        // Mostrar campos adicionales correspondientes
+        const campoId = 'campos-' + clasificacionSeleccionada.toLowerCase().replace(/ /g, '').replace(/\//g, '');
+        const campoAdicional = document.getElementById(campoId);
+        if (campoAdicional) {
+          campoAdicional.classList.add('active');
+        }
+      });
+    });
+
+    function guardarClasificacion() {
+      const graduadoId = document.getElementById('graduado').value;
+
+      if (!graduadoId) {
+        mostrarMensaje('Por favor selecciona un graduado', 'error');
+        return;
+      }
+
+      if (!clasificacionSeleccionada) {
+        mostrarMensaje('Por favor selecciona una clasificación', 'error');
+        return;
+      }
+
+      // Recopilar datos adicionales según la clasificación
+      const datosAdicionales = {
+        notas: document.getElementById('notas').value
+      };
+
+      switch(clasificacionSeleccionada) {
+        case 'Habilidades':
+          datosAdicionales.campo1 = document.getElementById('habilidad').value;
+          datosAdicionales.campo2 = document.getElementById('nivel').value;
+          break;
+        case 'GlobalGorros':
+          datosAdicionales.campo1 = document.getElementById('proyecto').value;
+          datosAdicionales.campo3 = document.getElementById('responsable').value;
+          break;
+        case 'Conexión':
+          datosAdicionales.campo1 = document.getElementById('lider').value;
+          datosAdicionales.campo2 = document.getElementById('tipoRelacion').value;
+          break;
+        case 'Por su Cuenta':
+          datosAdicionales.campo1 = document.getElementById('actividad').value;
+          break;
+        case 'No Hace Falta':
+          datosAdicionales.campo1 = document.getElementById('razon').value;
+          break;
+        case 'Empleado':
+          datosAdicionales.campo1 = document.getElementById('empresa').value;
+          datosAdicionales.campo2 = document.getElementById('puesto').value;
+          datosAdicionales.campo4 = document.getElementById('salario').value;
+          break;
+      }
+
+      // Mostrar loading
+      document.getElementById('formulario').style.display = 'none';
+      document.getElementById('loading').style.display = 'block';
+
+      // Llamar a la función del backend
+      google.script.run
+        .withSuccessHandler(onExito)
+        .withFailureHandler(onError)
+        .clasificarGraduado(graduadoId, clasificacionSeleccionada, datosAdicionales);
+    }
+
+    function onExito() {
+      document.getElementById('loading').style.display = 'none';
+      mostrarMensaje('✅ Graduado clasificado correctamente', 'exito');
+
+      setTimeout(() => {
+        google.script.host.close();
+      }, 2000);
+    }
+
+    function onError(error) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('formulario').style.display = 'block';
+      mostrarMensaje('❌ Error: ' + error.message, 'error');
+    }
+
+    function mostrarMensaje(texto, tipo) {
+      const mensaje = document.getElementById('mensaje');
+      mensaje.textContent = texto;
+      mensaje.className = 'mensaje ' + tipo;
+      mensaje.style.display = 'block';
+
+      setTimeout(() => {
+        mensaje.style.display = 'none';
+      }, 5000);
+    }
+
+    function cerrar() {
+      google.script.host.close();
+    }
+  </script>
+</body>
+</html>
