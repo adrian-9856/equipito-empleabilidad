@@ -1086,16 +1086,40 @@ function _marcarInactivoEnHoja(nombreHoja, creamosId) {
 }
 
 /**
+ * Devuelve el número de fila (1-based) donde escribir el próximo registro.
+ * Busca la primera fila desde la 2 donde la columna A (Fecha de ingreso)
+ * esté vacía. Esto evita el problema de que los checkboxes o el banding
+ * hagan que getLastRow() devuelva un número muy grande.
+ * @param {Sheet} hoja
+ * @return {number}
+ */
+function _siguienteFilaLibre(hoja) {
+  const lastRow = hoja.getLastRow();
+  if (lastRow <= 1) return 2; // hoja vacía, primera fila de datos
+
+  // Leer columna A desde fila 2 hasta lastRow
+  const colA = hoja.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (let i = 0; i < colA.length; i++) {
+    const val = colA[i][0];
+    if (val === '' || val === null || val === undefined || val === false) {
+      return i + 2; // i=0 → fila 2
+    }
+  }
+  return lastRow + 1; // todas las filas tienen dato, agregar al final
+}
+
+/**
  * Copia los datos del graduado a su hoja de clasificación
  * @param {Array}  datosGraduado
  * @param {string} clasificacion
  * @param {Object} datosAdicionales
  */
 function copiarAHojaClasificacion(datosGraduado, clasificacion, datosAdicionales) {
-  const nombreHoja = obtenerNombreHojaClasificacion(clasificacion);
-  const hoja       = obtenerHoja(nombreHoja);
-  const fila       = prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionales);
-  hoja.appendRow(fila);
+  const nombreHoja  = obtenerNombreHojaClasificacion(clasificacion);
+  const hoja        = obtenerHoja(nombreHoja);
+  const fila        = prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionales);
+  const filaDestino = _siguienteFilaLibre(hoja);
+  hoja.getRange(filaDestino, 1, 1, fila.length).setValues([fila]);
 }
 
 /**
@@ -1258,7 +1282,7 @@ function programarSeguimientos(graduadoId, nombreGraduado) {
     fechaProgramada.setDate(fechaProgramada.getDate() + seg.diasDespues);
 
     // Columnas Conexión laboral: No. | Creamos ID | Nombre | Tipo | Fecha prog. | Fecha real. | Estado | Resultado | Notas | Próximo paso
-    hojaSeguimientos.appendRow([
+    const fila = [
       graduadoId,     // No. (referencia)
       '',             // Creamos ID (se completa manualmente)
       nombreGraduado, // Nombre
@@ -1269,7 +1293,9 @@ function programarSeguimientos(graduadoId, nombreGraduado) {
       '',             // Resultado
       seg.descripcion,
       ''              // Próximo paso
-    ]);
+    ];
+    const filaDestino = _siguienteFilaLibre(hojaSeguimientos);
+    hojaSeguimientos.getRange(filaDestino, 1, 1, fila.length).setValues([fila]);
   });
 
   Logger.log(`Seguimientos programados para: ${nombreGraduado}`);
