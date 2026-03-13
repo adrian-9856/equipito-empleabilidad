@@ -883,6 +883,100 @@ function clasificarGraduado(graduadoId, clasificacion, datosAdicionales = {}) {
 }
 
 /**
+ * Reclasifica un participante: lo marca inactivo en su hoja actual
+ * y lo mueve a la nueva hoja de etapa.
+ *
+ * Flujo:
+ *   1. Busca al participante por Creamos ID en la hoja de su etapa anterior
+ *   2. Marca su columna "Activo" como "No" (lo desactiva en la hoja vieja)
+ *   3. Actualiza Graduados con la nueva clasificación/etapa
+ *   4. Copia la fila a la nueva hoja de clasificación
+ *   5. Registra el movimiento en "Estado actual del participante"
+ *
+ * @param {string} creamosId          - ID Creamos del participante
+ * @param {string} nuevaClasificacion - Nueva etapa destino
+ * @param {Object} datosAdicionales   - Campos extra de la nueva hoja (nota, activo, etc.)
+ */
+function reclasificarParticipante(creamosId, nuevaClasificacion, datosAdicionales = {}) {
+  const hojaGraduados = obtenerHoja('Graduados');
+  const datosGraduados = hojaGraduados.getDataRange().getValues();
+
+  // ── 1. Buscar fila del participante en Graduados ──────────────────────────
+  // Graduados: [0]=No. | [1]=Fecha envío | [2]=Creamos ID | [3]=Nombre | ... | [11]=Clasificación | [15]=Etapa
+  let filaGraduado = -1;
+  let datosParticipante = null;
+  let etapaAnterior = '';
+
+  for (let i = 1; i < datosGraduados.length; i++) {
+    if (datosGraduados[i][2] === creamosId) {
+      filaGraduado       = i + 1; // 1-based para getRange
+      datosParticipante  = datosGraduados[i];
+      etapaAnterior      = datosGraduados[i][11]; // col 12 = Clasificación
+      break;
+    }
+  }
+
+  if (filaGraduado === -1) {
+    Logger.log(`reclasificarParticipante: no se encontró Creamos ID "${creamosId}" en Graduados`);
+    return;
+  }
+
+  // ── 2. Marcar "Activo = No" en la hoja de la etapa anterior ───────────────
+  if (etapaAnterior) {
+    const nombreHojaAnterior = obtenerNombreHojaClasificacion(etapaAnterior);
+    if (nombreHojaAnterior !== 'Graduados') {
+      _marcarInactivoEnHoja(nombreHojaAnterior, creamosId);
+    }
+  }
+
+  // ── 3. Actualizar Graduados con la nueva clasificación y etapa ────────────
+  hojaGraduados.getRange(filaGraduado, 12).setValue(nuevaClasificacion); // Clasificación
+  hojaGraduados.getRange(filaGraduado, 16).setValue(nuevaClasificacion); // Etapa (dropdown)
+
+  // ── 4. Copiar a la nueva hoja de clasificación ────────────────────────────
+  copiarAHojaClasificacion(datosParticipante, nuevaClasificacion, datosAdicionales);
+
+  // ── 5. Registrar el movimiento en el historial ────────────────────────────
+  registrarMovimientoEtapa(
+    creamosId,
+    datosParticipante[3], // Nombre completo
+    nuevaClasificacion,
+    datosAdicionales.nota || ''
+  );
+
+  // ── 6. Si pasa a "Activamente busca trabajo", programar seguimientos ───────
+  if (nuevaClasificacion === 'Activamente busca trabajo') {
+    programarSeguimientos(datosParticipante[0], datosParticipante[3]);
+  }
+
+  Logger.log(`Participante "${datosParticipante[3]}" reclasificado: "${etapaAnterior}" → "${nuevaClasificacion}"`);
+}
+
+/**
+ * Busca un participante por Creamos ID en una hoja de clasificación
+ * y pone su columna "Activo" en "No".
+ * La columna "Activo" es siempre la última columna de cada hoja de clasificación.
+ * @param {string} nombreHoja
+ * @param {string} creamosId
+ */
+function _marcarInactivoEnHoja(nombreHoja, creamosId) {
+  const hoja  = obtenerHoja(nombreHoja);
+  const datos = hoja.getDataRange().getValues();
+
+  // En las hojas de clasificación, Creamos ID está en la columna 2 (índice [1])
+  // porque las columnas comunes son: Fecha de ingreso | Creamos ID | ...
+  for (let i = 1; i < datos.length; i++) {
+    if (datos[i][1] === creamosId) {
+      const totalCols = datos[0].length;
+      // "Activo" es siempre la última columna de cada hoja de apilabilidad
+      hoja.getRange(i + 1, totalCols).setValue('No');
+      Logger.log(`_marcarInactivoEnHoja: "${creamosId}" marcado inactivo en "${nombreHoja}" (fila ${i + 1})`);
+      break;
+    }
+  }
+}
+
+/**
  * Copia los datos del graduado a su hoja de clasificación
  * @param {Array}  datosGraduado
  * @param {string} clasificacion
@@ -1138,7 +1232,7 @@ function actualizarProximaLlamada(graduadoId, tipoLlamada) {
   const datos = hoja.getDataRange().getValues();
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduadoId) {
-      hoja.getRange(i + 1, 13).setValue(tipoLlamada); // col 13 = Próxima llamada
+      hoja.getRange(i + 1, 14).setValue(tipoLlamada); // col 14 = Próxima llamada
       break;
     }
   }
