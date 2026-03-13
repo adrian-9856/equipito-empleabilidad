@@ -43,6 +43,97 @@ function onOpen() {
 }
 
 /**
+ * Se ejecuta automáticamente cada vez que el usuario edita una celda.
+ *
+ * Flujo desde Graduados:
+ *   Cuando alguien selecciona una Etapa en col 16 de la hoja Graduados,
+ *   el sistema envía automáticamente al participante a la hoja correcta.
+ *
+ *   - Si el participante NO tenía etapa anterior → clasificación nueva
+ *   - Si el participante YA tenía etapa → reclasificación:
+ *       marca Activo=No en la hoja anterior y copia a la nueva
+ *
+ * No dispara nada si:
+ *   - La edición no es en la hoja Graduados
+ *   - La columna editada no es la 16 (Etapa)
+ *   - El valor seleccionado no es una etapa válida
+ *   - La etapa seleccionada es la misma que ya tenía
+ *
+ * @param {GoogleAppsScript.Events.SheetsOnEdit} e
+ */
+function onEdit(e) {
+  try {
+    if (!e || !e.range) return;
+
+    const hoja = e.range.getSheet();
+    if (hoja.getName() !== 'Graduados') return;
+
+    // Solo col 16 (Etapa) y no el encabezado
+    const col  = e.range.getColumn();
+    const fila = e.range.getRow();
+    if (col !== 16 || fila <= 1) return;
+
+    const nuevaEtapa = (e.value || '').toString().trim();
+    if (!nuevaEtapa || ETAPAS_FLUJO.indexOf(nuevaEtapa) === -1) return;
+
+    // Leer toda la fila de Graduados:
+    // [0]=No. [1]=Fecha envío [2]=Creamos ID [3]=Nombre [4]=Teléfono
+    // [5]=Formación [6]=Cohorte ... [11]=Clasificación ... [15]=Etapa
+    const datos         = hoja.getRange(fila, 1, 1, 16).getValues()[0];
+    const creamosId     = (datos[2] || '').toString().trim();
+    const nombre        = (datos[3] || '').toString().trim();
+    const etapaAnterior = (datos[11] || '').toString().trim(); // col 12 = Clasificación
+
+    // Si la etapa no cambió, no hacer nada
+    if (etapaAnterior === nuevaEtapa) return;
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    ss.toast(`Enviando "${nombre}" a ${nuevaEtapa}...`, '⏳', 5);
+
+    // ── 1. Actualizar col 12 (Clasificación) y col 13 (Empleado) ─────────────
+    hoja.getRange(fila, 12).setValue(nuevaEtapa);
+    hoja.getRange(fila, 13).setValue(
+      nuevaEtapa === 'Activamente busca trabajo' ? 'Sí' : 'No'
+    );
+
+    // ── 2. Si había etapa anterior con Creamos ID → marcar inactivo en hoja vieja
+    if (etapaAnterior && ETAPAS_FLUJO.indexOf(etapaAnterior) !== -1 && creamosId) {
+      const nombreHojaAnterior = obtenerNombreHojaClasificacion(etapaAnterior);
+      if (nombreHojaAnterior !== 'Graduados') {
+        _marcarInactivoEnHoja(nombreHojaAnterior, creamosId);
+      }
+    }
+
+    // ── 3. Copiar a la nueva hoja de clasificación ────────────────────────────
+    copiarAHojaClasificacion(datos, nuevaEtapa, {});
+
+    // ── 4. Registrar movimiento en "Estado actual del participante" ───────────
+    registrarMovimientoEtapa(creamosId, nombre, nuevaEtapa, '');
+
+    // ── 5. Programar conexiones laborales si pasa a "Activamente busca trabajo"
+    if (nuevaEtapa === 'Activamente busca trabajo') {
+      programarSeguimientos(datos[0], nombre); // datos[0] = No. (KoboToolbox ID)
+    }
+
+    // ── 6. Sync al sheet externo si es "Paso a paso" ──────────────────────────
+    if (nuevaEtapa === 'Paso a paso') {
+      sincronizarPasoAPasoExterno(datos, {});
+    }
+
+    const accion = etapaAnterior ? `movido de "${etapaAnterior}"` : 'clasificado nuevo';
+    ss.toast(`✅ "${nombre}" ${accion} → "${nuevaEtapa}"`, 'Hecho', 4);
+    Logger.log(`onEdit Graduados fila ${fila}: "${nombre}" → "${nuevaEtapa}" (antes: "${etapaAnterior}")`);
+
+  } catch (error) {
+    Logger.log('Error en onEdit: ' + error);
+    try {
+      SpreadsheetApp.getActiveSpreadsheet()
+        .toast('Error al clasificar: ' + error.message, '❌', 6);
+    } catch (e2) { /* silent */ }
+  }
+}
+
+/**
  * Función principal para importar datos desde KoboToolbox
  */
 function importarDatosKobo() {
