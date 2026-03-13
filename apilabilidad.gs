@@ -20,20 +20,26 @@
  * Crea el menú personalizado en la interfaz
  */
 function onOpen() {
-  const ui = SpreadsheetApp.getUi();
-  ui.createMenu('📊 Seguimiento Graduados')
-    .addItem('🔄 Importar desde KoboToolbox', 'importarDatosKobo')
-    .addSeparator()
-    .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
-    .addItem('📞 Ver Conexiones Laborales Pendientes', 'mostrarSeguimientosPendientes')
-    .addSeparator()
-    .addItem('📊 Generar Reporte de Números', 'generarReporteNumeros')
-    .addSeparator()
-    .addItem('⚙️ Configurar Credenciales', 'mostrarConfiguracion')
-    .addSeparator()
-    .addItem('🚀 Instalar Sistema (primera vez)', 'instalarSistema')
-    .addItem('🔁 Reinstalar Sistema (borra todo)', 'reinstalarSistema')
-    .addToUi();
+  try {
+    const ui = SpreadsheetApp.getUi();
+    ui.createMenu('📊 Seguimiento Graduados')
+      .addItem('🔄 Importar desde KoboToolbox', 'importarDatosKobo')
+      .addSeparator()
+      .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
+      .addItem('📞 Ver Conexiones Laborales Pendientes', 'mostrarSeguimientosPendientes')
+      .addSeparator()
+      .addItem('📊 Generar Reporte de Números', 'generarReporteNumeros')
+      .addSeparator()
+      .addItem('⚙️ Configurar Credenciales', 'mostrarConfiguracion')
+      .addSeparator()
+      .addItem('🚀 Instalar Sistema (primera vez)', 'instalarSistema')
+      .addItem('🔁 Reinstalar Sistema (borra todo)', 'reinstalarSistema')
+      .addToUi();
+  } catch (e) {
+    // onOpen fue ejecutado desde el editor de Apps Script (sin contexto de hoja).
+    // Esto es normal — el menú solo aparece al abrir la hoja de cálculo.
+    Logger.log('onOpen: sin contexto UI — ' + e.message);
+  }
 }
 
 /**
