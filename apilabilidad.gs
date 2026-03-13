@@ -46,8 +46,8 @@ function onOpen() {
  * Función principal para importar datos desde KoboToolbox
  */
 function importarDatosKobo() {
+  const ui = SpreadsheetApp.getUi();
   try {
-    const ui = SpreadsheetApp.getUi();
     if (!verificarConfiguracion()) {
       ui.alert('⚠️ Configuración Incompleta',
                'Por favor configura las credenciales de KoboToolbox primero.\n' +
@@ -72,9 +72,7 @@ function importarDatosKobo() {
              `Total de graduados: ${resultado.total}`,
              ui.ButtonSet.OK);
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Error',
-                                  'Error al importar datos: ' + error.message,
-                                  SpreadsheetApp.getUi().ButtonSet.OK);
+    ui.alert('❌ Error', 'Error al importar datos: ' + error.message, ui.ButtonSet.OK);
     Logger.log('Error en importarDatosKobo: ' + error);
   }
 }
@@ -104,8 +102,8 @@ function mostrarSeguimientosPendientes() {
   const html = HtmlService.createHtmlOutput(generarHTMLSeguimientos(seguimientos))
     .setWidth(700)
     .setHeight(500)
-    .setTitle('Seguimientos Pendientes');
-  SpreadsheetApp.getUi().showModalDialog(html, 'Seguimientos Pendientes');
+    .setTitle('Conexiones Laborales Pendientes');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Conexiones Laborales Pendientes');
 }
 
 /**
@@ -280,7 +278,7 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── SEGUIMIENTOS ───────────────────────────────────────────────────────────
+  // ── CONEXIÓN LABORAL ───────────────────────────────────────────────────────
   'Conexión laboral': {
     color: '#673ab7',
     columnas: [
@@ -384,7 +382,9 @@ function _ejecutarInstalacion(borrarExistentes) {
         'Conexión laboral',
         'Estado actual del participante',
         'Configuración',
-        // Nombres legacy (por si acaso existen)
+        // Nombres legacy (por si acaso existen hojas viejas)
+        'Seguimientos',
+        'No busca trabajo - Fito',
         'Reportes mensuales',
         'Reportes Mensuales',
         'Por su Cuenta',
@@ -1166,7 +1166,7 @@ function programarSeguimientos(graduadoId, nombreGraduado) {
     const fechaProgramada = new Date(fechaBase);
     fechaProgramada.setDate(fechaProgramada.getDate() + seg.diasDespues);
 
-    // Columnas Seguimientos: No. | Creamos ID | Nombre | Tipo | Fecha prog. | Fecha real. | Estado | Resultado | Notas | Próximo paso
+    // Columnas Conexión laboral: No. | Creamos ID | Nombre | Tipo | Fecha prog. | Fecha real. | Estado | Resultado | Notas | Próximo paso
     hojaSeguimientos.appendRow([
       graduadoId,     // No. (referencia)
       '',             // Creamos ID (se completa manualmente)
@@ -1198,8 +1198,8 @@ function obtenerSeguimientosPendientes() {
   hoy.setHours(0, 0, 0, 0);
 
   const pendientes = [];
-  // Seguimientos: [0]=No. | [1]=Creamos ID | [2]=Nombre | [3]=Tipo | [4]=Fecha prog. |
-  //              [5]=Fecha real. | [6]=Estado | [7]=Resultado | [8]=Notas | [9]=Próximo paso
+  // Conexión laboral: [0]=No. | [1]=Creamos ID | [2]=Nombre | [3]=Tipo | [4]=Fecha prog. |
+  //                  [5]=Fecha real. | [6]=Estado | [7]=Resultado | [8]=Notas | [9]=Próximo paso
   for (let i = 1; i < datos.length; i++) {
     const estado             = datos[i][6];
     const fechaProgramadaStr = datos[i][4];
@@ -1228,8 +1228,8 @@ function obtenerSeguimientosPendientes() {
  * @param {string} proximoPaso
  */
 function marcarSeguimientoRealizado(fila, resultado, notas, proximoPaso) {
-  // Seguimientos: col 1=No. | 2=Creamos ID | 3=Nombre | 4=Tipo | 5=Fecha prog. |
-  //              6=Fecha real. | 7=Estado | 8=Resultado | 9=Notas | 10=Próximo paso
+  // Conexión laboral: col 1=No. | 2=Creamos ID | 3=Nombre | 4=Tipo | 5=Fecha prog. |
+  //                  6=Fecha real. | 7=Estado | 8=Resultado | 9=Notas | 10=Próximo paso
   const hoja = obtenerHoja('Conexión laboral');
   hoja.getRange(fila, 6).setValue(new Date().toLocaleDateString('es-ES')); // Fecha realizada
   hoja.getRange(fila, 7).setValue('Realizado');                             // Estado
@@ -1269,8 +1269,8 @@ function generarHTMLSeguimientos(seguimientos) {
   html += 'th { background-color: #673ab7; color: white; }';
   html += 'tr:hover { background-color: #f5f5f5; }';
   html += '</style>';
-  html += '<h2>📞 Seguimientos Pendientes</h2>';
-  html += `<p>Total: <strong>${seguimientos.length}</strong> seguimiento(s)</p>`;
+  html += '<h2>📞 Conexiones Laborales Pendientes</h2>';
+  html += `<p>Total: <strong>${seguimientos.length}</strong> conexión(es) pendiente(s)</p>`;
   html += '<table>';
   html += '<tr><th>Nombre</th><th>Tipo</th><th>Fecha Programada</th><th>Notas</th></tr>';
   seguimientos.forEach(seg => {
@@ -1289,16 +1289,16 @@ function enviarNotificacionesSeguimientos(emailDestinatario) {
   const pendientes = obtenerSeguimientosPendientes();
   if (pendientes.length === 0) return;
 
-  let mensaje = '<h2>Seguimientos Pendientes - Equipito Empleabilidad</h2>';
-  mensaje += `<p>Tienes <strong>${pendientes.length}</strong> seguimiento(s) pendiente(s):</p><ul>`;
+  let mensaje = '<h2>Conexiones Laborales Pendientes - Equipito Empleabilidad</h2>';
+  mensaje += `<p>Tienes <strong>${pendientes.length}</strong> conexión(es) laboral(es) pendiente(s):</p><ul>`;
   pendientes.forEach(seg => {
     mensaje += `<li><strong>${seg.nombre}</strong> - ${seg.tipo} (${seg.fechaProgramada})</li>`;
   });
-  mensaje += '</ul><p>Por favor, realiza estos seguimientos lo antes posible.</p>';
+  mensaje += '</ul><p>Por favor, realiza estas conexiones lo antes posible.</p>';
 
   MailApp.sendEmail({
     to: emailDestinatario,
-    subject: `⏰ ${pendientes.length} Seguimiento(s) Pendiente(s) - Equipito Empleabilidad`,
+    subject: `⏰ ${pendientes.length} Conexión(es) Laboral(es) Pendiente(s) - Equipito Empleabilidad`,
     htmlBody: mensaje
   });
   Logger.log(`Notificación enviada a: ${emailDestinatario}`);
@@ -1521,6 +1521,9 @@ function guardarConfiguracionDesdeFormulario(datos) {
     if (datos.emailNotificaciones) {
       guardarConfiguracionNotificaciones(datos.emailNotificaciones, datos.activarNotificaciones);
     }
+    if (datos.pasoAPasoSheetId !== undefined && datos.pasoAPasoSheetId !== null) {
+      PropertiesService.getScriptProperties().setProperty('PASO_A_PASO_SHEET_ID', datos.pasoAPasoSheetId);
+    }
     return { exito: true, mensaje: 'Configuración guardada correctamente' };
   } catch (error) {
     return { exito: false, mensaje: 'Error al guardar: ' + error.message };
@@ -1605,9 +1608,16 @@ function enviarNotificacionNuevosGraduados(cantidad) {
  */
 function parsearFecha(fechaStr) {
   if (!fechaStr) return null;
+  if (fechaStr instanceof Date) return fechaStr;
   try {
-    const p = fechaStr.split('/');
-    if (p.length === 3) return new Date(p[2], p[1] - 1, p[0]);
+    const str = fechaStr.toString().trim();
+    const p = str.split('/');
+    if (p.length === 3) {
+      const d = parseInt(p[0], 10);
+      const m = parseInt(p[1], 10);
+      const y = parseInt(p[2], 10);
+      if (!isNaN(d) && !isNaN(m) && !isNaN(y)) return new Date(y, m - 1, d);
+    }
   } catch (e) {
     Logger.log('Error parseando fecha: ' + fechaStr);
   }
@@ -1646,26 +1656,25 @@ function registrarMovimientoEtapa(creamosId, nombreCompleto, etapa, nota) {
  * @param {Sheet} hoja
  */
 function actualizarResumenEstado(hoja) {
-  const datos       = hoja.getDataRange().getValues();
-  const ultimaFila  = hoja.getLastRow();
+  const datos = hoja.getDataRange().getValues();
 
   // Contar cuántas personas hay actualmente en cada etapa
-  // (se toma la etapa más reciente de cada participante por nombre)
-  const ultimaEtapaPorNombre = {};
+  // (se toma la etapa más reciente de cada participante por Creamos ID)
+  const ultimaEtapaPorId = {};
   // Columnas de Estado actual: [0]=Fecha | [1]=Creamos ID | [2]=Nombre | [3]=Etapa | [4]=Nota
   for (let i = 1; i < datos.length; i++) {
-    const nombre = datos[i][2];  // Nombre completo
-    const etapa  = datos[i][3];  // Etapa
+    const creamosId = datos[i][1];  // Creamos ID
+    const etapa     = datos[i][3];  // Etapa
     // Solo filas válidas (no parte del bloque de resumen)
-    if (nombre && etapa && ETAPAS_FLUJO.indexOf(etapa) !== -1) {
-      ultimaEtapaPorNombre[nombre] = etapa;
+    if (creamosId && etapa && ETAPAS_FLUJO.indexOf(etapa) !== -1) {
+      ultimaEtapaPorId[creamosId] = etapa;
     }
   }
 
   // Calcular conteos
   const conteos = {};
   ETAPAS_FLUJO.forEach(e => { conteos[e] = 0; });
-  Object.values(ultimaEtapaPorNombre).forEach(etapa => {
+  Object.values(ultimaEtapaPorId).forEach(etapa => {
     if (conteos[etapa] !== undefined) conteos[etapa]++;
   });
 
@@ -1679,8 +1688,9 @@ function actualizarResumenEstado(hoja) {
   }
 
   // Borrar resumen anterior si existe
+  // Filas del bloque: separador(1) + encabezado(1) + etapas(N) + total(1) = N + 3
   if (inicioResumen > 0) {
-    const filasResumen = ETAPAS_FLUJO.length + 2; // separador + filas + total
+    const filasResumen = ETAPAS_FLUJO.length + 3;
     hoja.deleteRows(inicioResumen, filasResumen);
   }
 
