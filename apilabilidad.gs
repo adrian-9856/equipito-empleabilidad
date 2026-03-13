@@ -25,7 +25,9 @@ function onOpen() {
     .addItem('🔄 Importar desde KoboToolbox', 'importarDatosKobo')
     .addSeparator()
     .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
-    .addItem('📞 Ver Seguimientos Pendientes', 'mostrarSeguimientosPendientes')
+    .addItem('📞 Ver Conexiones Laborales Pendientes', 'mostrarSeguimientosPendientes')
+    .addSeparator()
+    .addItem('📊 Generar Reporte de Números', 'generarReporteNumeros')
     .addSeparator()
     .addItem('⚙️ Configurar Credenciales', 'mostrarConfiguracion')
     .addSeparator()
@@ -134,7 +136,7 @@ const ETAPAS_FLUJO = [
   'Plataforma',
   'Derivaciones',
   'Por su cuenta',
-  'No busca trabajo - Fito',
+  'Paso a paso',
   'Activamente busca trabajo'
 ];
 
@@ -247,8 +249,8 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── 5. NO BUSCA TRABAJO / FITO ────────────────────────────────────────────
-  'No busca trabajo - Fito': {
+  // ── 5. PASO A PASO ────────────────────────────────────────────────────────
+  'Paso a paso': {
     color: '#9e9e9e',
     columnas: [
       ...COLUMNAS_COMUNES,
@@ -273,7 +275,7 @@ const ESTRUCTURA_HOJAS = {
   },
 
   // ── SEGUIMIENTOS ───────────────────────────────────────────────────────────
-  'Seguimientos': {
+  'Conexión laboral': {
     color: '#673ab7',
     columnas: [
       { nombre: 'No.',              ancho: 60,  tipo: 'texto' },  // número de registro
@@ -371,9 +373,9 @@ function _ejecutarInstalacion(borrarExistentes) {
         'Plataforma',
         'Derivaciones',
         'Por su cuenta',
-        'No busca trabajo - Fito',
+        'Paso a paso',
         'Activamente busca trabajo',
-        'Seguimientos',
+        'Conexión laboral',
         'Estado actual del participante',
         'Configuración',
         // Nombres legacy (por si acaso existen)
@@ -406,9 +408,9 @@ function _ejecutarInstalacion(borrarExistentes) {
       'Plataforma',
       'Derivaciones',
       'Por su cuenta',
-      'No busca trabajo - Fito',
+      'Paso a paso',
       'Activamente busca trabajo',
-      'Seguimientos',
+      'Conexión laboral',
       'Estado actual del participante'
     ];
 
@@ -562,11 +564,12 @@ function _crearHojaConfiguracion(ss) {
   hoja.setRowHeight(1, 36);
 
   const filas = [
-    ['KOBO_EXPORT_URL', '', 'URL de exportación CSV de KoboToolbox'],
-    ['KOBO_TOKEN',      '', 'Token de autenticación de KoboToolbox'],
-    ['EMAIL_NOTIF',     '', 'Email para recibir notificaciones'],
-    ['SYNC_AUTO',       'false', 'true = sincronizar cada hora automáticamente'],
-    ['NOTIF_AUTO',      'false', 'true = enviar email diario de seguimientos pendientes']
+    ['KOBO_EXPORT_URL',        '', 'URL de exportación CSV de KoboToolbox'],
+    ['KOBO_TOKEN',             '', 'Token de autenticación de KoboToolbox'],
+    ['EMAIL_NOTIF',            '', 'Email para recibir notificaciones'],
+    ['SYNC_AUTO',              'false', 'true = sincronizar cada hora automáticamente'],
+    ['NOTIF_AUTO',             'false', 'true = enviar email diario de seguimientos pendientes'],
+    ['PASO_A_PASO_SHEET_ID',   '', 'ID del Google Sheet externo donde se envían los participantes de "Paso a paso"']
   ];
   hoja.getRange(2, 1, filas.length, 3).setValues(filas);
 
@@ -876,6 +879,10 @@ function clasificarGraduado(graduadoId, clasificacion, datosAdicionales = {}) {
       if (clasificacion === 'Activamente busca trabajo') {
         programarSeguimientos(graduadoId, datos[i][3]); // [3] = Nombre completo
       }
+      // Si se clasifica como "Paso a paso", también enviar al Google Sheet externo
+      if (clasificacion === 'Paso a paso') {
+        sincronizarPasoAPasoExterno(datos[i], datosAdicionales);
+      }
       Logger.log(`Graduado ${datos[i][3]} clasificado como: ${clasificacion}`);
       break;
     }
@@ -949,6 +956,11 @@ function reclasificarParticipante(creamosId, nuevaClasificacion, datosAdicionale
     programarSeguimientos(datosParticipante[0], datosParticipante[3]);
   }
 
+  // ── 7. Si pasa a "Paso a paso", sincronizar al sheet externo ─────────────
+  if (nuevaClasificacion === 'Paso a paso') {
+    sincronizarPasoAPasoExterno(datosParticipante, datosAdicionales);
+  }
+
   Logger.log(`Participante "${datosParticipante[3]}" reclasificado: "${etapaAnterior}" → "${nuevaClasificacion}"`);
 }
 
@@ -1000,9 +1012,9 @@ function obtenerNombreHojaClasificacion(clasificacion) {
     'Plataforma':                 'Plataforma',
     'Derivaciones':               'Derivaciones',
     'Por su cuenta':              'Por su cuenta',
-    'No busca trabajo':           'No busca trabajo - Fito',
-    'Fito':                       'No busca trabajo - Fito',
-    'No busca trabajo - Fito':    'No busca trabajo - Fito',
+    'No busca trabajo':           'Paso a paso',
+    'Fito':                       'Paso a paso',
+    'Paso a paso':                'Paso a paso',
     'Activamente busca trabajo':  'Activamente busca trabajo',
     // legacy
     'Por su Cuenta':              'Por su cuenta',
@@ -1085,7 +1097,7 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
         datosAdicionales.activo  || 'Sí'
       ]);
 
-    case 'No busca trabajo - Fito':
+    case 'Paso a paso':
     case 'No busca trabajo':
     case 'Fito':
       return filaBase.concat([
@@ -1135,7 +1147,7 @@ function obtenerHoja(nombreHoja) {
  * @param {string} nombreGraduado
  */
 function programarSeguimientos(graduadoId, nombreGraduado) {
-  const hojaSeguimientos = obtenerHoja('Seguimientos');
+  const hojaSeguimientos = obtenerHoja('Conexión laboral');
 
   const fechaBase   = new Date();
   const seguimientos = [
@@ -1172,7 +1184,7 @@ function programarSeguimientos(graduadoId, nombreGraduado) {
  * @return {Array}
  */
 function obtenerSeguimientosPendientes() {
-  const hojaSeguimientos = obtenerHoja('Seguimientos');
+  const hojaSeguimientos = obtenerHoja('Conexión laboral');
   const datos            = hojaSeguimientos.getDataRange().getValues();
   if (datos.length <= 1) return [];
 
@@ -1212,7 +1224,7 @@ function obtenerSeguimientosPendientes() {
 function marcarSeguimientoRealizado(fila, resultado, notas, proximoPaso) {
   // Seguimientos: col 1=No. | 2=Creamos ID | 3=Nombre | 4=Tipo | 5=Fecha prog. |
   //              6=Fecha real. | 7=Estado | 8=Resultado | 9=Notas | 10=Próximo paso
-  const hoja = obtenerHoja('Seguimientos');
+  const hoja = obtenerHoja('Conexión laboral');
   hoja.getRange(fila, 6).setValue(new Date().toLocaleDateString('es-ES')); // Fecha realizada
   hoja.getRange(fila, 7).setValue('Realizado');                             // Estado
   hoja.getRange(fila, 8).setValue(resultado);                               // Resultado
@@ -1295,6 +1307,79 @@ function enviarNotificacionesDiarias() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// SECCIÓN 4B: SYNC EXTERNO — PASO A PASO
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Envía una fila de "Paso a paso" al Google Sheet externo configurado.
+ * El sheet externo debe existir previamente y tener acceso desde esta cuenta.
+ *
+ * Si no hay PASO_A_PASO_SHEET_ID configurado, omite silenciosamente.
+ *
+ * Columnas que se envían (igual que la hoja local "Paso a paso"):
+ *   Fecha de ingreso | Creamos ID | Nombre completo | Género | Edad |
+ *   Nivel educativo | DPI | Número de teléfono | Formación | Cohorte | Nota | Activo
+ *
+ * @param {Array}  datosGraduado   - Fila completa de la hoja Graduados
+ * @param {Object} datosAdicionales
+ */
+function sincronizarPasoAPasoExterno(datosGraduado, datosAdicionales) {
+  const config = obtenerConfiguracion();
+  if (!config.pasoAPasoSheetId) {
+    Logger.log('sincronizarPasoAPasoExterno: no hay PASO_A_PASO_SHEET_ID configurado, se omite.');
+    return;
+  }
+
+  try {
+    const ssExterno = SpreadsheetApp.openById(config.pasoAPasoSheetId);
+
+    // Buscar o crear hoja llamada "Paso a paso" en el sheet externo
+    let hojaExt = ssExterno.getSheetByName('Paso a paso');
+    if (!hojaExt) {
+      hojaExt = ssExterno.insertSheet('Paso a paso');
+      // Crear cabecera si la hoja es nueva
+      hojaExt.appendRow([
+        'Fecha de ingreso', 'Creamos ID', 'Nombre completo', 'Género', 'Edad',
+        'Nivel educativo', 'DPI', 'Número de teléfono', 'Formación', 'Cohorte',
+        'Nota', 'Activo', 'Origen'
+      ]);
+      hojaExt.getRange(1, 1, 1, 13)
+             .setBackground('#9e9e9e')
+             .setFontColor('#ffffff')
+             .setFontWeight('bold');
+      hojaExt.setFrozenRows(1);
+      Logger.log('sincronizarPasoAPasoExterno: hoja "Paso a paso" creada en sheet externo.');
+    }
+
+    // Construir fila
+    // datosGraduado índices: [0]=No. [1]=Fecha envío [2]=Creamos ID [3]=Nombre
+    //                        [4]=Teléfono [5]=Formación [6]=Cohorte
+    const fila = [
+      new Date().toLocaleDateString('es-ES'), // Fecha de ingreso
+      datosGraduado[2],                        // Creamos ID
+      datosGraduado[3],                        // Nombre completo
+      datosAdicionales.genero   || '',
+      datosAdicionales.edad     || '',
+      datosAdicionales.nivelEdu || '',
+      datosAdicionales.dpi      || '',
+      datosAdicionales.telefono || datosGraduado[4] || '',
+      datosAdicionales.formacion || datosGraduado[5] || '',
+      datosAdicionales.cohorte   || datosGraduado[6] || '',
+      datosAdicionales.nota      || '',
+      datosAdicionales.activo    || 'No',
+      SpreadsheetApp.getActiveSpreadsheet().getName() // nombre del sistema origen
+    ];
+
+    hojaExt.appendRow(fila);
+    Logger.log(`sincronizarPasoAPasoExterno: "${datosGraduado[3]}" enviado al sheet externo.`);
+
+  } catch (error) {
+    Logger.log('Error en sincronizarPasoAPasoExterno: ' + error.message);
+    // No lanzar error — la falla del sync externo no debe interrumpir el flujo local
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // SECCIÓN 5: CONFIGURACIÓN Y CREDENCIALES
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1317,7 +1402,8 @@ function obtenerConfiguracion() {
     koboExportUrl:        props.getProperty('KOBO_EXPORT_URL') || '',
     koboToken:            props.getProperty('KOBO_TOKEN')      || '',
     emailNotificaciones:  props.getProperty('EMAIL_NOTIFICACIONES') || '',
-    sincronizacionAuto:   props.getProperty('SINCRONIZACION_AUTO') === 'true'
+    sincronizacionAuto:   props.getProperty('SINCRONIZACION_AUTO') === 'true',
+    pasoAPasoSheetId:     props.getProperty('PASO_A_PASO_SHEET_ID') || ''
   };
 }
 
@@ -1649,6 +1735,87 @@ function obtenerEstadisticasGenerales() {
 
   stats.seguimientosPendientes = obtenerSeguimientosPendientes().length;
   return stats;
+}
+
+/**
+ * Genera un reporte de números por etapa y lo muestra en un popup.
+ * También actualiza el bloque de resumen en "Estado actual del participante".
+ *
+ * Cuenta:
+ *  - Participantes activos en cada etapa (columna Activo = 'Sí' en cada hoja)
+ *  - Total general
+ *  - Conexiones laborales pendientes
+ */
+function generarReporteNumeros() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // ── Contar activos por etapa ───────────────────────────────────────────────
+  const hojas = [
+    'Aliados',
+    'Plataforma',
+    'Derivaciones',
+    'Por su cuenta',
+    'Paso a paso',
+    'Activamente busca trabajo'
+  ];
+
+  const conteos = {};
+  let totalActivos = 0;
+
+  hojas.forEach(nombreHoja => {
+    const hoja = ss.getSheetByName(nombreHoja);
+    if (!hoja || hoja.getLastRow() <= 1) {
+      conteos[nombreHoja] = 0;
+      return;
+    }
+    const datos    = hoja.getDataRange().getValues();
+    const headers  = datos[0];
+    const colActivo = headers.indexOf('Activo'); // columna Activo (0-based)
+    let activos = 0;
+    for (let i = 1; i < datos.length; i++) {
+      if (colActivo >= 0 && datos[i][colActivo] === 'Sí') activos++;
+      else if (colActivo < 0) activos++; // si no hay columna Activo, cuenta todos
+    }
+    conteos[nombreHoja] = activos;
+    totalActivos += activos;
+  });
+
+  const pendientesConexion = obtenerSeguimientosPendientes().length;
+  const totalGraduados     = (ss.getSheetByName('Graduados') || {getLastRow: () => 1}).getLastRow() - 1;
+
+  // ── Actualizar resumen en "Estado actual del participante" ─────────────────
+  actualizarResumenEstado(obtenerHoja('Estado actual del participante'));
+
+  // ── Construir HTML del reporte ─────────────────────────────────────────────
+  let html = '<style>';
+  html += 'body{font-family:Arial,sans-serif;padding:16px;font-size:13px}';
+  html += 'h2{color:#e91e63;margin-bottom:12px}';
+  html += 'table{width:100%;border-collapse:collapse;margin-bottom:16px}';
+  html += 'th{background:#e91e63;color:#fff;padding:8px 12px;text-align:left}';
+  html += 'td{padding:7px 12px;border-bottom:1px solid #eee}';
+  html += '.num{text-align:right;font-weight:bold;font-size:15px}';
+  html += '.total-row{background:#fce4ec;font-weight:bold}';
+  html += '.badge{display:inline-block;background:#e91e63;color:#fff;border-radius:12px;padding:2px 10px;font-size:14px}';
+  html += '</style>';
+  html += `<h2>📊 Reporte de Números — ${new Date().toLocaleDateString('es-ES')}</h2>`;
+
+  html += '<table>';
+  html += '<tr><th>Etapa</th><th style="text-align:right">Participantes activos</th></tr>';
+  hojas.forEach(h => {
+    html += `<tr><td>${h}</td><td class="num">${conteos[h]}</td></tr>`;
+  });
+  html += `<tr class="total-row"><td>TOTAL ACTIVOS</td><td class="num">${totalActivos}</td></tr>`;
+  html += '</table>';
+
+  html += '<table>';
+  html += '<tr><th colspan="2">Resumen general</th></tr>';
+  html += `<tr><td>Graduados en el sistema</td><td class="num">${totalGraduados}</td></tr>`;
+  html += `<tr><td>Conexiones laborales pendientes</td><td class="num">${pendientesConexion}</td></tr>`;
+  html += '</table>';
+
+  const out = HtmlService.createHtmlOutput(html).setWidth(480).setHeight(420);
+  ui.showModalDialog(out, 'Reporte de Números');
 }
 
 function mostrarProgreso(mensaje) {
