@@ -40,6 +40,50 @@ function onOpen(e) {
 }
 
 /**
+ * Simple trigger: se ejecuta al editar cualquier celda.
+ * Si el usuario cambia la columna "Etapa" (col 12) en Graduados,
+ * copia automáticamente al graduado a la hoja de clasificación correspondiente.
+ */
+function onEdit(e) {
+  try {
+    if (!e || !e.range) return;
+    const hoja    = e.range.getSheet();
+    const colEtapa = 12; // Etapa es la columna 12 en Graduados
+
+    if (hoja.getName() !== 'Graduados') return;
+    if (e.range.getColumn() !== colEtapa) return;
+    if (e.range.getRow() <= 1) return; // ignorar header
+
+    const nuevaEtapa = e.value;
+    if (!nuevaEtapa) return;
+
+    const fila       = e.range.getRow();
+    const datosGrad  = hoja.getRange(fila, 1, 1, 12).getValues()[0];
+    const graduadoId = datosGrad[0];
+    const creamosId  = datosGrad[2];
+    const nombre     = datosGrad[3];
+
+    // Copiar a la hoja de clasificación
+    copiarAHojaClasificacion(datosGrad, nuevaEtapa, {});
+
+    // Registrar movimiento en "Estado actual del participante"
+    registrarMovimientoEtapa(creamosId, nombre, nuevaEtapa, '');
+
+    // Programar seguimientos si aplica
+    if (nuevaEtapa === 'Activamente busca trabajo') {
+      hoja.getRange(fila, 9).setValue('Sí'); // Empleado = Sí
+      programarSeguimientos(graduadoId, nombre);
+    }
+
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      nombre + ' enviado a: ' + nuevaEtapa, '✅ Clasificado', 3
+    );
+  } catch (error) {
+    Logger.log('onEdit: ' + error);
+  }
+}
+
+/**
  * Trigger instalable: úsalo si onOpen no crea el menú automáticamente.
  * Para instalarlo ejecuta: configurarMenuTrigger()
  */
@@ -184,23 +228,18 @@ const ESTRUCTURA_HOJAS = {
   // Columnas:
   //  1=No. | 2=Fecha de envío | 3=Creamos ID | 4=Nombre completo |
   //  5=Número de teléfono | 6=Formación | 7=Cohorte | 8=Fecha de entrevista |
-  //  9=Entrevistador | 10=Resultado entrevista | 11=Siguiente paso |
-  //  12=Clasificación | 13=Empleado | 14=Próxima llamada | 15=Notas | 16=Etapa
+  //  9=Empleado | 10=Próxima llamada | 11=Notas | 12=Etapa
   'Graduados': {
     color: '#1a73e8',
     columnas: [
-      { nombre: 'No.',                  ancho: 60,  tipo: 'texto'  },  // era ID Kobo
-      { nombre: 'Fecha de envío',       ancho: 140, tipo: 'fecha'  },  // auto al importar
-      { nombre: 'Creamos ID',           ancho: 130, tipo: 'texto'  },  // antes de Nombre
+      { nombre: 'No.',                  ancho: 60,  tipo: 'texto'  },
+      { nombre: 'Fecha de envío',       ancho: 140, tipo: 'fecha'  },
+      { nombre: 'Creamos ID',           ancho: 130, tipo: 'texto'  },
       { nombre: 'Nombre completo',      ancho: 200, tipo: 'texto'  },
       { nombre: 'Número de teléfono',   ancho: 150, tipo: 'texto'  },
       { nombre: 'Formación',            ancho: 180, tipo: 'texto'  },
       { nombre: 'Cohorte',              ancho: 100, tipo: 'texto'  },
       { nombre: 'Fecha de entrevista',  ancho: 140, tipo: 'fecha'  },
-      { nombre: 'Entrevistador',        ancho: 160, tipo: 'texto'  },
-      { nombre: 'Resultado entrevista', ancho: 220, tipo: 'texto'  },
-      { nombre: 'Siguiente paso',       ancho: 200, tipo: 'texto'  },
-      { nombre: 'Clasificación',        ancho: 180, tipo: 'texto'  },
       { nombre: 'Empleado',             ancho: 90,  tipo: 'siNo'   },
       { nombre: 'Próxima llamada',      ancho: 180, tipo: 'texto'  },
       { nombre: 'Notas',                ancho: 300, tipo: 'texto'  },
@@ -651,8 +690,8 @@ function obtenerGraduadosSinClasificar() {
 
     const sin = [];
     for (let i = 1; i < datos.length; i++) {
-      const clasificacion = datos[i][11]; // col 12 = Clasificación
-      if (!clasificacion || clasificacion.trim() === '') {
+      const etapa = datos[i][11]; // col 12 = Etapa
+      if (!etapa || etapa.toString().trim() === '') {
         sin.push({ id: datos[i][0], nombre: datos[i][3] }); // [3] = Nombre completo
       }
     }
@@ -845,33 +884,28 @@ function procesarDatosGraduados(datos) {
 
 /**
  * Agrega un nuevo graduado a la hoja Graduados
- * Columnas (según ESTRUCTURA_HOJAS['Graduados']):
- *   1=No. | 2=Fecha de envío (auto) | 3=Creamos ID | 4=Nombre completo |
+ * Columnas:
+ *   1=No. | 2=Fecha de envío | 3=Creamos ID | 4=Nombre completo |
  *   5=Número de teléfono | 6=Formación | 7=Cohorte |
- *   8=Fecha de entrevista | 9=Entrevistador | 10=Resultado entrevista |
- *   11=Siguiente paso | 12=Clasificación | 13=Empleado |
- *   14=Próxima llamada | 15=Notas | 16=Etapa
+ *   8=Fecha de entrevista | 9=Empleado | 10=Próxima llamada |
+ *   11=Notas | 12=Etapa
  * @param {Object} graduado
  */
 function agregarGraduado(graduado) {
   const hoja = obtenerHoja('Graduados');
   const fila = [
-    graduado.id,                            // No. (referencia KoboToolbox)
-    new Date().toLocaleDateString('es-ES'), // Fecha de envío — auto al importar
-    '',                                     // Creamos ID (se llena manualmente)
+    graduado.id,                            // No.
+    new Date().toLocaleDateString('es-ES'), // Fecha de envío
+    '',                                     // Creamos ID (manual)
     graduado.nombre,                        // Nombre completo
-    graduado.telefono,
-    graduado.formacion,
-    graduado.cohorte || '',
-    graduado.fechaEntrevista,
-    graduado.entrevistador || '',
-    '',    // Resultado entrevista (manual)
-    '',    // Siguiente paso (manual)
-    '',    // Clasificación (auto al clasificar)
-    'No',  // Empleado
-    '',    // Próxima llamada (auto al emplearse)
-    '',    // Notas (manual)
-    ''     // Etapa (dropdown — se llena al clasificar)
+    graduado.telefono,                      // Número de teléfono
+    graduado.formacion,                     // Formación
+    graduado.cohorte || '',                 // Cohorte
+    graduado.fechaEntrevista,               // Fecha de entrevista
+    'No',                                   // Empleado
+    '',                                     // Próxima llamada
+    '',                                     // Notas
+    ''                                      // Etapa (dropdown)
   ];
   hoja.appendRow(fila);
   Logger.log(`Graduado agregado: ${graduado.nombre} (${graduado.id})`);
@@ -893,7 +927,6 @@ function actualizarGraduado(graduado) {
       hoja.getRange(i + 1, 6).setValue(graduado.formacion       || datos[i][5]);
       hoja.getRange(i + 1, 7).setValue(graduado.cohorte         || datos[i][6]);
       hoja.getRange(i + 1, 8).setValue(graduado.fechaEntrevista || datos[i][7]);
-      hoja.getRange(i + 1, 9).setValue(graduado.entrevistador   || datos[i][8]);
       Logger.log(`Graduado actualizado: ${graduado.nombre} (${graduado.id})`);
       break;
     }
@@ -912,14 +945,11 @@ function clasificarGraduado(graduadoId, clasificacion, datosAdicionales = {}) {
 
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduadoId) {
-      // Índices con nueva estructura (No. | Fecha envío | Creamos ID | Nombre...):
-      //   col 12=Clasificación | col 13=Empleado | col 14=Próxima llamada |
-      //   col 15=Notas | col 16=Etapa
-      hojaGraduados.getRange(i + 1, 12).setValue(clasificacion);             // Clasificación
-      hojaGraduados.getRange(i + 1, 13).setValue(
-        clasificacion === 'Activamente busca trabajo' ? 'Sí' : 'No'          // Empleado
+      // Columnas: 9=Empleado | 12=Etapa
+      hojaGraduados.getRange(i + 1, 9).setValue(
+        clasificacion === 'Activamente busca trabajo' ? 'Sí' : 'No'
       );
-      hojaGraduados.getRange(i + 1, 16).setValue(clasificacion);             // Etapa (dropdown)
+      hojaGraduados.getRange(i + 1, 12).setValue(clasificacion);             // Etapa
       copiarAHojaClasificacion(datos[i], clasificacion, datosAdicionales);
       registrarMovimientoEtapa(datos[i][2], datos[i][3], clasificacion, datosAdicionales.nota || '');
       if (clasificacion === 'Activamente busca trabajo') {
@@ -1112,7 +1142,7 @@ function enviarAConexionesLaborales() {
   // Leer datos del graduado seleccionado
   // Graduados: [0]=No. | [1]=Fecha envío | [2]=Creamos ID | [3]=Nombre completo |
   //            [4]=Teléfono | [5]=Formación | [6]=Cohorte
-  const datos = hoja.getRange(filaActiva, 1, 1, 16).getValues()[0];
+  const datos = hoja.getRange(filaActiva, 1, 1, 12).getValues()[0];
   const creamosId      = datos[2] || '';
   const nombreCompleto = datos[3] || '';
 
@@ -1275,7 +1305,7 @@ function guardarConexionLaboral(datos) {
   try {
     // Leer datos del graduado desde la fila seleccionada
     const hojaGrad  = obtenerHoja('Graduados');
-    const filaGrad  = hojaGrad.getRange(datos.filaGraduado, 1, 1, 16).getValues()[0];
+    const filaGrad  = hojaGrad.getRange(datos.filaGraduado, 1, 1, 12).getValues()[0];
 
     // Graduados: [2]=Creamos ID | [3]=Nombre completo | [5]=Formación | [6]=Cohorte
     const creamosId = filaGrad[2] || '';
@@ -1436,7 +1466,7 @@ function actualizarProximaLlamada(graduadoId, tipoLlamada) {
   const datos = hoja.getDataRange().getValues();
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduadoId) {
-      hoja.getRange(i + 1, 13).setValue(tipoLlamada); // col 13 = Próxima llamada
+      hoja.getRange(i + 1, 10).setValue(tipoLlamada); // col 10 = Próxima llamada
       break;
     }
   }
@@ -1846,7 +1876,7 @@ function obtenerEstadisticasGenerales() {
     stats.totalGraduados = hojaGraduados.getLastRow() - 1;
     const datos = hojaGraduados.getDataRange().getValues();
     for (let i = 1; i < datos.length; i++) {
-      const c = datos[i][11]; // col 12 = Clasificación
+      const c = datos[i][11]; // col 12 = Etapa
       if (c) stats.porClasificacion[c] = (stats.porClasificacion[c] || 0) + 1;
     }
   }
