@@ -19,20 +19,40 @@
  * Función que se ejecuta al abrir la hoja de cálculo
  * Crea el menú personalizado en la interfaz
  */
-function onOpen() {
-  const ui = SpreadsheetApp.getUi();
-  ui.createMenu('📊 Seguimiento Graduados')
-    .addItem('🔄 Importar desde KoboToolbox', 'importarDatosKobo')
-    .addSeparator()
-    .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
-    .addItem('💼 Enviar a Conexiones Laborales', 'enviarAConexionesLaborales')
-    .addItem('📞 Ver Seguimientos Pendientes', 'mostrarSeguimientosPendientes')
-    .addSeparator()
-    .addItem('⚙️ Configurar Credenciales', 'mostrarConfiguracion')
-    .addSeparator()
-    .addItem('🚀 Instalar Sistema (primera vez)', 'instalarSistema')
-    .addItem('🔁 Reinstalar Sistema (borra todo)', 'reinstalarSistema')
-    .addToUi();
+function onOpen(e) {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    ui.createMenu('📊 Seguimiento Graduados')
+      .addItem('🔄 Importar desde KoboToolbox', 'importarDatosKobo')
+      .addSeparator()
+      .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
+      .addItem('💼 Enviar a Conexiones Laborales', 'enviarAConexionesLaborales')
+      .addItem('📞 Ver Seguimientos Pendientes', 'mostrarSeguimientosPendientes')
+      .addSeparator()
+      .addItem('⚙️ Configurar Credenciales', 'mostrarConfiguracion')
+      .addSeparator()
+      .addItem('🚀 Instalar Sistema (primera vez)', 'instalarSistema')
+      .addItem('🔁 Reinstalar Sistema (borra todo)', 'reinstalarSistema')
+      .addToUi();
+  } catch (error) {
+    Logger.log('onOpen: no se pudo crear el menú — ' + error.message);
+  }
+}
+
+/**
+ * Trigger instalable: úsalo si onOpen no crea el menú automáticamente.
+ * Para instalarlo ejecuta: configurarMenuTrigger()
+ */
+function configurarMenuTrigger() {
+  // Eliminar triggers anteriores de onOpen
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'onOpen') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('onOpen')
+    .forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())
+    .onOpen()
+    .create();
+  Logger.log('Trigger instalable de onOpen configurado correctamente');
 }
 
 /**
