@@ -272,6 +272,31 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
+  // ── CONEXIONES LABORALES ──────────────────────────────────────────────────
+  'Conexiones Laborales': {
+    color: '#e65100',
+    columnas: [
+      { nombre: 'Creamos ID',                    ancho: 130, tipo: 'texto' },
+      { nombre: 'Nombres',                       ancho: 160, tipo: 'texto' },
+      { nombre: 'Apellidos',                     ancho: 160, tipo: 'texto' },
+      { nombre: 'Edad',                          ancho: 80,  tipo: 'texto' },
+      { nombre: 'Nivel de estudios',             ancho: 160, tipo: 'texto' },
+      { nombre: 'Sexo',                          ancho: 100, tipo: 'texto' },
+      { nombre: 'Tipo',                          ancho: 130, tipo: 'texto' },
+      { nombre: 'Programa',                      ancho: 160, tipo: 'texto' },
+      { nombre: 'Proyecto',                      ancho: 160, tipo: 'texto' },
+      { nombre: 'Especialidad',                  ancho: 180, tipo: 'texto' },
+      { nombre: 'Empresa',                       ancho: 200, tipo: 'texto' },
+      { nombre: 'Cargo que desempeña',           ancho: 200, tipo: 'texto' },
+      { nombre: 'Tipo de duración de contrato',  ancho: 220, tipo: 'texto' },
+      { nombre: 'Tipo de contrato',              ancho: 180, tipo: 'texto' },
+      { nombre: 'Fecha de inicio',               ancho: 140, tipo: 'fecha' },
+      { nombre: 'Fecha de final',                ancho: 140, tipo: 'fecha' },
+      { nombre: 'Duración (meses)',              ancho: 140, tipo: 'texto' },
+      { nombre: 'Salario mensual',               ancho: 150, tipo: 'texto' }
+    ]
+  },
+
   // ── SEGUIMIENTOS ───────────────────────────────────────────────────────────
   'Seguimientos': {
     color: '#673ab7',
@@ -375,6 +400,7 @@ function _ejecutarInstalacion(borrarExistentes) {
         'Activamente busca trabajo',
         'Seguimientos',
         'Estado actual del participante',
+        'Conexiones Laborales',
         'Configuración',
         // Nombres legacy (por si acaso existen)
         'Reportes mensuales',
@@ -408,6 +434,7 @@ function _ejecutarInstalacion(borrarExistentes) {
       'Por su cuenta',
       'No busca trabajo - Fito',
       'Activamente busca trabajo',
+      'Conexiones Laborales',
       'Seguimientos',
       'Estado actual del participante'
     ];
