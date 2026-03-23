@@ -25,6 +25,7 @@ function onOpen() {
     .addItem('🔄 Importar desde KoboToolbox', 'importarDatosKobo')
     .addSeparator()
     .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
+    .addItem('💼 Enviar a Conexiones Laborales', 'enviarAConexionesLaborales')
     .addItem('📞 Ver Seguimientos Pendientes', 'mostrarSeguimientosPendientes')
     .addSeparator()
     .addItem('⚙️ Configurar Credenciales', 'mostrarConfiguracion')
@@ -1056,6 +1057,253 @@ function obtenerHoja(nombreHoja) {
     Logger.log(`Hoja creada: ${nombreHoja}`);
   }
   return hoja;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SECCIÓN 3B: CONEXIONES LABORALES
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Abre el formulario de Conexiones Laborales para el graduado seleccionado.
+ * El usuario debe tener seleccionada una fila en la hoja "Graduados".
+ */
+function enviarAConexionesLaborales() {
+  const ui   = SpreadsheetApp.getUi();
+  const hoja = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+
+  if (hoja.getName() !== 'Graduados') {
+    ui.alert('⚠️ Hoja incorrecta',
+             'Debes estar en la hoja "Graduados" y seleccionar una fila.',
+             ui.ButtonSet.OK);
+    return;
+  }
+
+  const filaActiva = hoja.getActiveRange().getRow();
+  if (filaActiva <= 1) {
+    ui.alert('⚠️ Selección inválida',
+             'Selecciona la fila de un graduado (no la fila de encabezados).',
+             ui.ButtonSet.OK);
+    return;
+  }
+
+  // Leer datos del graduado seleccionado
+  // Graduados: [0]=No. | [1]=Fecha envío | [2]=Creamos ID | [3]=Nombre completo |
+  //            [4]=Teléfono | [5]=Formación | [6]=Cohorte
+  const datos = hoja.getRange(filaActiva, 1, 1, 16).getValues()[0];
+  const creamosId      = datos[2] || '';
+  const nombreCompleto = datos[3] || '';
+
+  if (!nombreCompleto) {
+    ui.alert('⚠️ Sin datos', 'La fila seleccionada no tiene nombre.', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Generar y mostrar el formulario HTML
+  const html = HtmlService.createHtmlOutput(_generarHTMLFormConexionLaboral(filaActiva, creamosId, nombreCompleto))
+    .setWidth(520)
+    .setHeight(580)
+    .setTitle('Conexión Laboral');
+  ui.showModalDialog(html, '💼 Conexión Laboral — ' + nombreCompleto);
+}
+
+/**
+ * Genera el HTML del formulario de Conexiones Laborales
+ * @param {number} filaGraduado
+ * @param {string} creamosId
+ * @param {string} nombre
+ * @return {string}
+ */
+function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre) {
+  return `
+    <style>
+      body { font-family: Arial, sans-serif; padding: 16px; background: #fafafa; }
+      h3 { color: #e65100; margin-top: 0; }
+      .info { background: #fff3e0; padding: 10px; border-radius: 6px; margin-bottom: 14px; }
+      .info strong { color: #e65100; }
+      label { display: block; font-weight: bold; margin: 10px 0 4px; font-size: 13px; }
+      input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;
+                      box-sizing: border-box; font-size: 13px; }
+      input:focus, select:focus { border-color: #e65100; outline: none; }
+      .row2 { display: flex; gap: 12px; }
+      .row2 > div { flex: 1; }
+      .btn { margin-top: 18px; text-align: right; }
+      .btn button { padding: 10px 24px; border: none; border-radius: 4px; font-size: 14px;
+                    cursor: pointer; }
+      .btn-ok  { background: #e65100; color: #fff; }
+      .btn-ok:hover { background: #bf360c; }
+      .btn-cancel { background: #eee; color: #333; margin-right: 8px; }
+      .msg { padding: 10px; margin-top: 10px; border-radius: 4px; display: none; }
+      .msg-ok  { background: #c8e6c9; color: #2e7d32; }
+      .msg-err { background: #ffcdd2; color: #c62828; }
+    </style>
+
+    <h3>Registro de Conexión Laboral</h3>
+    <div class="info">
+      <strong>Graduado:</strong> ${nombre}<br>
+      <strong>Creamos ID:</strong> ${creamosId || '(sin asignar)'}
+    </div>
+
+    <label>Empresa *</label>
+    <input id="empresa" placeholder="Nombre de la empresa">
+
+    <label>Cargo que desempeña *</label>
+    <input id="cargo" placeholder="Puesto o cargo">
+
+    <label>Tipo de duración de contrato</label>
+    <input id="tipoDuracion" placeholder="Ej: Temporal, Indefinido">
+
+    <label>Tipo de contrato</label>
+    <input id="tipoContrato" placeholder="Ej: Tiempo completo, Medio tiempo">
+
+    <div class="row2">
+      <div>
+        <label>Fecha de inicio</label>
+        <input id="fechaInicio" type="date">
+      </div>
+      <div>
+        <label>Fecha de final</label>
+        <input id="fechaFinal" type="date">
+      </div>
+    </div>
+
+    <div class="row2">
+      <div>
+        <label>Duración (meses)</label>
+        <input id="duracion" type="number" min="0" placeholder="Meses">
+      </div>
+      <div>
+        <label>Salario mensual</label>
+        <input id="salario" placeholder="Q 0.00">
+      </div>
+    </div>
+
+    <div id="mensaje" class="msg"></div>
+
+    <div class="btn">
+      <button class="btn-cancel" onclick="google.script.host.close()">Cancelar</button>
+      <button class="btn-ok" id="btnGuardar" onclick="guardar()">Guardar</button>
+    </div>
+
+    <script>
+      function guardar() {
+        var empresa = document.getElementById('empresa').value.trim();
+        var cargo   = document.getElementById('cargo').value.trim();
+        if (!empresa || !cargo) {
+          mostrarMsg('Empresa y Cargo son obligatorios.', true);
+          return;
+        }
+        document.getElementById('btnGuardar').disabled = true;
+        document.getElementById('btnGuardar').textContent = 'Guardando...';
+
+        var datos = {
+          filaGraduado:  ${filaActiva},
+          empresa:       empresa,
+          cargo:         cargo,
+          tipoDuracion:  document.getElementById('tipoDuracion').value.trim(),
+          tipoContrato:  document.getElementById('tipoContrato').value.trim(),
+          fechaInicio:   document.getElementById('fechaInicio').value,
+          fechaFinal:    document.getElementById('fechaFinal').value,
+          duracion:      document.getElementById('duracion').value,
+          salario:       document.getElementById('salario').value.trim()
+        };
+
+        google.script.run
+          .withSuccessHandler(function(r) {
+            if (r.exito) {
+              mostrarMsg(r.mensaje, false);
+              setTimeout(function() { google.script.host.close(); }, 1500);
+            } else {
+              mostrarMsg(r.mensaje, true);
+              document.getElementById('btnGuardar').disabled = false;
+              document.getElementById('btnGuardar').textContent = 'Guardar';
+            }
+          })
+          .withFailureHandler(function(e) {
+            mostrarMsg('Error: ' + e.message, true);
+            document.getElementById('btnGuardar').disabled = false;
+            document.getElementById('btnGuardar').textContent = 'Guardar';
+          })
+          .guardarConexionLaboral(datos);
+      }
+
+      function mostrarMsg(texto, esError) {
+        var el = document.getElementById('mensaje');
+        el.textContent = texto;
+        el.className = 'msg ' + (esError ? 'msg-err' : 'msg-ok');
+        el.style.display = 'block';
+      }
+    </script>`;
+}
+
+/**
+ * Guarda los datos del formulario en la hoja "Conexiones Laborales".
+ * Combina datos automáticos del graduado + datos del formulario.
+ *
+ * Columnas Conexiones Laborales:
+ *  1=Creamos ID | 2=Nombres | 3=Apellidos | 4=Edad | 5=Nivel de estudios |
+ *  6=Sexo | 7=Tipo | 8=Programa | 9=Proyecto | 10=Especialidad |
+ *  11=Empresa | 12=Cargo | 13=Tipo duración contrato | 14=Tipo contrato |
+ *  15=Fecha inicio | 16=Fecha final | 17=Duración (meses) | 18=Salario mensual
+ *
+ * @param {Object} datos - datos del formulario
+ * @return {Object}
+ */
+function guardarConexionLaboral(datos) {
+  try {
+    // Leer datos del graduado desde la fila seleccionada
+    const hojaGrad  = obtenerHoja('Graduados');
+    const filaGrad  = hojaGrad.getRange(datos.filaGraduado, 1, 1, 16).getValues()[0];
+
+    // Graduados: [2]=Creamos ID | [3]=Nombre completo | [5]=Formación | [6]=Cohorte
+    const creamosId = filaGrad[2] || '';
+    const nombreCompleto = filaGrad[3] || '';
+
+    // Separar nombre y apellidos (primera palabra = nombre, resto = apellidos)
+    const partes   = nombreCompleto.trim().split(/\s+/);
+    const nombres  = partes.length > 0 ? partes[0] : '';
+    const apellidos = partes.length > 1 ? partes.slice(1).join(' ') : '';
+
+    // Formatear fechas de yyyy-mm-dd (input date) a dd/mm/yyyy
+    var fechaInicio = '';
+    if (datos.fechaInicio) {
+      const p = datos.fechaInicio.split('-');
+      fechaInicio = p[2] + '/' + p[1] + '/' + p[0];
+    }
+    var fechaFinal = '';
+    if (datos.fechaFinal) {
+      const p = datos.fechaFinal.split('-');
+      fechaFinal = p[2] + '/' + p[1] + '/' + p[0];
+    }
+
+    const fila = [
+      creamosId,             // Creamos ID
+      nombres,               // Nombres
+      apellidos,             // Apellidos
+      '',                    // Edad (se llena manualmente o de datos adicionales)
+      '',                    // Nivel de estudios
+      '',                    // Sexo
+      '',                    // Tipo
+      '',                    // Programa
+      '',                    // Proyecto
+      '',                    // Especialidad
+      datos.empresa,         // Empresa
+      datos.cargo,           // Cargo que desempeña
+      datos.tipoDuracion,    // Tipo de duración de contrato
+      datos.tipoContrato,    // Tipo de contrato
+      fechaInicio,           // Fecha de inicio
+      fechaFinal,            // Fecha de final
+      datos.duracion || '',  // Duración (meses)
+      datos.salario          // Salario mensual
+    ];
+
+    obtenerHoja('Conexiones Laborales').appendRow(fila);
+    Logger.log('Conexión laboral registrada: ' + nombreCompleto + ' en ' + datos.empresa);
+
+    return { exito: true, mensaje: 'Conexión laboral guardada correctamente.' };
+  } catch (error) {
+    Logger.log('Error al guardar conexión laboral: ' + error);
+    return { exito: false, mensaje: 'Error al guardar: ' + error.message };
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
