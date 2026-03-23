@@ -155,7 +155,7 @@ const ETAPAS_FLUJO = [
   'Plataforma',
   'Derivaciones',
   'Por su cuenta',
-  'No busca trabajo - Fito',
+  'Paso a paso',
   'Activamente busca trabajo'
 ];
 
@@ -268,8 +268,8 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── 5. NO BUSCA TRABAJO / FITO ────────────────────────────────────────────
-  'No busca trabajo - Fito': {
+  // ── 5. PASO A PASO ────────────────────────────────────────────────────────
+  'Paso a paso': {
     color: '#9e9e9e',
     columnas: [
       ...COLUMNAS_COMUNES,
@@ -417,7 +417,7 @@ function _ejecutarInstalacion(borrarExistentes) {
         'Plataforma',
         'Derivaciones',
         'Por su cuenta',
-        'No busca trabajo - Fito',
+        'Paso a paso',
         'Activamente busca trabajo',
         'Seguimientos',
         'Estado actual del participante',
@@ -429,6 +429,7 @@ function _ejecutarInstalacion(borrarExistentes) {
         'Por su Cuenta',
         'Busca Trabajo (Fito)',
         'No Busca Trabajar',
+        'No busca trabajo - Fito',
         'Filtro/Papelería',
         'Revisión y Control',
         'Empleados',
@@ -453,7 +454,7 @@ function _ejecutarInstalacion(borrarExistentes) {
       'Plataforma',
       'Derivaciones',
       'Por su cuenta',
-      'No busca trabajo - Fito',
+      'Paso a paso',
       'Activamente busca trabajo',
       'Conexiones Laborales',
       'Seguimientos',
@@ -954,9 +955,11 @@ function obtenerNombreHojaClasificacion(clasificacion) {
     'Plataforma':                 'Plataforma',
     'Derivaciones':               'Derivaciones',
     'Por su cuenta':              'Por su cuenta',
-    'No busca trabajo':           'No busca trabajo - Fito',
-    'Fito':                       'No busca trabajo - Fito',
-    'No busca trabajo - Fito':    'No busca trabajo - Fito',
+    'Paso a paso':                'Paso a paso',
+    // legacy
+    'No busca trabajo':           'Paso a paso',
+    'Fito':                       'Paso a paso',
+    'No busca trabajo - Fito':    'Paso a paso',
     'Activamente busca trabajo':  'Activamente busca trabajo',
     // legacy
     'Por su Cuenta':              'Por su cuenta',
@@ -1039,7 +1042,7 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
         datosAdicionales.activo  || 'Sí'
       ]);
 
-    case 'No busca trabajo - Fito':
+    case 'Paso a paso':
     case 'No busca trabajo':
     case 'Fito':
       return filaBase.concat([
