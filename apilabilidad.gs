@@ -1,19 +1,19 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ==========================================================================
  * SISTEMA DE SEGUIMIENTO DE GRADUADOS - EQUIPITO EMPLEABILIDAD
- * ═══════════════════════════════════════════════════════════════════════════
+ * ==========================================================================
  *
- * Sistema completo de seguimiento de graduados con integración a KoboToolbox
+ * Sistema completo de seguimiento de graduados con integracion a KoboToolbox
  * Archivo unificado con todas las funcionalidades
  *
  * Autor: Equipito Empleabilidad
  * Fecha: 2026-02-03
- * ═══════════════════════════════════════════════════════════════════════════
+ * ==========================================================================
  */
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SECCIÓN 1: MENÚ PRINCIPAL Y FUNCIONES DE INTERFAZ
-// ═══════════════════════════════════════════════════════════════════════════
+// ==========================================================================
+// SECCION 1: MENU PRINCIPAL Y FUNCIONES DE INTERFAZ
+// ==========================================================================
 
 /**
  * Función que se ejecuta al abrir la hoja de cálculo
@@ -177,9 +177,9 @@ function mostrarConfiguracion() {
   SpreadsheetApp.getUi().showModalDialog(html, 'Configuración');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // COLUMNAS COMUNES — van en las 6 hojas de apilabilidad
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Columnas que aparecen en TODAS las hojas de apilabilidad (información principal)
@@ -219,13 +219,13 @@ const AREAS_TRABAJO = [
   'Otro'
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // ESTRUCTURA EXACTA DE COLUMNAS POR HOJA
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 const ESTRUCTURA_HOJAS = {
 
-  // ── GRADUADOS ──────────────────────────────────────────────────────────────
+  // -- GRADUADOS --------------------------------------------------------------
   // Columnas:
   //  1=No. | 2=Fecha de envío | 3=Creamos ID | 4=Nombre completo |
   //  5=Género | 6=Edad | 7=Nivel educativo | 8=Número de teléfono |
@@ -252,7 +252,7 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── 1. ALIADOS ─────────────────────────────────────────────────────────────
+  // -- 1. ALIADOS -------------------------------------------------------------
   'Aliados': {
     color: '#3f51b5',
     columnas: [
@@ -267,7 +267,7 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── 2. PLATAFORMA ──────────────────────────────────────────────────────────
+  // -- 2. PLATAFORMA ----------------------------------------------------------
   'Plataforma': {
     color: '#00bcd4',
     columnas: [
@@ -284,7 +284,7 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── 3. DERIVACIONES ───────────────────────────────────────────────────────
+  // -- 3. DERIVACIONES -------------------------------------------------------
   'Derivaciones': {
     color: '#ff9800',
     columnas: [
@@ -300,7 +300,7 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── 4. POR SU CUENTA ──────────────────────────────────────────────────────
+  // -- 4. POR SU CUENTA ------------------------------------------------------
   'Por su cuenta': {
     color: '#4285f4',
     columnas: [
@@ -312,7 +312,7 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── 5. PASO A PASO ────────────────────────────────────────────────────────
+  // -- 5. PASO A PASO --------------------------------------------------------
   'Paso a paso': {
     color: '#9e9e9e',
     columnas: [
@@ -326,7 +326,7 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── 6. ACTIVAMENTE BUSCA TRABAJO ──────────────────────────────────────────
+  // -- 6. ACTIVAMENTE BUSCA TRABAJO ------------------------------------------
   'Activamente busca trabajo': {
     color: '#0f9d58',
     columnas: [
@@ -337,7 +337,7 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── CONEXIONES LABORALES ──────────────────────────────────────────────────
+  // -- CONEXIONES LABORALES --------------------------------------------------
   'Conexiones Laborales': {
     color: '#e65100',
     columnas: [
@@ -361,7 +361,7 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── SEGUIMIENTOS ───────────────────────────────────────────────────────────
+  // -- SEGUIMIENTOS -----------------------------------------------------------
   'Seguimientos': {
     color: '#673ab7',
     columnas: [
@@ -381,7 +381,7 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── REPORTE ───────────────────────────────────────────────────────────────
+  // -- REPORTE ---------------------------------------------------------------
   // Hoja de reporte automático — no tiene columnas editables por el usuario
   // Se genera/actualiza automáticamente con generarReporte()
   'Reporte': {
@@ -390,9 +390,9 @@ const ESTRUCTURA_HOJAS = {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // FUNCIONES DE INSTALACIÓN Y REINSTALACIÓN
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Instalación inicial: crea las hojas si no existen (no borra nada)
@@ -449,7 +449,7 @@ function _ejecutarInstalacion(borrarExistentes) {
       '⏳ Procesando', -1
     );
 
-    // ── 1. Eliminar hojas existentes si se solicita ──────────────────────────
+    // -- 1. Eliminar hojas existentes si se solicita --------------------------
     if (borrarExistentes) {
       const hojasDelSistema = [
         // Hojas actuales
@@ -488,7 +488,7 @@ function _ejecutarInstalacion(borrarExistentes) {
       });
     }
 
-    // ── 2. Crear cada hoja con su estructura exacta ──────────────────────────
+    // -- 2. Crear cada hoja con su estructura exacta --------------------------
     const ordenHojas = [
       'Graduados',
       'Aliados',
@@ -512,14 +512,14 @@ function _ejecutarInstalacion(borrarExistentes) {
       _construirHoja(hoja, nombreHoja);
     });
 
-    // ── 3. Crear hoja Configuración ──────────────────────────────────────────
+    // -- 3. Crear hoja Configuración ------------------------------------------
     _crearHojaConfiguracion(ss);
 
-    // ── 4. Eliminar hoja temporal si existe ──────────────────────────────────
+    // -- 4. Eliminar hoja temporal si existe ----------------------------------
     const temp = ss.getSheetByName('_temp_');
     if (temp) ss.deleteSheet(temp);
 
-    // ── 5. Ordenar hojas ─────────────────────────────────────────────────────
+    // -- 5. Ordenar hojas -----------------------------------------------------
     _ordenarHojas(ss, [...ordenHojas, 'Configuración']);
 
     ss.toast('', '', 1);
@@ -557,11 +557,11 @@ function _construirHoja(hoja, nombreHoja) {
   const columnas = estructura.columnas;
   const headers  = columnas.map(c => c.nombre);
 
-  // ── Escribir headers ──────────────────────────────────────────────────────
+  // -- Escribir headers ------------------------------------------------------
   const rangoHeader = hoja.getRange(1, 1, 1, headers.length);
   rangoHeader.setValues([headers]);
 
-  // ── Formato de headers ────────────────────────────────────────────────────
+  // -- Formato de headers ----------------------------------------------------
   rangoHeader
     .setBackground(estructura.color)
     .setFontColor('#ffffff')
@@ -573,24 +573,24 @@ function _construirHoja(hoja, nombreHoja) {
 
   hoja.setRowHeight(1, 36);
 
-  // ── Anchos de columna ─────────────────────────────────────────────────────
+  // -- Anchos de columna -----------------------------------------------------
   columnas.forEach((col, i) => {
     hoja.setColumnWidth(i + 1, col.ancho);
   });
 
-  // ── Congelar primera fila ─────────────────────────────────────────────────
+  // -- Congelar primera fila -------------------------------------------------
   hoja.setFrozenRows(1);
 
-  // ── Quitar columnas sobrantes ─────────────────────────────────────────────
+  // -- Quitar columnas sobrantes ---------------------------------------------
   const totalCols = hoja.getMaxColumns();
   if (totalCols > headers.length) {
     hoja.deleteColumns(headers.length + 1, totalCols - headers.length);
   }
 
-  // ── Agregar filtros ───────────────────────────────────────────────────────
+  // -- Agregar filtros -------------------------------------------------------
   rangoHeader.createFilter();
 
-  // ── Validaciones por tipo de columna ─────────────────────────────────────
+  // -- Validaciones por tipo de columna -------------------------------------
   columnas.forEach((col, i) => {
     const colNum = i + 1;
     const rango  = hoja.getRange(2, colNum, 999);
@@ -621,7 +621,7 @@ function _construirHoja(hoja, nombreHoja) {
     }
   });
 
-  // ── Color alterno en filas de datos ──────────────────────────────────────
+  // -- Color alterno en filas de datos --------------------------------------
   try {
     hoja.getRange(2, 1, 1000, headers.length)
         .applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false);
@@ -704,9 +704,9 @@ function obtenerGraduadosSinClasificar() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECCIÓN 2: INTEGRACIÓN CON KOBOTOOLBOX API
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /**
  * Obtiene los datos desde KoboToolbox usando la URL de exportación
@@ -856,9 +856,9 @@ function configurarTriggerSincronizacion() {
   Logger.log('Sincronización automática configurada para ejecutarse cada hora');
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECCIÓN 3: GESTIÓN DE HOJAS Y DATOS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /**
  * Procesa los datos de graduados y los almacena
@@ -1120,9 +1120,9 @@ function obtenerHoja(nombreHoja) {
   return hoja;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECCIÓN 3B: CONEXIONES LABORALES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /**
  * Abre el formulario de Conexiones Laborales para el graduado seleccionado.
@@ -1382,9 +1382,9 @@ function guardarConexionLaboral(datos) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECCIÓN 4: SEGUIMIENTOS Y LLAMADAS PROGRAMADAS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /**
  * Programa los seguimientos automáticos para un graduado empleado/activo
@@ -1556,9 +1556,9 @@ function enviarNotificacionesDiarias() {
   if (email) enviarNotificacionesSeguimientos(email);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECCIÓN 5: CONFIGURACIÓN Y CREDENCIALES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /**
  * Verifica si la configuración está completa
@@ -1697,9 +1697,9 @@ function guardarConfiguracionDesdeFormulario(datos) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECCIÓN 6: UTILIDADES Y FUNCIONES AUXILIARES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 function formatearFecha(fecha) {
   if (!(fecha instanceof Date)) fecha = new Date(fecha);
@@ -1813,7 +1813,7 @@ function generarReporte() {
   hoja.clear();
   hoja.setTabColor('#e91e63');
 
-  // ── Colores ────────────────────────────────────────────────────────────
+  // -- Colores ------------------------------------------------------------
   const C_TITULO     = '#1a237e';
   const C_TITULO_FG  = '#ffffff';
   const C_HEADER     = '#3949ab';
@@ -1827,7 +1827,7 @@ function generarReporte() {
   const MESES_NOMBRE = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const BORDER_STYLE = SpreadsheetApp.BorderStyle.SOLID;
 
-  // ── Leer conteos de cada hoja de clasificación ─────────────────────────
+  // -- Leer conteos de cada hoja de clasificación -------------------------
   const conteos = {};
   let totalParticipantes = 0;
   ETAPAS_FLUJO.forEach(nombreHoja => {
@@ -1848,7 +1848,7 @@ function generarReporte() {
   // Seguimientos pendientes
   const totalSeguimientos = obtenerSeguimientosPendientes().length;
 
-  // ── Leer fechas de ingreso por mes desde cada hoja clasificación ───────
+  // -- Leer fechas de ingreso por mes desde cada hoja clasificación -------
   const ingresosPorMes = {}; // { 'Ene 2026': { 'Aliados': 2, ... } }
   ETAPAS_FLUJO.forEach(nombreHoja => {
     const h = ss.getSheetByName(nombreHoja);
@@ -1878,7 +1878,7 @@ function generarReporte() {
     (a, b) => ingresosPorMes[a]._orden - ingresosPorMes[b]._orden
   );
 
-  // ── Ajustar anchos de columna ──────────────────────────────────────────
+  // -- Ajustar anchos de columna ------------------------------------------
   hoja.setColumnWidth(1, 200);
   hoja.setColumnWidth(2, 120);
   hoja.setColumnWidth(3, 80);
@@ -1886,9 +1886,9 @@ function generarReporte() {
 
   let fila = 1;
 
-  // ══════════════════════════════════════════════════════════════════════
+  // ======================================================================
   // BLOQUE 1: RESUMEN GENERAL
-  // ══════════════════════════════════════════════════════════════════════
+  // ======================================================================
   const anchoBloq1 = 3;
   hoja.getRange(fila, 1, 1, anchoBloq1).merge()
       .setValue('REPORTE DE PARTICIPANTES')
@@ -1927,9 +1927,9 @@ function generarReporte() {
       .setBorder(true, true, true, true, true, true, '#cccccc', BORDER_STYLE);
   fila += 2;
 
-  // ══════════════════════════════════════════════════════════════════════
+  // ======================================================================
   // BLOQUE 2: DISTRIBUCIÓN POR ETAPA
-  // ══════════════════════════════════════════════════════════════════════
+  // ======================================================================
   hoja.getRange(fila, 1, 1, anchoBloq1).merge()
       .setValue('DISTRIBUCIÓN POR ETAPA')
       .setBackground(C_SECCION).setFontColor(C_TITULO_FG)
@@ -1966,9 +1966,9 @@ function generarReporte() {
       .setBorder(true, true, true, true, true, true, '#cccccc', BORDER_STYLE);
   fila += 2;
 
-  // ══════════════════════════════════════════════════════════════════════
+  // ======================================================================
   // BLOQUE 3: INGRESOS POR MES
-  // ══════════════════════════════════════════════════════════════════════
+  // ======================================================================
   if (mesesOrdenados.length > 0) {
     const headerMes = ['Mes'];
     ETAPAS_FLUJO.forEach(e => {
@@ -2031,9 +2031,9 @@ function generarReporte() {
     fila += 2;
   }
 
-  // ══════════════════════════════════════════════════════════════════════
+  // ======================================================================
   // BLOQUE 4: CONEXIONES LABORALES
-  // ══════════════════════════════════════════════════════════════════════
+  // ======================================================================
   hoja.getRange(fila, 1, 1, 2).merge()
       .setValue('CONEXIONES LABORALES')
       .setBackground(C_CONEXIONES).setFontColor(C_TITULO_FG)
@@ -2084,9 +2084,9 @@ function mostrarError(mensaje) {
   SpreadsheetApp.getActiveSpreadsheet().toast(mensaje, '❌ Error', 5);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECCIÓN 7: FUNCIONES DE PRUEBA Y DEPURACIÓN
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /**
  * Función de prueba para verificar que todo funciona
