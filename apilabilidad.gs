@@ -201,7 +201,8 @@ const ETAPAS_FLUJO = [
   'Derivaciones',
   'Por su cuenta',
   'Paso a paso',
-  'Activamente busca trabajo'
+  'Activamente busca trabajo',
+  'Conexiones Laborales'
 ];
 
 // Áreas de trabajo — opciones del dropdown Área en Aliados
@@ -1001,6 +1002,7 @@ function obtenerNombreHojaClasificacion(clasificacion) {
     'Fito':                       'Paso a paso',
     'No busca trabajo - Fito':    'Paso a paso',
     'Activamente busca trabajo':  'Activamente busca trabajo',
+    'Conexiones Laborales':       'Conexiones Laborales',
     // legacy
     'Por su Cuenta':              'Por su cuenta',
     'Busca Trabajo':              'Derivaciones',
@@ -1101,6 +1103,22 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
         datosAdicionales.tramites   || '',
         datosAdicionales.activo     || 'Sí'
       ]);
+
+    case 'Conexiones Laborales':
+      // Conexiones Laborales: Creamos ID | Nombre completo | Genero | Edad | Nivel edu |
+      //   Tipo | Programa | Proyecto | Especialidad | Empresa | Cargo | ...
+      return [
+        datosGraduado[2] || '',                       // Creamos ID
+        datosGraduado[3] || '',                       // Nombre completo
+        datosGraduado[4] || datosAdicionales.genero   || '', // Genero
+        datosGraduado[5] || datosAdicionales.edad     || '', // Edad
+        datosGraduado[6] || datosAdicionales.nivelEdu || '', // Nivel educativo
+        '', '', '', '',                               // Tipo, Programa, Proyecto, Especialidad
+        datosAdicionales.empresa  || '',              // Empresa
+        datosAdicionales.cargo    || '',              // Cargo
+        '', '',                                       // Tipo duracion, Tipo contrato
+        '', '', '', ''                                // Fechas, Duracion, Salario
+      ];
 
     default:
       return filaBase.concat([datosAdicionales.notas || '']);
@@ -1830,22 +1848,44 @@ function generarReporte() {
   const BORDER_STYLE = SpreadsheetApp.BorderStyle.SOLID;
 
   // -- Leer conteos de cada hoja de clasificación -------------------------
+  // Usamos getDataRange().getValues() y contamos filas con datos reales
+  // (no filas vacías creadas por validaciones de dropdown)
   const conteos = {};
   let totalParticipantes = 0;
   ETAPAS_FLUJO.forEach(nombreHoja => {
     const h = ss.getSheetByName(nombreHoja);
-    const cant = h ? Math.max(0, h.getLastRow() - 1) : 0;
+    if (!h || h.getLastRow() <= 1) { conteos[nombreHoja] = 0; return; }
+    const datos = h.getDataRange().getValues();
+    var cant = 0;
+    for (var i = 1; i < datos.length; i++) {
+      // Fila tiene datos si alguna celda no está vacía
+      if (datos[i].some(function(celda) { return celda !== '' && celda !== null && celda !== undefined; })) {
+        cant++;
+      }
+    }
     conteos[nombreHoja] = cant;
     totalParticipantes += cant;
   });
 
   // Conexiones Laborales
   const hojaCL = ss.getSheetByName('Conexiones Laborales');
-  const totalConexiones = hojaCL ? Math.max(0, hojaCL.getLastRow() - 1) : 0;
+  var totalConexiones = 0;
+  if (hojaCL && hojaCL.getLastRow() > 1) {
+    var datosCL = hojaCL.getDataRange().getValues();
+    for (var i = 1; i < datosCL.length; i++) {
+      if (datosCL[i].some(function(c) { return c !== '' && c !== null && c !== undefined; })) totalConexiones++;
+    }
+  }
 
   // Total graduados
   const hojaGrad = ss.getSheetByName('Graduados');
-  const totalGraduados = hojaGrad ? Math.max(0, hojaGrad.getLastRow() - 1) : 0;
+  var totalGraduados = 0;
+  if (hojaGrad && hojaGrad.getLastRow() > 1) {
+    var datosGr = hojaGrad.getDataRange().getValues();
+    for (var i = 1; i < datosGr.length; i++) {
+      if (datosGr[i].some(function(c) { return c !== '' && c !== null && c !== undefined; })) totalGraduados++;
+    }
+  }
 
   // Seguimientos pendientes
   const totalSeguimientos = obtenerSeguimientosPendientes().length;
@@ -1856,8 +1896,10 @@ function generarReporte() {
     const h = ss.getSheetByName(nombreHoja);
     if (!h || h.getLastRow() <= 1) return;
     const datos = h.getDataRange().getValues();
-    // Col 1 (índice 0) = Fecha de ingreso en todas las hojas de clasificación
+    // Col 1 (indice 0) = Fecha de ingreso en todas las hojas de clasificacion
     for (let i = 1; i < datos.length; i++) {
+      // Ignorar filas vacias
+      if (!datos[i].some(function(c) { return c !== '' && c !== null && c !== undefined; })) continue;
       const fechaRaw = datos[i][0];
       var fecha;
       if (fechaRaw instanceof Date) {
