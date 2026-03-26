@@ -1847,9 +1847,10 @@ function generarReporte() {
   const MESES_NOMBRE = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const BORDER_STYLE = SpreadsheetApp.BorderStyle.SOLID;
 
-  // -- Leer conteos de cada hoja de clasificación -------------------------
-  // Usamos getDataRange().getValues() y contamos filas con datos reales
-  // (no filas vacías creadas por validaciones de dropdown)
+  // -- Leer conteos de cada hoja de clasificacion -------------------------
+  // Contamos filas que tengan Nombre completo (no filas vacias con checkboxes)
+  // Hojas clasificacion: col 3 (indice 2) = Nombre completo
+  // Conexiones Laborales: col 2 (indice 1) = Nombre completo
   const conteos = {};
   let totalParticipantes = 0;
   ETAPAS_FLUJO.forEach(nombreHoja => {
@@ -1857,9 +1858,9 @@ function generarReporte() {
     if (!h || h.getLastRow() <= 1) { conteos[nombreHoja] = 0; return; }
     const datos = h.getDataRange().getValues();
     var cant = 0;
+    var colNombre = (nombreHoja === 'Conexiones Laborales') ? 1 : 2; // indice de Nombre completo
     for (var i = 1; i < datos.length; i++) {
-      // Fila tiene datos si alguna celda no está vacía
-      if (datos[i].some(function(celda) { return celda !== '' && celda !== null && celda !== undefined; })) {
+      if (datos[i][colNombre] && datos[i][colNombre].toString().trim() !== '') {
         cant++;
       }
     }
@@ -1867,23 +1868,16 @@ function generarReporte() {
     totalParticipantes += cant;
   });
 
-  // Conexiones Laborales
-  const hojaCL = ss.getSheetByName('Conexiones Laborales');
-  var totalConexiones = 0;
-  if (hojaCL && hojaCL.getLastRow() > 1) {
-    var datosCL = hojaCL.getDataRange().getValues();
-    for (var i = 1; i < datosCL.length; i++) {
-      if (datosCL[i].some(function(c) { return c !== '' && c !== null && c !== undefined; })) totalConexiones++;
-    }
-  }
+  // Conexiones Laborales (ya incluida arriba si esta en ETAPAS_FLUJO)
+  var totalConexiones = conteos['Conexiones Laborales'] || 0;
 
-  // Total graduados
+  // Total graduados (col 4, indice 3 = Nombre completo)
   const hojaGrad = ss.getSheetByName('Graduados');
   var totalGraduados = 0;
   if (hojaGrad && hojaGrad.getLastRow() > 1) {
     var datosGr = hojaGrad.getDataRange().getValues();
     for (var i = 1; i < datosGr.length; i++) {
-      if (datosGr[i].some(function(c) { return c !== '' && c !== null && c !== undefined; })) totalGraduados++;
+      if (datosGr[i][3] && datosGr[i][3].toString().trim() !== '') totalGraduados++;
     }
   }
 
@@ -1897,9 +1891,10 @@ function generarReporte() {
     if (!h || h.getLastRow() <= 1) return;
     const datos = h.getDataRange().getValues();
     // Col 1 (indice 0) = Fecha de ingreso en todas las hojas de clasificacion
+    var colNom = (nombreHoja === 'Conexiones Laborales') ? 1 : 2;
     for (let i = 1; i < datos.length; i++) {
-      // Ignorar filas vacias
-      if (!datos[i].some(function(c) { return c !== '' && c !== null && c !== undefined; })) continue;
+      // Ignorar filas sin nombre (vacias por checkboxes/validaciones)
+      if (!datos[i][colNom] || datos[i][colNom].toString().trim() === '') continue;
       const fechaRaw = datos[i][0];
       var fecha;
       if (fechaRaw instanceof Date) {
