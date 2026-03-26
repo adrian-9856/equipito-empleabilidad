@@ -1995,7 +1995,7 @@ function generarReporte() {
   });
 
   hoja.getRange(fila, 1, 1, 3)
-      .setValues([['TOTAL', totalParticipantes, '100%']])
+      .setValues([['TOTAL', totalParticipantes, totalParticipantes > 0 ? '100%' : '0%']])
       .setBackground(C_TOTAL).setFontWeight('bold')
       .setHorizontalAlignment('center').setFontSize(12);
   hoja.getRange(fila, 1).setHorizontalAlignment('left');
