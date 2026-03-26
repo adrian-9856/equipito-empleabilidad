@@ -555,6 +555,8 @@ function _construirHoja(hoja, nombreHoja) {
   hoja.clearFormats();
 
   const columnas = estructura.columnas;
+  if (!columnas || columnas.length === 0) return; // Hoja sin columnas (ej. Reporte)
+
   const headers  = columnas.map(c => c.nombre);
 
   // -- Escribir headers ------------------------------------------------------
