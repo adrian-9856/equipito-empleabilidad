@@ -594,41 +594,38 @@ function _construirHoja(hoja, nombreHoja) {
   rangoHeader.createFilter();
 
   // -- Validaciones por tipo de columna -------------------------------------
+  // Solo aplicar validaciones de dropdown/siNo (NO checkboxes, que llenan
+  // las celdas con FALSE y causan problemas con appendRow y conteos)
   columnas.forEach((col, i) => {
     const colNum = i + 1;
-    const rango  = hoja.getRange(2, colNum, 999);
+    const rango  = hoja.getRange(2, colNum, 100);
 
     if (col.tipo === 'siNo') {
       const regla = SpreadsheetApp.newDataValidation()
-        .requireValueInList(['Sí', 'No'], true)
+        .requireValueInList(['Si', 'No'], true)
         .setAllowInvalid(false)
         .build();
       rango.setDataValidation(regla);
 
     } else if (col.tipo === 'dropdown' && col.opciones && col.opciones.length) {
-      // Dropdown con lista de opciones personalizada
       const regla = SpreadsheetApp.newDataValidation()
         .requireValueInList(col.opciones, true)
         .setAllowInvalid(false)
         .build();
       rango.setDataValidation(regla);
 
-    } else if (col.tipo === 'checkbox') {
-      const regla = SpreadsheetApp.newDataValidation()
-        .requireCheckbox()
-        .build();
-      rango.setDataValidation(regla);
-
     } else if (col.tipo === 'fecha') {
       rango.setNumberFormat('dd/mm/yyyy');
     }
+    // Checkboxes: NO aplicar requireCheckbox() porque llena con FALSE.
+    // Se aplicaran manualmente cuando la fila tenga datos.
   });
 
   // -- Color alterno en filas de datos --------------------------------------
   try {
-    hoja.getRange(2, 1, 1000, headers.length)
+    hoja.getRange(2, 1, 100, headers.length)
         .applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false);
-  } catch (e) { /* ignorar si no está disponible */ }
+  } catch (e) { /* ignorar si no esta disponible */ }
 
   Logger.log('Hoja construida: ' + nombreHoja);
 }
@@ -1197,8 +1194,8 @@ function enviarAConexionesLaborales() {
   const html = HtmlService.createHtmlOutput(
     _generarHTMLFormConexionLaboral(filaActiva, creamosId, nombreCompleto, nombreHoja)
   )
-    .setWidth(520)
-    .setHeight(580)
+    .setWidth(560)
+    .setHeight(720)
     .setTitle('Conexión Laboral');
   ui.showModalDialog(html, '💼 Conexión Laboral — ' + nombreCompleto);
 }
@@ -1214,7 +1211,7 @@ function enviarAConexionesLaborales() {
 function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOrigen) {
   return `
     <style>
-      body { font-family: Arial, sans-serif; padding: 16px; background: #fafafa; }
+      body { font-family: Arial, sans-serif; padding: 16px; background: #fafafa; overflow-y: auto; }
       h3 { color: #e65100; margin-top: 0; }
       .info { background: #fff3e0; padding: 10px; border-radius: 6px; margin-bottom: 14px; }
       .info strong { color: #e65100; }
@@ -1224,6 +1221,9 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
       input:focus, select:focus { border-color: #e65100; outline: none; }
       .row2 { display: flex; gap: 12px; }
       .row2 > div { flex: 1; }
+      .seccion { background: #f5f5f5; padding: 10px; border-radius: 6px; margin: 14px 0 8px;
+                 border-left: 3px solid #e65100; }
+      .seccion-titulo { font-weight: bold; color: #e65100; font-size: 13px; margin: 0; }
       .btn { margin-top: 18px; text-align: right; }
       .btn button { padding: 10px 24px; border: none; border-radius: 4px; font-size: 14px;
                     cursor: pointer; }
@@ -1235,23 +1235,54 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
       .msg-err { background: #ffcdd2; color: #c62828; }
     </style>
 
-    <h3>Registro de Conexión Laboral</h3>
+    <h3>Registro de Conexion Laboral</h3>
     <div class="info">
       <strong>Graduado:</strong> ${nombre}<br>
       <strong>Creamos ID:</strong> ${creamosId || '(sin asignar)'}
     </div>
 
+    <div class="seccion"><p class="seccion-titulo">Informacion del programa</p></div>
+
+    <div class="row2">
+      <div>
+        <label>Tipo</label>
+        <input id="tipo" placeholder="Ej: Insercion, Emprendimiento">
+      </div>
+      <div>
+        <label>Programa</label>
+        <input id="programa" placeholder="Nombre del programa">
+      </div>
+    </div>
+
+    <div class="row2">
+      <div>
+        <label>Proyecto</label>
+        <input id="proyecto" placeholder="Nombre del proyecto">
+      </div>
+      <div>
+        <label>Especialidad</label>
+        <input id="especialidad" placeholder="Especialidad o area">
+      </div>
+    </div>
+
+    <div class="seccion"><p class="seccion-titulo">Datos del empleo</p></div>
+
     <label>Empresa *</label>
     <input id="empresa" placeholder="Nombre de la empresa">
 
-    <label>Cargo que desempeña *</label>
+    <label>Cargo que desempena *</label>
     <input id="cargo" placeholder="Puesto o cargo">
 
-    <label>Tipo de duración de contrato</label>
-    <input id="tipoDuracion" placeholder="Ej: Temporal, Indefinido">
-
-    <label>Tipo de contrato</label>
-    <input id="tipoContrato" placeholder="Ej: Tiempo completo, Medio tiempo">
+    <div class="row2">
+      <div>
+        <label>Tipo de duracion de contrato</label>
+        <input id="tipoDuracion" placeholder="Ej: Temporal, Indefinido">
+      </div>
+      <div>
+        <label>Tipo de contrato</label>
+        <input id="tipoContrato" placeholder="Ej: Tiempo completo, Medio tiempo">
+      </div>
+    </div>
 
     <div class="row2">
       <div>
@@ -1266,7 +1297,7 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
 
     <div class="row2">
       <div>
-        <label>Duración (meses)</label>
+        <label>Duracion (meses)</label>
         <input id="duracion" type="number" min="0" placeholder="Meses">
       </div>
       <div>
@@ -1298,6 +1329,10 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
           hojaOrigen:    '${hojaOrigen}',
           creamosId:     '${creamosId}',
           nombreCompleto:'${nombre}',
+          tipo:          document.getElementById('tipo').value.trim(),
+          programa:      document.getElementById('programa').value.trim(),
+          proyecto:      document.getElementById('proyecto').value.trim(),
+          especialidad:  document.getElementById('especialidad').value.trim(),
           empresa:       empresa,
           cargo:         cargo,
           tipoDuracion:  document.getElementById('tipoDuracion').value.trim(),
@@ -1338,20 +1373,18 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
 
 /**
  * Guarda los datos del formulario en la hoja "Conexiones Laborales".
- * Combina datos automáticos del graduado + datos del formulario.
  *
- * Columnas Conexiones Laborales:
- *  1=Creamos ID | 2=Nombres | 3=Apellidos | 4=Edad | 5=Nivel de estudios |
- *  6=Sexo | 7=Tipo | 8=Programa | 9=Proyecto | 10=Especialidad |
- *  11=Empresa | 12=Cargo | 13=Tipo duración contrato | 14=Tipo contrato |
- *  15=Fecha inicio | 16=Fecha final | 17=Duración (meses) | 18=Salario mensual
+ * Columnas Conexiones Laborales (17):
+ *  1=Creamos ID | 2=Nombre completo | 3=Genero | 4=Edad | 5=Nivel educativo |
+ *  6=Tipo | 7=Programa | 8=Proyecto | 9=Especialidad | 10=Empresa |
+ *  11=Cargo | 12=Tipo duracion contrato | 13=Tipo contrato |
+ *  14=Fecha inicio | 15=Fecha final | 16=Duracion (meses) | 17=Salario mensual
  *
  * @param {Object} datos - datos del formulario
  * @return {Object}
  */
 function guardarConexionLaboral(datos) {
   try {
-    // Datos vienen directamente del formulario (funciona desde cualquier hoja)
     const creamosId      = datos.creamosId || '';
     const nombreCompleto = datos.nombreCompleto || '';
 
@@ -1367,29 +1400,24 @@ function guardarConexionLaboral(datos) {
       fechaFinal = p[2] + '/' + p[1] + '/' + p[0];
     }
 
-    // Conexiones Laborales (17 cols):
-    // 1=Creamos ID | 2=Nombre completo | 3=Género | 4=Edad | 5=Nivel educativo |
-    // 6=Tipo | 7=Programa | 8=Proyecto | 9=Especialidad | 10=Empresa |
-    // 11=Cargo | 12=Tipo duración | 13=Tipo contrato | 14=Fecha inicio |
-    // 15=Fecha final | 16=Duración | 17=Salario
     const fila = [
-      creamosId,             // 1  Creamos ID
-      nombreCompleto,        // 2  Nombre completo
-      '',                    // 3  Género (manual)
-      '',                    // 4  Edad (manual)
-      '',                    // 5  Nivel educativo (manual)
-      '',                    // 6  Tipo
-      '',                    // 7  Programa
-      '',                    // 8  Proyecto
-      '',                    // 9  Especialidad
-      datos.empresa,         // 10 Empresa
-      datos.cargo,           // 11 Cargo que desempeña
-      datos.tipoDuracion,    // 12 Tipo de duración de contrato
-      datos.tipoContrato,    // 13 Tipo de contrato
-      fechaInicio,           // 14 Fecha de inicio
-      fechaFinal,            // 15 Fecha de final
-      datos.duracion || '',  // 16 Duración (meses)
-      datos.salario          // 17 Salario mensual
+      creamosId,                    // 1  Creamos ID
+      nombreCompleto,               // 2  Nombre completo
+      '',                           // 3  Genero (manual)
+      '',                           // 4  Edad (manual)
+      '',                           // 5  Nivel educativo (manual)
+      datos.tipo         || '',     // 6  Tipo
+      datos.programa     || '',     // 7  Programa
+      datos.proyecto     || '',     // 8  Proyecto
+      datos.especialidad || '',     // 9  Especialidad
+      datos.empresa,                // 10 Empresa
+      datos.cargo,                  // 11 Cargo que desempena
+      datos.tipoDuracion || '',     // 12 Tipo de duracion de contrato
+      datos.tipoContrato || '',     // 13 Tipo de contrato
+      fechaInicio,                  // 14 Fecha de inicio
+      fechaFinal,                   // 15 Fecha de final
+      datos.duracion     || '',     // 16 Duracion (meses)
+      datos.salario      || ''      // 17 Salario mensual
     ];
 
     obtenerHoja('Conexiones Laborales').appendRow(fila);
