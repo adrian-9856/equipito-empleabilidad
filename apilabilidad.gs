@@ -27,6 +27,7 @@ function onOpen(e) {
       .addSeparator()
       .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
       .addItem('💼 Enviar a Conexiones Laborales', 'enviarAConexionesLaborales')
+      .addItem('📊 Generar Reporte', 'generarReporte')
       .addItem('📞 Ver Seguimientos Pendientes', 'mostrarSeguimientosPendientes')
       .addSeparator()
       .addItem('⚙️ Configurar Credenciales', 'mostrarConfiguracion')
@@ -48,7 +49,7 @@ function onEdit(e) {
   try {
     if (!e || !e.range) return;
     const hoja    = e.range.getSheet();
-    const colEtapa = 12; // Etapa es la columna 12 en Graduados
+    const colEtapa = 15; // Etapa es la columna 15 en Graduados
 
     if (hoja.getName() !== 'Graduados') return;
     if (e.range.getColumn() !== colEtapa) return;
@@ -58,7 +59,7 @@ function onEdit(e) {
     if (!nuevaEtapa) return;
 
     const fila       = e.range.getRow();
-    const datosGrad  = hoja.getRange(fila, 1, 1, 12).getValues()[0];
+    const datosGrad  = hoja.getRange(fila, 1, 1, 15).getValues()[0];
     const graduadoId = datosGrad[0];
     const creamosId  = datosGrad[2];
     const nombre     = datosGrad[3];
@@ -66,12 +67,12 @@ function onEdit(e) {
     // Copiar a la hoja de clasificación
     copiarAHojaClasificacion(datosGrad, nuevaEtapa, {});
 
-    // Registrar movimiento en "Estado actual del participante"
-    registrarMovimientoEtapa(creamosId, nombre, nuevaEtapa, '');
+    // Actualizar reporte
+    generarReporte();
 
     // Programar seguimientos si aplica
     if (nuevaEtapa === 'Activamente busca trabajo') {
-      hoja.getRange(fila, 9).setValue('Sí'); // Empleado = Sí
+      hoja.getRange(fila, 12).setValue('Sí'); // Empleado = Sí
       programarSeguimientos(graduadoId, nombre);
     }
 
@@ -227,8 +228,9 @@ const ESTRUCTURA_HOJAS = {
   // ── GRADUADOS ──────────────────────────────────────────────────────────────
   // Columnas:
   //  1=No. | 2=Fecha de envío | 3=Creamos ID | 4=Nombre completo |
-  //  5=Número de teléfono | 6=Formación | 7=Cohorte | 8=Fecha de entrevista |
-  //  9=Empleado | 10=Próxima llamada | 11=Notas | 12=Etapa
+  //  5=Género | 6=Edad | 7=Nivel educativo | 8=Número de teléfono |
+  //  9=Formación | 10=Cohorte | 11=Fecha de entrevista |
+  //  12=Empleado | 13=Próxima llamada | 14=Notas | 15=Etapa
   'Graduados': {
     color: '#1a73e8',
     columnas: [
@@ -236,6 +238,9 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Fecha de envío',       ancho: 140, tipo: 'fecha'  },
       { nombre: 'Creamos ID',           ancho: 130, tipo: 'texto'  },
       { nombre: 'Nombre completo',      ancho: 200, tipo: 'texto'  },
+      { nombre: 'Género',               ancho: 100, tipo: 'texto'  },
+      { nombre: 'Edad',                 ancho: 80,  tipo: 'texto'  },
+      { nombre: 'Nivel educativo',      ancho: 160, tipo: 'texto'  },
       { nombre: 'Número de teléfono',   ancho: 150, tipo: 'texto'  },
       { nombre: 'Formación',            ancho: 180, tipo: 'texto'  },
       { nombre: 'Cohorte',              ancho: 100, tipo: 'texto'  },
@@ -337,11 +342,10 @@ const ESTRUCTURA_HOJAS = {
     color: '#e65100',
     columnas: [
       { nombre: 'Creamos ID',                    ancho: 130, tipo: 'texto' },
-      { nombre: 'Nombres',                       ancho: 160, tipo: 'texto' },
-      { nombre: 'Apellidos',                     ancho: 160, tipo: 'texto' },
+      { nombre: 'Nombre completo',               ancho: 200, tipo: 'texto' },
+      { nombre: 'Género',                         ancho: 100, tipo: 'texto' },
       { nombre: 'Edad',                          ancho: 80,  tipo: 'texto' },
-      { nombre: 'Nivel de estudios',             ancho: 160, tipo: 'texto' },
-      { nombre: 'Sexo',                          ancho: 100, tipo: 'texto' },
+      { nombre: 'Nivel educativo',               ancho: 160, tipo: 'texto' },
       { nombre: 'Tipo',                          ancho: 130, tipo: 'texto' },
       { nombre: 'Programa',                      ancho: 160, tipo: 'texto' },
       { nombre: 'Proyecto',                      ancho: 160, tipo: 'texto' },
@@ -361,9 +365,12 @@ const ESTRUCTURA_HOJAS = {
   'Seguimientos': {
     color: '#673ab7',
     columnas: [
-      { nombre: 'No.',              ancho: 60,  tipo: 'texto' },  // número de registro
-      { nombre: 'Creamos ID',       ancho: 130, tipo: 'texto' },  // antes de Nombre
-      { nombre: 'Nombre',           ancho: 200, tipo: 'texto' },
+      { nombre: 'No.',              ancho: 60,  tipo: 'texto' },
+      { nombre: 'Creamos ID',       ancho: 130, tipo: 'texto' },
+      { nombre: 'Nombre completo',  ancho: 200, tipo: 'texto' },
+      { nombre: 'Género',           ancho: 100, tipo: 'texto' },
+      { nombre: 'Edad',             ancho: 80,  tipo: 'texto' },
+      { nombre: 'Nivel educativo',  ancho: 160, tipo: 'texto' },
       { nombre: 'Tipo seguimiento', ancho: 180, tipo: 'texto' },
       { nombre: 'Fecha programada', ancho: 150, tipo: 'fecha' },
       { nombre: 'Fecha realizada',  ancho: 150, tipo: 'fecha' },
@@ -374,17 +381,12 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // ── ESTADO ACTUAL DEL PARTICIPANTE ────────────────────────────────────────
-  // Historial de movimientos entre etapas + resumen de conteos al final
-  'Estado actual del participante': {
+  // ── REPORTE ───────────────────────────────────────────────────────────────
+  // Hoja de reporte automático — no tiene columnas editables por el usuario
+  // Se genera/actualiza automáticamente con generarReporte()
+  'Reporte': {
     color: '#e91e63',
-    columnas: [
-      { nombre: 'Fecha de registro', ancho: 150, tipo: 'fecha'    },
-      { nombre: 'Creamos ID',        ancho: 130, tipo: 'texto'    },  // antes de Nombre
-      { nombre: 'Nombre completo',   ancho: 200, tipo: 'texto'    },
-      { nombre: 'Etapa',             ancho: 200, tipo: 'dropdown', opciones: ETAPAS_FLUJO },
-      { nombre: 'Nota',              ancho: 300, tipo: 'texto'    }
-    ]
+    columnas: []
   }
 };
 
@@ -459,7 +461,7 @@ function _ejecutarInstalacion(borrarExistentes) {
         'Paso a paso',
         'Activamente busca trabajo',
         'Seguimientos',
-        'Estado actual del participante',
+        'Reporte',
         'Conexiones Laborales',
         'Configuración',
         // Nombres legacy (por si acaso existen)
@@ -497,7 +499,7 @@ function _ejecutarInstalacion(borrarExistentes) {
       'Activamente busca trabajo',
       'Conexiones Laborales',
       'Seguimientos',
-      'Estado actual del participante'
+      'Reporte'
     ];
 
     ordenHojas.forEach(nombreHoja => {
@@ -690,7 +692,7 @@ function obtenerGraduadosSinClasificar() {
 
     const sin = [];
     for (let i = 1; i < datos.length; i++) {
-      const etapa = datos[i][11]; // col 12 = Etapa
+      const etapa = datos[i][14]; // col 15 = Etapa
       if (!etapa || etapa.toString().trim() === '') {
         sin.push({ id: datos[i][0], nombre: datos[i][3] }); // [3] = Nombre completo
       }
@@ -884,28 +886,31 @@ function procesarDatosGraduados(datos) {
 
 /**
  * Agrega un nuevo graduado a la hoja Graduados
- * Columnas:
+ * Columnas (15):
  *   1=No. | 2=Fecha de envío | 3=Creamos ID | 4=Nombre completo |
- *   5=Número de teléfono | 6=Formación | 7=Cohorte |
- *   8=Fecha de entrevista | 9=Empleado | 10=Próxima llamada |
- *   11=Notas | 12=Etapa
+ *   5=Género | 6=Edad | 7=Nivel educativo | 8=Número de teléfono |
+ *   9=Formación | 10=Cohorte | 11=Fecha de entrevista |
+ *   12=Empleado | 13=Próxima llamada | 14=Notas | 15=Etapa
  * @param {Object} graduado
  */
 function agregarGraduado(graduado) {
   const hoja = obtenerHoja('Graduados');
   const fila = [
-    graduado.id,                            // No.
-    new Date().toLocaleDateString('es-ES'), // Fecha de envío
-    '',                                     // Creamos ID (manual)
-    graduado.nombre,                        // Nombre completo
-    graduado.telefono,                      // Número de teléfono
-    graduado.formacion,                     // Formación
-    graduado.cohorte || '',                 // Cohorte
-    graduado.fechaEntrevista,               // Fecha de entrevista
-    'No',                                   // Empleado
-    '',                                     // Próxima llamada
-    '',                                     // Notas
-    ''                                      // Etapa (dropdown)
+    graduado.id,                            // 1  No.
+    new Date().toLocaleDateString('es-ES'), // 2  Fecha de envío
+    '',                                     // 3  Creamos ID (manual)
+    graduado.nombre,                        // 4  Nombre completo
+    graduado.genero || '',                  // 5  Género
+    graduado.edad || '',                    // 6  Edad
+    graduado.nivelEducativo || '',          // 7  Nivel educativo
+    graduado.telefono,                      // 8  Número de teléfono
+    graduado.formacion,                     // 9  Formación
+    graduado.cohorte || '',                 // 10 Cohorte
+    graduado.fechaEntrevista,               // 11 Fecha de entrevista
+    'No',                                   // 12 Empleado
+    '',                                     // 13 Próxima llamada
+    '',                                     // 14 Notas
+    ''                                      // 15 Etapa (dropdown)
   ];
   hoja.appendRow(fila);
   Logger.log(`Graduado agregado: ${graduado.nombre} (${graduado.id})`);
@@ -921,12 +926,15 @@ function actualizarGraduado(graduado) {
   const datos = hoja.getDataRange().getValues();
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduado.id) {
-      // col 1=No. | col 2=Fecha de envío | col 3=Creamos ID → no tocar
+      // col 1-3 (No., Fecha envío, Creamos ID) → no tocar
       hoja.getRange(i + 1, 4).setValue(graduado.nombre);
-      hoja.getRange(i + 1, 5).setValue(graduado.telefono);
-      hoja.getRange(i + 1, 6).setValue(graduado.formacion       || datos[i][5]);
-      hoja.getRange(i + 1, 7).setValue(graduado.cohorte         || datos[i][6]);
-      hoja.getRange(i + 1, 8).setValue(graduado.fechaEntrevista || datos[i][7]);
+      hoja.getRange(i + 1, 5).setValue(graduado.genero          || datos[i][4]);
+      hoja.getRange(i + 1, 6).setValue(graduado.edad            || datos[i][5]);
+      hoja.getRange(i + 1, 7).setValue(graduado.nivelEducativo  || datos[i][6]);
+      hoja.getRange(i + 1, 8).setValue(graduado.telefono);
+      hoja.getRange(i + 1, 9).setValue(graduado.formacion       || datos[i][8]);
+      hoja.getRange(i + 1, 10).setValue(graduado.cohorte        || datos[i][9]);
+      hoja.getRange(i + 1, 11).setValue(graduado.fechaEntrevista || datos[i][10]);
       Logger.log(`Graduado actualizado: ${graduado.nombre} (${graduado.id})`);
       break;
     }
@@ -945,11 +953,11 @@ function clasificarGraduado(graduadoId, clasificacion, datosAdicionales = {}) {
 
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduadoId) {
-      // Columnas: 9=Empleado | 12=Etapa
-      hojaGraduados.getRange(i + 1, 9).setValue(
+      // Columnas: 12=Empleado | 15=Etapa
+      hojaGraduados.getRange(i + 1, 12).setValue(
         clasificacion === 'Activamente busca trabajo' ? 'Sí' : 'No'
       );
-      hojaGraduados.getRange(i + 1, 12).setValue(clasificacion);             // Etapa
+      hojaGraduados.getRange(i + 1, 15).setValue(clasificacion);             // Etapa
       copiarAHojaClasificacion(datos[i], clasificacion, datosAdicionales);
       registrarMovimientoEtapa(datos[i][2], datos[i][3], clasificacion, datosAdicionales.nota || '');
       if (clasificacion === 'Activamente busca trabajo') {
@@ -1020,9 +1028,9 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
     new Date().toLocaleDateString('es-ES'), // Fecha de ingreso
     datosGraduado[2],                        // Creamos ID (índice 2)
     datosGraduado[3],                        // Nombre completo (índice 3)
-    datosAdicionales.genero   || '',         // Género
-    datosAdicionales.edad     || '',         // Edad
-    datosAdicionales.nivelEdu || ''          // Nivel educativo
+    datosGraduado[4] || datosAdicionales.genero   || '',  // Género (índice 4)
+    datosGraduado[5] || datosAdicionales.edad     || '',  // Edad (índice 5)
+    datosGraduado[6] || datosAdicionales.nivelEdu || ''   // Nivel educativo (índice 6)
   ];
 
   switch (clasificacion) {
@@ -1077,9 +1085,9 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
     case 'Fito':
       return filaBase.concat([
         datosAdicionales.dpi       || '',
-        datosAdicionales.telefono  || datosGraduado[4] || '',  // índice 4 = Teléfono
-        datosAdicionales.formacion || datosGraduado[5] || '',  // índice 5 = Formación
-        datosAdicionales.cohorte   || datosGraduado[6] || '',  // índice 6 = Cohorte
+        datosAdicionales.telefono  || datosGraduado[7] || '',  // índice 7 = Teléfono
+        datosAdicionales.formacion || datosGraduado[8] || '',  // índice 8 = Formación
+        datosAdicionales.cohorte   || datosGraduado[9] || '',  // índice 9 = Cohorte
         datosAdicionales.nota      || '',
         datosAdicionales.activo    || 'No'
       ]);
@@ -1151,7 +1159,7 @@ function enviarAConexionesLaborales() {
   // Hojas clasificación (COLUMNAS_COMUNES): [1]=Creamos ID, [2]=Nombre completo
   var creamosId, nombreCompleto;
   if (nombreHoja === 'Graduados') {
-    const datos = hoja.getRange(filaActiva, 1, 1, 12).getValues()[0];
+    const datos = hoja.getRange(filaActiva, 1, 1, 15).getValues()[0];
     creamosId      = datos[2] || '';
     nombreCompleto = datos[3] || '';
   } else {
@@ -1327,11 +1335,6 @@ function guardarConexionLaboral(datos) {
     const creamosId      = datos.creamosId || '';
     const nombreCompleto = datos.nombreCompleto || '';
 
-    // Separar nombre y apellidos (primera palabra = nombre, resto = apellidos)
-    const partes   = nombreCompleto.trim().split(/\s+/);
-    const nombres  = partes.length > 0 ? partes[0] : '';
-    const apellidos = partes.length > 1 ? partes.slice(1).join(' ') : '';
-
     // Formatear fechas de yyyy-mm-dd (input date) a dd/mm/yyyy
     var fechaInicio = '';
     if (datos.fechaInicio) {
@@ -1344,25 +1347,29 @@ function guardarConexionLaboral(datos) {
       fechaFinal = p[2] + '/' + p[1] + '/' + p[0];
     }
 
+    // Conexiones Laborales (17 cols):
+    // 1=Creamos ID | 2=Nombre completo | 3=Género | 4=Edad | 5=Nivel educativo |
+    // 6=Tipo | 7=Programa | 8=Proyecto | 9=Especialidad | 10=Empresa |
+    // 11=Cargo | 12=Tipo duración | 13=Tipo contrato | 14=Fecha inicio |
+    // 15=Fecha final | 16=Duración | 17=Salario
     const fila = [
-      creamosId,             // Creamos ID
-      nombres,               // Nombres
-      apellidos,             // Apellidos
-      '',                    // Edad (se llena manualmente o de datos adicionales)
-      '',                    // Nivel de estudios
-      '',                    // Sexo
-      '',                    // Tipo
-      '',                    // Programa
-      '',                    // Proyecto
-      '',                    // Especialidad
-      datos.empresa,         // Empresa
-      datos.cargo,           // Cargo que desempeña
-      datos.tipoDuracion,    // Tipo de duración de contrato
-      datos.tipoContrato,    // Tipo de contrato
-      fechaInicio,           // Fecha de inicio
-      fechaFinal,            // Fecha de final
-      datos.duracion || '',  // Duración (meses)
-      datos.salario          // Salario mensual
+      creamosId,             // 1  Creamos ID
+      nombreCompleto,        // 2  Nombre completo
+      '',                    // 3  Género (manual)
+      '',                    // 4  Edad (manual)
+      '',                    // 5  Nivel educativo (manual)
+      '',                    // 6  Tipo
+      '',                    // 7  Programa
+      '',                    // 8  Proyecto
+      '',                    // 9  Especialidad
+      datos.empresa,         // 10 Empresa
+      datos.cargo,           // 11 Cargo que desempeña
+      datos.tipoDuracion,    // 12 Tipo de duración de contrato
+      datos.tipoContrato,    // 13 Tipo de contrato
+      fechaInicio,           // 14 Fecha de inicio
+      fechaFinal,            // 15 Fecha de final
+      datos.duracion || '',  // 16 Duración (meses)
+      datos.salario          // 17 Salario mensual
     ];
 
     obtenerHoja('Conexiones Laborales').appendRow(fila);
@@ -1398,11 +1405,14 @@ function programarSeguimientos(graduadoId, nombreGraduado) {
     const fechaProgramada = new Date(fechaBase);
     fechaProgramada.setDate(fechaProgramada.getDate() + seg.diasDespues);
 
-    // Columnas Seguimientos: No. | Creamos ID | Nombre | Tipo | Fecha prog. | Fecha real. | Estado | Resultado | Notas | Próximo paso
+    // Columnas Seguimientos: No. | Creamos ID | Nombre completo | Género | Edad | Nivel educativo | Tipo | Fecha prog. | Fecha real. | Estado | Resultado | Notas | Próximo paso
     hojaSeguimientos.appendRow([
-      graduadoId,     // No. (referencia)
-      '',             // Creamos ID (se completa manualmente)
-      nombreGraduado, // Nombre
+      graduadoId,     // No.
+      '',             // Creamos ID (manual)
+      nombreGraduado, // Nombre completo
+      '',             // Género (manual)
+      '',             // Edad (manual)
+      '',             // Nivel educativo (manual)
       seg.tipo,
       fechaProgramada.toLocaleDateString('es-ES'),
       '',             // Fecha realizada
@@ -1430,21 +1440,22 @@ function obtenerSeguimientosPendientes() {
   hoy.setHours(0, 0, 0, 0);
 
   const pendientes = [];
-  // Seguimientos: [0]=No. | [1]=Creamos ID | [2]=Nombre | [3]=Tipo | [4]=Fecha prog. |
-  //              [5]=Fecha real. | [6]=Estado | [7]=Resultado | [8]=Notas | [9]=Próximo paso
+  // Seguimientos: [0]=No. | [1]=Creamos ID | [2]=Nombre | [3]=Género | [4]=Edad |
+  //   [5]=Nivel edu | [6]=Tipo | [7]=Fecha prog. | [8]=Fecha real. | [9]=Estado |
+  //   [10]=Resultado | [11]=Notas | [12]=Próximo paso
   for (let i = 1; i < datos.length; i++) {
-    const estado             = datos[i][6];
-    const fechaProgramadaStr = datos[i][4];
+    const estado             = datos[i][9];
+    const fechaProgramadaStr = datos[i][7];
     if (estado === 'Pendiente' && fechaProgramadaStr) {
       const fechaProgramada = parsearFecha(fechaProgramadaStr);
       if (fechaProgramada && fechaProgramada <= hoy) {
         pendientes.push({
           fila:            i + 1,
           id:              datos[i][0],
-          nombre:          datos[i][2],  // [2] = Nombre
-          tipo:            datos[i][3],  // [3] = Tipo seguimiento
+          nombre:          datos[i][2],
+          tipo:            datos[i][6],
           fechaProgramada: fechaProgramadaStr,
-          notas:           datos[i][8]   // [8] = Notas
+          notas:           datos[i][11]
         });
       }
     }
@@ -1460,15 +1471,16 @@ function obtenerSeguimientosPendientes() {
  * @param {string} proximoPaso
  */
 function marcarSeguimientoRealizado(fila, resultado, notas, proximoPaso) {
-  // Seguimientos: col 1=No. | 2=Creamos ID | 3=Nombre | 4=Tipo | 5=Fecha prog. |
-  //              6=Fecha real. | 7=Estado | 8=Resultado | 9=Notas | 10=Próximo paso
+  // Seguimientos: col 1=No. | 2=Creamos ID | 3=Nombre | 4=Género | 5=Edad |
+  //   6=Nivel edu | 7=Tipo | 8=Fecha prog. | 9=Fecha real. | 10=Estado |
+  //   11=Resultado | 12=Notas | 13=Próximo paso
   const hoja = obtenerHoja('Seguimientos');
-  hoja.getRange(fila, 6).setValue(new Date().toLocaleDateString('es-ES')); // Fecha realizada
-  hoja.getRange(fila, 7).setValue('Realizado');                             // Estado
-  hoja.getRange(fila, 8).setValue(resultado);                               // Resultado
-  hoja.getRange(fila, 9).setValue(notas);                                   // Notas
-  hoja.getRange(fila, 10).setValue(proximoPaso);                            // Próximo paso
-  hoja.getRange(fila, 1, 1, 10).setBackground('#d9ead3');
+  hoja.getRange(fila, 9).setValue(new Date().toLocaleDateString('es-ES'));  // Fecha realizada
+  hoja.getRange(fila, 10).setValue('Realizado');                            // Estado
+  hoja.getRange(fila, 11).setValue(resultado);                              // Resultado
+  hoja.getRange(fila, 12).setValue(notas);                                  // Notas
+  hoja.getRange(fila, 13).setValue(proximoPaso);                            // Próximo paso
+  hoja.getRange(fila, 1, 1, 13).setBackground('#d9ead3');
   Logger.log(`Seguimiento marcado como realizado en fila ${fila}`);
 }
 
@@ -1482,7 +1494,7 @@ function actualizarProximaLlamada(graduadoId, tipoLlamada) {
   const datos = hoja.getDataRange().getValues();
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduadoId) {
-      hoja.getRange(i + 1, 10).setValue(tipoLlamada); // col 10 = Próxima llamada
+      hoja.getRange(i + 1, 13).setValue(tipoLlamada); // col 13 = Próxima llamada
       break;
     }
   }
@@ -1773,182 +1785,193 @@ function parsearFecha(fechaStr) {
 }
 
 /**
- * Registra un movimiento de etapa en la hoja "Estado actual del participante"
- * y actualiza el resumen de conteos al final de esa hoja.
- * @param {string} creamosId     - ID Creamos del participante (índice [2] en Graduados)
- * @param {string} nombreCompleto - Nombre del participante (índice [3] en Graduados)
- * @param {string} etapa
- * @param {string} nota
+ * Registra un movimiento de etapa — ahora solo actualiza el reporte.
+ * Se mantiene la firma para compatibilidad con clasificarGraduado().
  */
 function registrarMovimientoEtapa(creamosId, nombreCompleto, etapa, nota) {
-  const hoja = obtenerHoja('Estado actual del participante');
-
-  // Agregar la fila de historial
-  // Orden: Fecha de registro | Creamos ID | Nombre completo | Etapa | Nota
-  hoja.appendRow([
-    new Date().toLocaleDateString('es-ES'), // Fecha de registro
-    creamosId     || '',                    // Creamos ID
-    nombreCompleto,                         // Nombre completo
-    etapa,
-    nota || ''
-  ]);
-
-  // Actualizar el resumen de conteos
-  actualizarResumenEstado(hoja);
+  generarReporte();
 }
 
 /**
- * Escribe/actualiza el bloque de resumen de conteos por etapa
- * al final de la hoja "Estado actual del participante".
- * Siempre se reescribe para mantenerlo actualizado.
- * @param {Sheet} hoja
+ * Genera el reporte completo en la hoja "Reporte".
+ * Lee datos directamente de las hojas de clasificación y Graduados.
+ * Se puede ejecutar desde el menú o se llama automáticamente.
  */
-function actualizarResumenEstado(hoja) {
-  const datos = hoja.getDataRange().getValues();
-
-  // ── Recopilar datos ──────────────────────────────────────────────────────
-  // Columnas: [0]=Fecha | [1]=Creamos ID | [2]=Nombre | [3]=Etapa | [4]=Nota
-  const ultimaEtapaPorNombre = {};
-  const movimientosPorMes    = {};  // { 'Ene 2026': { 'Aliados': 2, ... } }
-  const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-
-  for (let i = 1; i < datos.length; i++) {
-    const fechaRaw = datos[i][0];
-    const nombre   = datos[i][2];
-    const etapa    = datos[i][3];
-    if (!nombre || !etapa || ETAPAS_FLUJO.indexOf(etapa) === -1) continue;
-
-    // Última etapa por persona
-    ultimaEtapaPorNombre[nombre] = etapa;
-
-    // Conteo por mes
-    var fecha;
-    if (fechaRaw instanceof Date) {
-      fecha = fechaRaw;
-    } else if (typeof fechaRaw === 'string' && fechaRaw.indexOf('/') !== -1) {
-      const p = fechaRaw.split('/');
-      fecha = new Date(p[2], parseInt(p[1]) - 1, p[0]);
+function generarReporte() {
+  const ss   = SpreadsheetApp.getActiveSpreadsheet();
+  var hoja = ss.getSheetByName('Reporte');
+  if (!hoja) {
+    hoja = ss.getSheetByName('Estado actual del participante');
+    if (!hoja) {
+      hoja = ss.insertSheet('Reporte');
     } else {
-      continue;
+      hoja.setName('Reporte');
     }
-    const claveMes = MESES[fecha.getMonth()] + ' ' + fecha.getFullYear();
-    if (!movimientosPorMes[claveMes]) {
-      movimientosPorMes[claveMes] = { _orden: fecha.getTime() };
-      ETAPAS_FLUJO.forEach(e => { movimientosPorMes[claveMes][e] = 0; });
-    }
-    movimientosPorMes[claveMes][etapa]++;
   }
 
-  // Conteos actuales por etapa
-  const conteos = {};
-  ETAPAS_FLUJO.forEach(e => { conteos[e] = 0; });
-  Object.values(ultimaEtapaPorNombre).forEach(etapa => {
-    if (conteos[etapa] !== undefined) conteos[etapa]++;
-  });
-  const totalGeneral = Object.values(conteos).reduce((a, b) => a + b, 0);
+  // Limpiar toda la hoja
+  hoja.clear();
+  hoja.setTabColor('#e91e63');
 
-  // Ordenar meses cronológicamente
-  const mesesOrdenados = Object.keys(movimientosPorMes).sort(
-    (a, b) => movimientosPorMes[a]._orden - movimientosPorMes[b]._orden
+  // ── Colores ────────────────────────────────────────────────────────────
+  const C_TITULO     = '#1a237e';
+  const C_TITULO_FG  = '#ffffff';
+  const C_HEADER     = '#3949ab';
+  const C_HEADER_FG  = '#ffffff';
+  const C_PAR        = '#e8eaf6';
+  const C_IMPAR      = '#ffffff';
+  const C_TOTAL      = '#c5cae9';
+  const C_SECCION    = '#283593';
+  const C_ACCENT     = '#0d47a1';
+  const C_CONEXIONES = '#e65100';
+  const MESES_NOMBRE = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const BORDER_STYLE = SpreadsheetApp.BorderStyle.SOLID;
+
+  // ── Leer conteos de cada hoja de clasificación ─────────────────────────
+  const conteos = {};
+  let totalParticipantes = 0;
+  ETAPAS_FLUJO.forEach(nombreHoja => {
+    const h = ss.getSheetByName(nombreHoja);
+    const cant = h ? Math.max(0, h.getLastRow() - 1) : 0;
+    conteos[nombreHoja] = cant;
+    totalParticipantes += cant;
+  });
+
+  // Conexiones Laborales
+  const hojaCL = ss.getSheetByName('Conexiones Laborales');
+  const totalConexiones = hojaCL ? Math.max(0, hojaCL.getLastRow() - 1) : 0;
+
+  // Total graduados
+  const hojaGrad = ss.getSheetByName('Graduados');
+  const totalGraduados = hojaGrad ? Math.max(0, hojaGrad.getLastRow() - 1) : 0;
+
+  // Seguimientos pendientes
+  const totalSeguimientos = obtenerSeguimientosPendientes().length;
+
+  // ── Leer fechas de ingreso por mes desde cada hoja clasificación ───────
+  const ingresosPorMes = {}; // { 'Ene 2026': { 'Aliados': 2, ... } }
+  ETAPAS_FLUJO.forEach(nombreHoja => {
+    const h = ss.getSheetByName(nombreHoja);
+    if (!h || h.getLastRow() <= 1) return;
+    const datos = h.getDataRange().getValues();
+    // Col 1 (índice 0) = Fecha de ingreso en todas las hojas de clasificación
+    for (let i = 1; i < datos.length; i++) {
+      const fechaRaw = datos[i][0];
+      var fecha;
+      if (fechaRaw instanceof Date) {
+        fecha = fechaRaw;
+      } else if (typeof fechaRaw === 'string' && fechaRaw.indexOf('/') !== -1) {
+        const p = fechaRaw.split('/');
+        fecha = new Date(p[2], parseInt(p[1]) - 1, p[0]);
+      } else {
+        continue;
+      }
+      const claveMes = MESES_NOMBRE[fecha.getMonth()] + ' ' + fecha.getFullYear();
+      if (!ingresosPorMes[claveMes]) {
+        ingresosPorMes[claveMes] = { _orden: fecha.getTime() };
+        ETAPAS_FLUJO.forEach(e => { ingresosPorMes[claveMes][e] = 0; });
+      }
+      ingresosPorMes[claveMes][nombreHoja]++;
+    }
+  });
+  const mesesOrdenados = Object.keys(ingresosPorMes).sort(
+    (a, b) => ingresosPorMes[a]._orden - ingresosPorMes[b]._orden
   );
 
-  // ── Borrar resumen anterior ──────────────────────────────────────────────
-  let inicioResumen = -1;
-  for (let i = 1; i < datos.length; i++) {
-    if (datos[i][0] === '══ REPORTE DE PARTICIPANTES ══') {
-      inicioResumen = i + 1;
-      break;
-    }
-    // Compatibilidad con resumen anterior
-    if (datos[i][0] === '── RESUMEN ──') {
-      inicioResumen = i + 1;
-      break;
-    }
-  }
-  if (inicioResumen > 0) {
-    const filasABorrar = hoja.getLastRow() - inicioResumen + 1;
-    if (filasABorrar > 0) hoja.deleteRows(inicioResumen, filasABorrar);
-  }
+  // ── Ajustar anchos de columna ──────────────────────────────────────────
+  hoja.setColumnWidth(1, 200);
+  hoja.setColumnWidth(2, 120);
+  hoja.setColumnWidth(3, 80);
+  for (let c = 4; c <= 10; c++) hoja.setColumnWidth(c, 110);
 
-  // ── Colores del reporte ──────────────────────────────────────────────────
-  const COLOR_TITULO    = '#1a237e';  // azul oscuro
-  const COLOR_TITULO_FG = '#ffffff';
-  const COLOR_HEADER    = '#3949ab';  // azul medio
-  const COLOR_HEADER_FG = '#ffffff';
-  const COLOR_FILA_PAR  = '#e8eaf6';  // lila claro
-  const COLOR_FILA_IMP  = '#ffffff';
-  const COLOR_TOTAL     = '#c5cae9';  // lila
-  const COLOR_SEC_TITULO = '#283593'; // azul para segunda sección
+  let fila = 1;
 
-  let fila = hoja.getLastRow() + 2;
-  const numCols = 5; // ancho del reporte
-
-  // ── BLOQUE 1: Resumen actual por etapa ─────────────────────────────────
-  // Título principal
-  const tituloRng = hoja.getRange(fila, 1, 1, numCols);
-  tituloRng.merge();
-  tituloRng.setValue('══ REPORTE DE PARTICIPANTES ══');
-  tituloRng.setBackground(COLOR_TITULO).setFontColor(COLOR_TITULO_FG)
-           .setFontWeight('bold').setFontSize(12)
-           .setHorizontalAlignment('center');
+  // ══════════════════════════════════════════════════════════════════════
+  // BLOQUE 1: RESUMEN GENERAL
+  // ══════════════════════════════════════════════════════════════════════
+  const anchoBloq1 = 3;
+  hoja.getRange(fila, 1, 1, anchoBloq1).merge()
+      .setValue('REPORTE DE PARTICIPANTES')
+      .setBackground(C_TITULO).setFontColor(C_TITULO_FG)
+      .setFontWeight('bold').setFontSize(14)
+      .setHorizontalAlignment('center');
   fila++;
 
-  // Subtítulo
-  const subRng = hoja.getRange(fila, 1, 1, numCols);
-  subRng.merge();
-  subRng.setValue('Distribución actual — ' + new Date().toLocaleDateString('es-ES'));
-  subRng.setFontColor('#666666').setFontStyle('italic')
-        .setHorizontalAlignment('center');
+  hoja.getRange(fila, 1, 1, anchoBloq1).merge()
+      .setValue('Actualizado: ' + new Date().toLocaleDateString('es-ES') + ' ' +
+                new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }))
+      .setFontColor('#666666').setFontStyle('italic')
+      .setHorizontalAlignment('center').setFontSize(10);
+  fila += 2;
+
+  // Indicadores clave
+  const indicadores = [
+    ['Total graduados registrados', totalGraduados],
+    ['Participantes clasificados', totalParticipantes],
+    ['Conexiones laborales', totalConexiones],
+    ['Seguimientos pendientes', totalSeguimientos]
+  ];
+  hoja.getRange(fila, 1, 1, 2)
+      .setValues([['Indicador', 'Cantidad']])
+      .setBackground(C_ACCENT).setFontColor(C_TITULO_FG)
+      .setFontWeight('bold').setHorizontalAlignment('center');
+  fila++;
+  indicadores.forEach((ind, idx) => {
+    const bg = idx % 2 === 0 ? C_PAR : C_IMPAR;
+    hoja.getRange(fila, 1).setValue(ind[0]).setBackground(bg).setFontSize(11);
+    hoja.getRange(fila, 2).setValue(ind[1]).setBackground(bg)
+        .setHorizontalAlignment('center').setFontWeight('bold').setFontSize(13);
+    fila++;
+  });
+  hoja.getRange(fila - indicadores.length - 1, 1, indicadores.length + 1, 2)
+      .setBorder(true, true, true, true, true, true, '#cccccc', BORDER_STYLE);
+  fila += 2;
+
+  // ══════════════════════════════════════════════════════════════════════
+  // BLOQUE 2: DISTRIBUCIÓN POR ETAPA
+  // ══════════════════════════════════════════════════════════════════════
+  hoja.getRange(fila, 1, 1, anchoBloq1).merge()
+      .setValue('DISTRIBUCIÓN POR ETAPA')
+      .setBackground(C_SECCION).setFontColor(C_TITULO_FG)
+      .setFontWeight('bold').setFontSize(12)
+      .setHorizontalAlignment('center');
   fila++;
 
-  // Encabezados
   hoja.getRange(fila, 1, 1, 3)
       .setValues([['Etapa', 'Participantes', '%']])
-      .setBackground(COLOR_HEADER).setFontColor(COLOR_HEADER_FG)
+      .setBackground(C_HEADER).setFontColor(C_HEADER_FG)
       .setFontWeight('bold').setHorizontalAlignment('center');
   fila++;
 
-  // Filas por etapa
   ETAPAS_FLUJO.forEach((etapa, idx) => {
     const cant = conteos[etapa];
-    const pct  = totalGeneral > 0 ? Math.round((cant / totalGeneral) * 100) : 0;
-    const bg   = idx % 2 === 0 ? COLOR_FILA_PAR : COLOR_FILA_IMP;
-    hoja.getRange(fila, 1).setValue(etapa).setBackground(bg);
+    const pct  = totalParticipantes > 0 ? Math.round((cant / totalParticipantes) * 100) : 0;
+    const bg   = idx % 2 === 0 ? C_PAR : C_IMPAR;
+    hoja.getRange(fila, 1).setValue(etapa).setBackground(bg).setFontSize(11);
     hoja.getRange(fila, 2).setValue(cant).setBackground(bg)
-        .setHorizontalAlignment('center');
+        .setHorizontalAlignment('center').setFontWeight('bold').setFontSize(12);
     hoja.getRange(fila, 3).setValue(pct + '%').setBackground(bg)
-        .setHorizontalAlignment('center');
+        .setHorizontalAlignment('center').setFontSize(11);
     fila++;
   });
 
-  // Fila total
   hoja.getRange(fila, 1, 1, 3)
-      .setValues([['TOTAL', totalGeneral, '100%']])
-      .setBackground(COLOR_TOTAL).setFontWeight('bold')
-      .setHorizontalAlignment('center');
+      .setValues([['TOTAL', totalParticipantes, '100%']])
+      .setBackground(C_TOTAL).setFontWeight('bold')
+      .setHorizontalAlignment('center').setFontSize(12);
   hoja.getRange(fila, 1).setHorizontalAlignment('left');
   fila++;
 
-  // Borde al bloque
   hoja.getRange(fila - ETAPAS_FLUJO.length - 2, 1, ETAPAS_FLUJO.length + 2, 3)
-      .setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+      .setBorder(true, true, true, true, true, true, '#cccccc', BORDER_STYLE);
+  fila += 2;
 
-  fila++; // espacio
-
-  // ── BLOQUE 2: Desglose por mes ─────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════
+  // BLOQUE 3: INGRESOS POR MES
+  // ══════════════════════════════════════════════════════════════════════
   if (mesesOrdenados.length > 0) {
-    const titulo2 = hoja.getRange(fila, 1, 1, numCols);
-    titulo2.merge();
-    titulo2.setValue('Ingresos por mes');
-    titulo2.setBackground(COLOR_SEC_TITULO).setFontColor(COLOR_TITULO_FG)
-           .setFontWeight('bold').setFontSize(11)
-           .setHorizontalAlignment('center');
-    fila++;
-
-    // Encabezados: Mes | Etapa1 | Etapa2 | ... | Total
     const headerMes = ['Mes'];
     ETAPAS_FLUJO.forEach(e => {
-      // Acortar nombres para que quepan
       const corto = e === 'Activamente busca trabajo' ? 'Act. busca' :
                     e === 'Por su cuenta' ? 'Por su cta.' :
                     e === 'Derivaciones' ? 'Deriv.' : e;
@@ -1956,24 +1979,30 @@ function actualizarResumenEstado(hoja) {
     });
     headerMes.push('Total');
     const numColsMes = headerMes.length;
-    hoja.getRange(fila, 1, 1, numColsMes)
-        .setValues([headerMes])
-        .setBackground(COLOR_HEADER).setFontColor(COLOR_HEADER_FG)
-        .setFontWeight('bold').setHorizontalAlignment('center')
-        .setFontSize(10);
+
+    hoja.getRange(fila, 1, 1, numColsMes).merge()
+        .setValue('INGRESOS POR MES')
+        .setBackground(C_SECCION).setFontColor(C_TITULO_FG)
+        .setFontWeight('bold').setFontSize(12)
+        .setHorizontalAlignment('center');
     fila++;
 
-    // Filas por mes
+    hoja.getRange(fila, 1, 1, numColsMes)
+        .setValues([headerMes])
+        .setBackground(C_HEADER).setFontColor(C_HEADER_FG)
+        .setFontWeight('bold').setHorizontalAlignment('center').setFontSize(10);
+    fila++;
+
     const totalesPorEtapa = {};
     ETAPAS_FLUJO.forEach(e => { totalesPorEtapa[e] = 0; });
     let granTotal = 0;
 
     mesesOrdenados.forEach((mes, idx) => {
-      const bg    = idx % 2 === 0 ? COLOR_FILA_PAR : COLOR_FILA_IMP;
+      const bg = idx % 2 === 0 ? C_PAR : C_IMPAR;
       const filaMes = [mes];
       let totalMes = 0;
       ETAPAS_FLUJO.forEach(e => {
-        const cant = movimientosPorMes[mes][e];
+        const cant = ingresosPorMes[mes][e];
         filaMes.push(cant);
         totalesPorEtapa[e] += cant;
         totalMes += cant;
@@ -1982,29 +2011,43 @@ function actualizarResumenEstado(hoja) {
       granTotal += totalMes;
 
       hoja.getRange(fila, 1, 1, numColsMes)
-          .setValues([filaMes])
-          .setBackground(bg)
-          .setHorizontalAlignment('center');
+          .setValues([filaMes]).setBackground(bg)
+          .setHorizontalAlignment('center').setFontSize(10);
       hoja.getRange(fila, 1).setHorizontalAlignment('left');
       fila++;
     });
 
-    // Fila totales
     const filaTotales = ['TOTAL'];
     ETAPAS_FLUJO.forEach(e => { filaTotales.push(totalesPorEtapa[e]); });
     filaTotales.push(granTotal);
     hoja.getRange(fila, 1, 1, numColsMes)
         .setValues([filaTotales])
-        .setBackground(COLOR_TOTAL).setFontWeight('bold')
-        .setHorizontalAlignment('center');
+        .setBackground(C_TOTAL).setFontWeight('bold')
+        .setHorizontalAlignment('center').setFontSize(11);
     hoja.getRange(fila, 1).setHorizontalAlignment('left');
 
-    // Borde al bloque
     hoja.getRange(fila - mesesOrdenados.length - 1, 1, mesesOrdenados.length + 2, numColsMes)
-        .setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+        .setBorder(true, true, true, true, true, true, '#cccccc', BORDER_STYLE);
+    fila += 2;
   }
 
-  Logger.log('Reporte de participantes actualizado');
+  // ══════════════════════════════════════════════════════════════════════
+  // BLOQUE 4: CONEXIONES LABORALES
+  // ══════════════════════════════════════════════════════════════════════
+  hoja.getRange(fila, 1, 1, 2).merge()
+      .setValue('CONEXIONES LABORALES')
+      .setBackground(C_CONEXIONES).setFontColor(C_TITULO_FG)
+      .setFontWeight('bold').setFontSize(12)
+      .setHorizontalAlignment('center');
+  fila++;
+
+  hoja.getRange(fila, 1).setValue('Total conexiones registradas').setFontSize(11);
+  hoja.getRange(fila, 2).setValue(totalConexiones)
+      .setHorizontalAlignment('center').setFontWeight('bold').setFontSize(13);
+  hoja.getRange(fila, 1, 1, 2)
+      .setBorder(true, true, true, true, true, true, '#cccccc', BORDER_STYLE);
+
+  Logger.log('Reporte generado exitosamente');
 }
 
 /**
@@ -2020,7 +2063,7 @@ function obtenerEstadisticasGenerales() {
     stats.totalGraduados = hojaGraduados.getLastRow() - 1;
     const datos = hojaGraduados.getDataRange().getValues();
     for (let i = 1; i < datos.length; i++) {
-      const c = datos[i][11]; // col 12 = Etapa
+      const c = datos[i][14]; // col 15 = Etapa
       if (c) stats.porClasificacion[c] = (stats.porClasificacion[c] || 0) + 1;
     }
   }
