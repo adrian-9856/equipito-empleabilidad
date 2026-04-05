@@ -198,12 +198,13 @@ function mostrarConfiguracion() {
  * tipo: 'texto' | 'fecha' | 'siNo' | 'checkbox' | 'dropdown'
  */
 const COLUMNAS_COMUNES = [
-  { nombre: 'Fecha de ingreso',  ancho: 140, tipo: 'fecha' },
-  { nombre: 'Creamos ID',        ancho: 130, tipo: 'texto' },  // antes de Nombre
-  { nombre: 'Nombre completo',   ancho: 200, tipo: 'texto' },
-  { nombre: 'Género',            ancho: 100, tipo: 'texto' },
-  { nombre: 'Edad',              ancho: 80,  tipo: 'texto' },
-  { nombre: 'Nivel educativo',   ancho: 160, tipo: 'texto' }
+  { nombre: 'Fecha de ingreso',    ancho: 140, tipo: 'fecha' },
+  { nombre: 'Creamos ID',          ancho: 130, tipo: 'texto' },
+  { nombre: 'Nombre completo',     ancho: 200, tipo: 'texto' },
+  { nombre: 'Número de teléfono',  ancho: 150, tipo: 'texto' },
+  { nombre: 'Género',              ancho: 120, tipo: 'dropdown', opciones: GENEROS },
+  { nombre: 'Edad',                ancho: 80,  tipo: 'texto' },
+  { nombre: 'Nivel educativo',     ancho: 160, tipo: 'texto' }
 ];
 
 // Etapas del flujo — usadas como opciones de dropdown en varias hojas
@@ -232,6 +233,15 @@ const AREAS_TRABAJO = [
   'Otro'
 ];
 
+// Géneros — opciones del dropdown Género en todas las hojas
+const GENEROS = [
+  'Hombre',
+  'Mujer',
+  'Trans hombre',
+  'No binario',
+  'Otro'
+];
+
 // -----------------------------------------------------------------------------
 // ESTRUCTURA EXACTA DE COLUMNAS POR HOJA
 // -----------------------------------------------------------------------------
@@ -251,7 +261,7 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Fecha de envío',       ancho: 140, tipo: 'fecha'  },
       { nombre: 'Creamos ID',           ancho: 130, tipo: 'texto'  },
       { nombre: 'Nombre completo',      ancho: 200, tipo: 'texto'  },
-      { nombre: 'Género',               ancho: 100, tipo: 'texto'  },
+      { nombre: 'Género',               ancho: 120, tipo: 'dropdown', opciones: GENEROS },
       { nombre: 'Edad',                 ancho: 80,  tipo: 'texto'  },
       { nombre: 'Nivel educativo',      ancho: 160, tipo: 'texto'  },
       { nombre: 'Número de teléfono',   ancho: 150, tipo: 'texto'  },
@@ -286,7 +296,7 @@ const ESTRUCTURA_HOJAS = {
     columnas: [
       ...COLUMNAS_COMUNES,
       { nombre: 'Cita',              ancho: 90,  tipo: 'checkbox' },
-      { nombre: 'Creación de perfil',ancho: 160, tipo: 'checkbox' },  // cambio: checkbox
+      { nombre: 'Creación de perfil',ancho: 160, tipo: 'siNo'     },
       { nombre: 'Contacto',          ancho: 90,  tipo: 'checkbox' },
       { nombre: 'Trámites',          ancho: 200, tipo: 'texto'    },
       { nombre: 'Entrevista',        ancho: 130, tipo: 'texto'    },
@@ -356,7 +366,8 @@ const ESTRUCTURA_HOJAS = {
     columnas: [
       { nombre: 'Creamos ID',                    ancho: 130, tipo: 'texto' },
       { nombre: 'Nombre completo',               ancho: 200, tipo: 'texto' },
-      { nombre: 'Género',                         ancho: 100, tipo: 'texto' },
+      { nombre: 'Número de teléfono',            ancho: 150, tipo: 'texto' },
+      { nombre: 'Género',                         ancho: 120, tipo: 'dropdown', opciones: GENEROS },
       { nombre: 'Edad',                          ancho: 80,  tipo: 'texto' },
       { nombre: 'Nivel educativo',               ancho: 160, tipo: 'texto' },
       { nombre: 'Tipo',                          ancho: 130, tipo: 'texto' },
@@ -378,12 +389,13 @@ const ESTRUCTURA_HOJAS = {
   'Seguimientos': {
     color: '#673ab7',
     columnas: [
-      { nombre: 'No.',              ancho: 60,  tipo: 'texto' },
-      { nombre: 'Creamos ID',       ancho: 130, tipo: 'texto' },
-      { nombre: 'Nombre completo',  ancho: 200, tipo: 'texto' },
-      { nombre: 'Género',           ancho: 100, tipo: 'texto' },
-      { nombre: 'Edad',             ancho: 80,  tipo: 'texto' },
-      { nombre: 'Nivel educativo',  ancho: 160, tipo: 'texto' },
+      { nombre: 'No.',                ancho: 60,  tipo: 'texto' },
+      { nombre: 'Creamos ID',         ancho: 130, tipo: 'texto' },
+      { nombre: 'Nombre completo',    ancho: 200, tipo: 'texto' },
+      { nombre: 'Número de teléfono', ancho: 150, tipo: 'texto' },
+      { nombre: 'Género',             ancho: 120, tipo: 'dropdown', opciones: GENEROS },
+      { nombre: 'Edad',               ancho: 80,  tipo: 'texto' },
+      { nombre: 'Nivel educativo',    ancho: 160, tipo: 'texto' },
       { nombre: 'Tipo seguimiento', ancho: 180, tipo: 'texto' },
       { nombre: 'Fecha programada', ancho: 150, tipo: 'fecha' },
       { nombre: 'Fecha realizada',  ancho: 150, tipo: 'fecha' },
@@ -1026,10 +1038,12 @@ function obtenerNombreHojaClasificacion(clasificacion) {
  *
  * Índices en datosGraduado (hoja Graduados):
  *   0=No. | 1=Fecha de envío | 2=Creamos ID | 3=Nombre completo |
- *   4=Teléfono | 5=Formación | 6=Cohorte | 7=Fecha entrevista | 8=Entrevistador
+ *   4=Género | 5=Edad | 6=Nivel educativo | 7=Número de teléfono |
+ *   8=Formación | 9=Cohorte | 10=Fecha entrevista | 11=Empleado |
+ *   12=Próxima llamada | 13=Notas | 14=Etapa
  *
- * Columnas comunes que van en las 6 hojas de apilabilidad:
- *   Fecha de ingreso | Creamos ID | Nombre completo | Género | Edad | Nivel educativo
+ * Columnas comunes que van en las 6 hojas de apilabilidad (7 cols):
+ *   Fecha de ingreso | Creamos ID | Nombre completo | Número de teléfono | Género | Edad | Nivel educativo
  *
  * @param {Array}  datosGraduado
  * @param {string} clasificacion
@@ -1041,6 +1055,7 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
     new Date().toLocaleDateString('es-ES'), // Fecha de ingreso
     datosGraduado[2],                        // Creamos ID (índice 2)
     datosGraduado[3],                        // Nombre completo (índice 3)
+    datosGraduado[7] || datosAdicionales.telefono || '',  // Número de teléfono (índice 7)
     datosGraduado[4] || datosAdicionales.genero   || '',  // Género (índice 4)
     datosGraduado[5] || datosAdicionales.edad     || '',  // Edad (índice 5)
     datosGraduado[6] || datosAdicionales.nivelEdu || ''   // Nivel educativo (índice 6)
@@ -1098,7 +1113,7 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
     case 'Fito':
       return filaBase.concat([
         datosAdicionales.dpi       || '',
-        datosAdicionales.telefono  || datosGraduado[7] || '',  // índice 7 = Teléfono
+        datosAdicionales.telefono  || datosGraduado[7] || '',  // índice 7 = Número de teléfono
         datosAdicionales.formacion || datosGraduado[8] || '',  // índice 8 = Formación
         datosAdicionales.cohorte   || datosGraduado[9] || '',  // índice 9 = Cohorte
         datosAdicionales.nota      || '',
@@ -1114,12 +1129,13 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
       ]);
 
     case 'Conexiones Laborales':
-      // Conexiones Laborales: Creamos ID | Nombre completo | Genero | Edad | Nivel edu |
+      // Conexiones Laborales: Creamos ID | Nombre completo | Teléfono | Género | Edad | Nivel edu |
       //   Tipo | Programa | Proyecto | Especialidad | Empresa | Cargo | ...
       return [
         datosGraduado[2] || '',                       // Creamos ID
         datosGraduado[3] || '',                       // Nombre completo
-        datosGraduado[4] || datosAdicionales.genero   || '', // Genero
+        datosGraduado[7] || datosAdicionales.telefono || '', // Número de teléfono
+        datosGraduado[4] || datosAdicionales.genero   || '', // Género
         datosGraduado[5] || datosAdicionales.edad     || '', // Edad
         datosGraduado[6] || datosAdicionales.nivelEdu || '', // Nivel educativo
         '', '', '', '',                               // Tipo, Programa, Proyecto, Especialidad
@@ -1192,7 +1208,7 @@ function enviarAConexionesLaborales() {
     creamosId      = datos[2] || '';
     nombreCompleto = datos[3] || '';
   } else {
-    const datos = hoja.getRange(filaActiva, 1, 1, 6).getValues()[0];
+    const datos = hoja.getRange(filaActiva, 1, 1, 7).getValues()[0];
     creamosId      = datos[1] || '';  // Col 2 = Creamos ID
     nombreCompleto = datos[2] || '';  // Col 3 = Nombre completo
   }
@@ -1386,11 +1402,11 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
 /**
  * Guarda los datos del formulario en la hoja "Conexiones Laborales".
  *
- * Columnas Conexiones Laborales (17):
- *  1=Creamos ID | 2=Nombre completo | 3=Genero | 4=Edad | 5=Nivel educativo |
- *  6=Tipo | 7=Programa | 8=Proyecto | 9=Especialidad | 10=Empresa |
- *  11=Cargo | 12=Tipo duracion contrato | 13=Tipo contrato |
- *  14=Fecha inicio | 15=Fecha final | 16=Duracion (meses) | 17=Salario mensual
+ * Columnas Conexiones Laborales (18):
+ *  1=Creamos ID | 2=Nombre completo | 3=Teléfono | 4=Género | 5=Edad | 6=Nivel educativo |
+ *  7=Tipo | 8=Programa | 9=Proyecto | 10=Especialidad | 11=Empresa |
+ *  12=Cargo | 13=Tipo duracion contrato | 14=Tipo contrato |
+ *  15=Fecha inicio | 16=Fecha final | 17=Duracion (meses) | 18=Salario mensual
  *
  * @param {Object} datos - datos del formulario
  * @return {Object}
@@ -1415,21 +1431,22 @@ function guardarConexionLaboral(datos) {
     const fila = [
       creamosId,                    // 1  Creamos ID
       nombreCompleto,               // 2  Nombre completo
-      '',                           // 3  Genero (manual)
-      '',                           // 4  Edad (manual)
-      '',                           // 5  Nivel educativo (manual)
-      datos.tipo         || '',     // 6  Tipo
-      datos.programa     || '',     // 7  Programa
-      datos.proyecto     || '',     // 8  Proyecto
-      datos.especialidad || '',     // 9  Especialidad
-      datos.empresa,                // 10 Empresa
-      datos.cargo,                  // 11 Cargo que desempena
-      datos.tipoDuracion || '',     // 12 Tipo de duracion de contrato
-      datos.tipoContrato || '',     // 13 Tipo de contrato
-      fechaInicio,                  // 14 Fecha de inicio
-      fechaFinal,                   // 15 Fecha de final
-      datos.duracion     || '',     // 16 Duracion (meses)
-      datos.salario      || ''      // 17 Salario mensual
+      '',                           // 3  Número de teléfono (manual)
+      '',                           // 4  Género (manual)
+      '',                           // 5  Edad (manual)
+      '',                           // 6  Nivel educativo (manual)
+      datos.tipo         || '',     // 7  Tipo
+      datos.programa     || '',     // 8  Programa
+      datos.proyecto     || '',     // 9  Proyecto
+      datos.especialidad || '',     // 10 Especialidad
+      datos.empresa,                // 11 Empresa
+      datos.cargo,                  // 12 Cargo que desempena
+      datos.tipoDuracion || '',     // 13 Tipo de duracion de contrato
+      datos.tipoContrato || '',     // 14 Tipo de contrato
+      fechaInicio,                  // 15 Fecha de inicio
+      fechaFinal,                   // 16 Fecha de final
+      datos.duracion     || '',     // 17 Duracion (meses)
+      datos.salario      || ''      // 18 Salario mensual
     ];
 
     obtenerHoja('Conexiones Laborales').appendRow(fila);
@@ -1465,11 +1482,12 @@ function programarSeguimientos(graduadoId, nombreGraduado) {
     const fechaProgramada = new Date(fechaBase);
     fechaProgramada.setDate(fechaProgramada.getDate() + seg.diasDespues);
 
-    // Columnas Seguimientos: No. | Creamos ID | Nombre completo | Género | Edad | Nivel educativo | Tipo | Fecha prog. | Fecha real. | Estado | Resultado | Notas | Próximo paso
+    // Columnas Seguimientos: No. | Creamos ID | Nombre completo | Teléfono | Género | Edad | Nivel educativo | Tipo | Fecha prog. | Fecha real. | Estado | Resultado | Notas | Próximo paso
     hojaSeguimientos.appendRow([
       graduadoId,     // No.
       '',             // Creamos ID (manual)
       nombreGraduado, // Nombre completo
+      '',             // Número de teléfono (manual)
       '',             // Género (manual)
       '',             // Edad (manual)
       '',             // Nivel educativo (manual)
