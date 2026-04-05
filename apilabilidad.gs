@@ -466,6 +466,31 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
+  // -- SEGUIMIENTO BOT (para n8n + WhatsApp) --------------------------------
+  'Seguimiento Bot': {
+    color: '#00897b',
+    columnas: [
+      { nombre: 'Creamos ID',         ancho: 130, tipo: 'texto' },
+      { nombre: 'Nombre',             ancho: 200, tipo: 'texto' },
+      { nombre: 'Telefono',           ancho: 150, tipo: 'texto' },
+      { nombre: 'Empresa',            ancho: 200, tipo: 'texto' },
+      { nombre: 'Cargo',              ancho: 200, tipo: 'texto' },
+      { nombre: 'Fecha Empleo',       ancho: 140, tipo: 'fecha' },
+      { nombre: 'Fecha Seg1',         ancho: 140, tipo: 'fecha' },
+      { nombre: 'Fecha Seg2',         ancho: 140, tipo: 'fecha' },
+      { nombre: 'Fecha Recordatorio', ancho: 160, tipo: 'fecha' },
+      { nombre: 'Estado',             ancho: 160, tipo: 'texto' },
+      { nombre: 'Etapa Actual',       ancho: 130, tipo: 'texto' },
+      { nombre: 'Resp S1 P1',         ancho: 300, tipo: 'texto' },
+      { nombre: 'Resp S1 P2',         ancho: 300, tipo: 'texto' },
+      { nombre: 'Resp S1 P3',         ancho: 300, tipo: 'texto' },
+      { nombre: 'Resp S2 P1',         ancho: 300, tipo: 'texto' },
+      { nombre: 'Resp S2 P2',         ancho: 300, tipo: 'texto' },
+      { nombre: 'Resp S2 P3',         ancho: 300, tipo: 'texto' },
+      { nombre: 'Email Enviado',      ancho: 130, tipo: 'siNo'  }
+    ]
+  },
+
   // -- REPORTE ---------------------------------------------------------------
   // Hoja de reporte automático — no tiene columnas editables por el usuario
   // Se genera/actualiza automáticamente con generarReporte()
@@ -546,6 +571,7 @@ function _ejecutarInstalacion(borrarExistentes) {
         'Paso a paso',
         'Activamente busca trabajo',
         'Seguimientos',
+        'Seguimiento Bot',
         'Reporte',
         'Conexiones Laborales',
         'Configuración',
@@ -584,6 +610,7 @@ function _ejecutarInstalacion(borrarExistentes) {
       'Activamente busca trabajo',
       'Conexiones Laborales',
       'Seguimientos',
+      'Seguimiento Bot',
       'Reporte'
     ];
 
@@ -1612,10 +1639,70 @@ function guardarConexionLaboral(datos) {
     obtenerHoja('Conexiones Laborales').appendRow(fila);
     Logger.log('Conexión laboral registrada: ' + nombreCompleto + ' en ' + datos.empresa);
 
-    return { exito: true, mensaje: 'Conexión laboral guardada correctamente.' };
+    // Crear fila en Seguimiento Bot para n8n/WhatsApp
+    crearFilaSeguimientoBot(datos, fechaInicio);
+
+    return { exito: true, mensaje: 'Conexión laboral guardada. Seguimiento WhatsApp programado.' };
   } catch (error) {
     Logger.log('Error al guardar conexión laboral: ' + error);
     return { exito: false, mensaje: 'Error al guardar: ' + error.message };
+  }
+}
+
+/**
+ * Crea una fila en "Seguimiento Bot" con fechas calculadas.
+ * Esta hoja es leída por n8n para disparar los mensajes de WhatsApp.
+ *
+ * Día 0   -> WhatsApp Seguimiento 1 (3 preguntas)
+ * Día 14  -> WhatsApp Seguimiento 2 (3 preguntas)
+ * Día 90  -> Email a adrian@creamosguatemala.org para llamada de cierre
+ */
+function crearFilaSeguimientoBot(datos, fechaEmpleo) {
+  try {
+    const hoja = obtenerHoja('Seguimiento Bot');
+
+    const hoy         = new Date();
+    const fechaSeg1   = new Date(hoy);                      // Día 0 = hoy
+    const fechaSeg2   = new Date(hoy);
+    fechaSeg2.setDate(fechaSeg2.getDate() + 14);            // Día 14
+    const fechaRecord = new Date(hoy);
+    fechaRecord.setDate(fechaRecord.getDate() + 90);        // Día 90
+
+    function fmt(d) {
+      return ('0' + d.getDate()).slice(-2) + '/' +
+             ('0' + (d.getMonth() + 1)).slice(-2) + '/' +
+             d.getFullYear();
+    }
+
+    // Asegurar formato +502XXXXXXXX
+    var telefono = (datos.telefono || '').toString().trim();
+    if (telefono && !telefono.startsWith('+')) {
+      telefono = '+' + telefono;
+    }
+
+    const fila = [
+      datos.creamosId      || '',   // Creamos ID
+      datos.nombreCompleto || '',   // Nombre
+      telefono,                     // Telefono
+      datos.empresa        || '',   // Empresa
+      datos.cargo          || '',   // Cargo
+      fechaEmpleo,                  // Fecha Empleo
+      fmt(fechaSeg1),               // Fecha Seg1 (hoy)
+      fmt(fechaSeg2),               // Fecha Seg2 (+14 días)
+      fmt(fechaRecord),             // Fecha Recordatorio (+90 días)
+      'Nuevo',                      // Estado (n8n detecta esto)
+      '',                           // Etapa Actual
+      '', '', '',                   // Resp S1 P1, P2, P3
+      '', '', '',                   // Resp S2 P1, P2, P3
+      'No'                          // Email Enviado
+    ];
+
+    hoja.appendRow(fila);
+    Logger.log('Seguimiento Bot creado para: ' + datos.nombreCompleto);
+
+  } catch (error) {
+    Logger.log('Error al crear fila en Seguimiento Bot: ' + error);
+    // No lanzar el error para no interrumpir el guardado de Conexiones Laborales
   }
 }
 
