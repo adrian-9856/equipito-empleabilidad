@@ -64,7 +64,19 @@ function onEdit(e) {
     const creamosId  = datosGrad[2];
     const nombre     = datosGrad[3];
 
-    // Copiar a la hoja de clasificación
+    // Conexiones Laborales: NO copiar datos desde el dropdown
+    // porque se necesita el formulario completo (que no se puede abrir desde onEdit)
+    if (nuevaEtapa === 'Conexiones Laborales') {
+      // Limpiar la seleccion del dropdown para que no quede marcada
+      e.range.setValue('');
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'Selecciona la fila y ve al menu:\nSeguimiento Graduados > Enviar a Conexiones Laborales',
+        '💼 Usa el menu para Conexiones Laborales', 8
+      );
+      return;
+    }
+
+    // Copiar a la hoja de clasificacion
     copiarAHojaClasificacion(datosGrad, nuevaEtapa, {});
 
     // Actualizar reporte
@@ -72,7 +84,7 @@ function onEdit(e) {
 
     // Programar seguimientos si aplica
     if (nuevaEtapa === 'Activamente busca trabajo') {
-      hoja.getRange(fila, 12).setValue('Sí'); // Empleado = Sí
+      hoja.getRange(fila, 12).setValue('Si'); // Empleado = Si
       programarSeguimientos(graduadoId, nombre);
     }
 
