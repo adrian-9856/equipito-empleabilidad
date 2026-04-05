@@ -190,6 +190,19 @@ function mostrarConfiguracion() {
 }
 
 // -----------------------------------------------------------------------------
+// CONSTANTES DE OPCIONES DE DROPDOWN
+// -----------------------------------------------------------------------------
+
+// Géneros — opciones del dropdown Género en todas las hojas
+const GENEROS = [
+  'Hombre',
+  'Mujer',
+  'Trans hombre',
+  'No binario',
+  'Otro'
+];
+
+// -----------------------------------------------------------------------------
 // COLUMNAS COMUNES — van en las 6 hojas de apilabilidad
 // -----------------------------------------------------------------------------
 
@@ -230,15 +243,6 @@ const AREAS_TRABAJO = [
   'Construcción',
   'Educación',
   'Finanzas',
-  'Otro'
-];
-
-// Géneros — opciones del dropdown Género en todas las hojas
-const GENEROS = [
-  'Hombre',
-  'Mujer',
-  'Trans hombre',
-  'No binario',
   'Otro'
 ];
 
