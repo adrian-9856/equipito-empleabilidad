@@ -26,7 +26,6 @@ function onOpen(e) {
       .addItem('🔄 Importar desde KoboToolbox', 'importarDatosKobo')
       .addSeparator()
       .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
-      .addItem('💼 Enviar a Conexiones Laborales', 'enviarAConexionesLaborales')
       .addItem('📊 Generar Reporte', 'generarReporte')
       .addItem('📞 Ver Seguimientos Pendientes', 'mostrarSeguimientosPendientes')
       .addSeparator()
@@ -45,46 +44,32 @@ function onOpen(e) {
  * Si el usuario cambia la columna "Etapa" (col 12) en Graduados,
  * copia automáticamente al graduado a la hoja de clasificación correspondiente.
  */
+/**
+ * Simple trigger onEdit: maneja TODAS las etapas EXCEPTO Conexiones Laborales.
+ * Conexiones Laborales se maneja en onEditInstalable (trigger instalable)
+ * porque el trigger simple NO puede abrir formularios/dialogos.
+ */
 function onEdit(e) {
   try {
     if (!e || !e.range) return;
-    const hoja    = e.range.getSheet();
-    const colEtapa = 15; // Etapa es la columna 15 en Graduados
-
+    const hoja = e.range.getSheet();
     if (hoja.getName() !== 'Graduados') return;
-    if (e.range.getColumn() !== colEtapa) return;
-    if (e.range.getRow() <= 1) return; // ignorar header
+    if (e.range.getColumn() !== 15) return;
+    if (e.range.getRow() <= 1) return;
 
     const nuevaEtapa = e.value;
-    if (!nuevaEtapa) return;
+    if (!nuevaEtapa || nuevaEtapa === 'Conexiones Laborales') return;
 
     const fila       = e.range.getRow();
     const datosGrad  = hoja.getRange(fila, 1, 1, 15).getValues()[0];
     const graduadoId = datosGrad[0];
-    const creamosId  = datosGrad[2];
     const nombre     = datosGrad[3];
 
-    // Conexiones Laborales: NO copiar datos desde el dropdown
-    // porque se necesita el formulario completo (que no se puede abrir desde onEdit)
-    if (nuevaEtapa === 'Conexiones Laborales') {
-      // Limpiar la seleccion del dropdown para que no quede marcada
-      e.range.setValue('');
-      SpreadsheetApp.getActiveSpreadsheet().toast(
-        'Selecciona la fila y ve al menu:\nSeguimiento Graduados > Enviar a Conexiones Laborales',
-        '💼 Usa el menu para Conexiones Laborales', 8
-      );
-      return;
-    }
-
-    // Copiar a la hoja de clasificacion
     copiarAHojaClasificacion(datosGrad, nuevaEtapa, {});
-
-    // Actualizar reporte
     generarReporte();
 
-    // Programar seguimientos si aplica
     if (nuevaEtapa === 'Activamente busca trabajo') {
-      hoja.getRange(fila, 12).setValue('Si'); // Empleado = Si
+      hoja.getRange(fila, 12).setValue('Si');
       programarSeguimientos(graduadoId, nombre);
     }
 
@@ -94,6 +79,69 @@ function onEdit(e) {
   } catch (error) {
     Logger.log('onEdit: ' + error);
   }
+}
+
+/**
+ * Trigger INSTALABLE de onEdit: maneja Conexiones Laborales.
+ * Al seleccionar "Conexiones Laborales" en el dropdown de Etapa,
+ * limpia la selección y abre el formulario directamente.
+ *
+ * Los triggers instalables SÍ pueden abrir dialogos (a diferencia del simple onEdit).
+ * Se instala automáticamente con instalarSistema() o ejecutando configurarEditTrigger().
+ */
+function onEditInstalable(e) {
+  try {
+    if (!e || !e.range) return;
+    const hoja = e.range.getSheet();
+    if (hoja.getName() !== 'Graduados') return;
+    if (e.range.getColumn() !== 15) return;
+    if (e.range.getRow() <= 1) return;
+
+    const nuevaEtapa = e.value;
+    if (nuevaEtapa !== 'Conexiones Laborales') return;
+
+    const fila      = e.range.getRow();
+    const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
+    const creamosId = datosGrad[2] || '';
+    const nombre    = datosGrad[3] || '';
+
+    // Limpiar el dropdown
+    e.range.setValue('');
+
+    if (!nombre) {
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'La fila no tiene nombre.', '⚠️ Sin datos', 3
+      );
+      return;
+    }
+
+    // Abrir formulario de Conexiones Laborales
+    const html = HtmlService.createHtmlOutput(
+      _generarHTMLFormConexionLaboral(fila, creamosId, nombre, 'Graduados')
+    )
+      .setWidth(560)
+      .setHeight(720)
+      .setTitle('Conexión Laboral');
+    SpreadsheetApp.getUi().showModalDialog(html, '💼 Conexión Laboral — ' + nombre);
+  } catch (error) {
+    Logger.log('onEditInstalable: ' + error);
+  }
+}
+
+/**
+ * Instala el trigger de onEdit para Conexiones Laborales.
+ * También se puede ejecutar manualmente si el trigger no está configurado.
+ */
+function configurarEditTrigger() {
+  // Eliminar triggers anteriores de onEditInstalable
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'onEditInstalable') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('onEditInstalable')
+    .forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())
+    .onEdit()
+    .create();
+  Logger.log('Trigger instalable de onEditInstalable configurado');
 }
 
 /**
@@ -550,6 +598,9 @@ function _ejecutarInstalacion(borrarExistentes) {
 
     // -- 5. Ordenar hojas -----------------------------------------------------
     _ordenarHojas(ss, [...ordenHojas, 'Configuración']);
+
+    // -- 6. Instalar trigger de onEdit para Conexiones Laborales -------------
+    configurarEditTrigger();
 
     ss.toast('', '', 1);
 
