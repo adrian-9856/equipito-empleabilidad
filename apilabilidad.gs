@@ -115,9 +115,17 @@ function onEditInstalable(e) {
       return;
     }
 
+    // Datos personales del graduado (Graduados: 4=Género, 5=Edad, 6=Nivel edu, 7=Teléfono)
+    const datosExtra = {
+      genero:         datosGrad[4] || '',
+      edad:           datosGrad[5] || '',
+      nivelEducativo: datosGrad[6] || '',
+      telefono:       datosGrad[7] || ''
+    };
+
     // Abrir formulario de Conexiones Laborales
     const html = HtmlService.createHtmlOutput(
-      _generarHTMLFormConexionLaboral(fila, creamosId, nombre, 'Graduados')
+      _generarHTMLFormConexionLaboral(fila, creamosId, nombre, 'Graduados', datosExtra)
     )
       .setWidth(560)
       .setHeight(720)
@@ -1254,18 +1262,30 @@ function enviarAConexionesLaborales() {
     return;
   }
 
-  // Leer Creamos ID y Nombre completo según la hoja activa
-  // Graduados: [2]=Creamos ID, [3]=Nombre completo
-  // Hojas clasificación (COLUMNAS_COMUNES): [1]=Creamos ID, [2]=Nombre completo
-  var creamosId, nombreCompleto;
+  // Leer datos según la hoja activa
+  // Graduados: 2=Creamos ID, 3=Nombre, 4=Género, 5=Edad, 6=Nivel edu, 7=Teléfono
+  // Hojas clasificación (COLUMNAS_COMUNES): 1=Creamos ID, 2=Nombre, 3=Teléfono, 4=Género, 5=Edad, 6=Nivel edu
+  var creamosId, nombreCompleto, datosExtra;
   if (nombreHoja === 'Graduados') {
     const datos = hoja.getRange(filaActiva, 1, 1, 15).getValues()[0];
     creamosId      = datos[2] || '';
     nombreCompleto = datos[3] || '';
+    datosExtra = {
+      genero:         datos[4] || '',
+      edad:           datos[5] || '',
+      nivelEducativo: datos[6] || '',
+      telefono:       datos[7] || ''
+    };
   } else {
     const datos = hoja.getRange(filaActiva, 1, 1, 7).getValues()[0];
     creamosId      = datos[1] || '';  // Col 2 = Creamos ID
     nombreCompleto = datos[2] || '';  // Col 3 = Nombre completo
+    datosExtra = {
+      telefono:       datos[3] || '',
+      genero:         datos[4] || '',
+      edad:           datos[5] || '',
+      nivelEducativo: datos[6] || ''
+    };
   }
 
   if (!nombreCompleto) {
@@ -1275,7 +1295,7 @@ function enviarAConexionesLaborales() {
 
   // Generar y mostrar el formulario HTML
   const html = HtmlService.createHtmlOutput(
-    _generarHTMLFormConexionLaboral(filaActiva, creamosId, nombreCompleto, nombreHoja)
+    _generarHTMLFormConexionLaboral(filaActiva, creamosId, nombreCompleto, nombreHoja, datosExtra)
   )
     .setWidth(560)
     .setHeight(720)
@@ -1289,19 +1309,34 @@ function enviarAConexionesLaborales() {
  * @param {string} creamosId
  * @param {string} nombre
  * @param {string} hojaOrigen - nombre de la hoja desde donde se abrió
+ * @param {Object} datosExtra - { telefono, genero, edad, nivelEducativo }
  * @return {string}
  */
-function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOrigen) {
+function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOrigen, datosExtra) {
+  datosExtra = datosExtra || {};
+  var telefono       = datosExtra.telefono       || '';
+  var genero         = datosExtra.genero         || '';
+  var edad           = datosExtra.edad           || '';
+  var nivelEducativo = datosExtra.nivelEducativo || '';
+
+  // Fecha de hoy en formato yyyy-mm-dd para el input date
+  var hoy = new Date();
+  var hoyStr = hoy.getFullYear() + '-' +
+    String(hoy.getMonth() + 1).padStart(2, '0') + '-' +
+    String(hoy.getDate()).padStart(2, '0');
+
   return `
     <style>
       body { font-family: Arial, sans-serif; padding: 16px; background: #fafafa; overflow-y: auto; }
       h3 { color: #e65100; margin-top: 0; }
       .info { background: #fff3e0; padding: 10px; border-radius: 6px; margin-bottom: 14px; }
       .info strong { color: #e65100; }
+      .info-dato { display: inline-block; margin-right: 16px; margin-top: 4px; }
       label { display: block; font-weight: bold; margin: 10px 0 4px; font-size: 13px; }
       input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;
                       box-sizing: border-box; font-size: 13px; }
       input:focus, select:focus { border-color: #e65100; outline: none; }
+      input[readonly] { background: #f0f0f0; color: #666; }
       .row2 { display: flex; gap: 12px; }
       .row2 > div { flex: 1; }
       .seccion { background: #f5f5f5; padding: 10px; border-radius: 6px; margin: 14px 0 8px;
@@ -1316,12 +1351,17 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
       .msg { padding: 10px; margin-top: 10px; border-radius: 4px; display: none; }
       .msg-ok  { background: #c8e6c9; color: #2e7d32; }
       .msg-err { background: #ffcdd2; color: #c62828; }
+      .duracion-auto { font-size: 12px; color: #666; margin-top: 2px; }
     </style>
 
     <h3>Registro de Conexion Laboral</h3>
     <div class="info">
       <strong>Graduado:</strong> ${nombre}<br>
-      <strong>Creamos ID:</strong> ${creamosId || '(sin asignar)'}
+      <strong>Creamos ID:</strong> ${creamosId || '(sin asignar)'}<br>
+      <span class="info-dato"><strong>Tel:</strong> ${telefono || '-'}</span>
+      <span class="info-dato"><strong>Genero:</strong> ${genero || '-'}</span>
+      <span class="info-dato"><strong>Edad:</strong> ${edad || '-'}</span>
+      <span class="info-dato"><strong>Nivel edu:</strong> ${nivelEducativo || '-'}</span>
     </div>
 
     <div class="seccion"><p class="seccion-titulo">Informacion del programa</p></div>
@@ -1370,18 +1410,19 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
     <div class="row2">
       <div>
         <label>Fecha de inicio</label>
-        <input id="fechaInicio" type="date">
+        <input id="fechaInicio" type="date" value="${hoyStr}" onchange="calcularDuracion()">
       </div>
       <div>
-        <label>Fecha de final</label>
-        <input id="fechaFinal" type="date">
+        <label>Fecha de final (opcional)</label>
+        <input id="fechaFinal" type="date" onchange="calcularDuracion()">
       </div>
     </div>
 
     <div class="row2">
       <div>
         <label>Duracion (meses)</label>
-        <input id="duracion" type="number" min="0" placeholder="Meses">
+        <input id="duracion" type="text" readonly placeholder="Se calcula automaticamente">
+        <div class="duracion-auto" id="duracionInfo">Se calcula con las fechas de inicio y final</div>
       </div>
       <div>
         <label>Salario mensual</label>
@@ -1397,6 +1438,66 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
     </div>
 
     <script>
+      function calcularDuracion() {
+        var inicio = document.getElementById('fechaInicio').value;
+        var final  = document.getElementById('fechaFinal').value;
+        var campo  = document.getElementById('duracion');
+        var info   = document.getElementById('duracionInfo');
+
+        if (!inicio) {
+          campo.value = '';
+          info.textContent = 'Ingresa la fecha de inicio';
+          return;
+        }
+
+        if (!final) {
+          // Si no hay fecha final, calcular desde inicio hasta hoy
+          var hoy = new Date();
+          var fi  = new Date(inicio);
+          if (fi > hoy) {
+            campo.value = '0';
+            info.textContent = 'Aun no ha iniciado';
+            return;
+          }
+          var meses = (hoy.getFullYear() - fi.getFullYear()) * 12 + (hoy.getMonth() - fi.getMonth());
+          var dias  = hoy.getDate() - fi.getDate();
+          if (dias < 0) meses--;
+          if (meses < 1) {
+            var diffDias = Math.floor((hoy - fi) / (1000 * 60 * 60 * 24));
+            var semanas  = Math.floor(diffDias / 7);
+            campo.value = meses <= 0 ? '0' : String(meses);
+            info.textContent = 'Sin fecha final: ' + diffDias + ' dias (' + semanas + ' semanas) hasta hoy';
+          } else {
+            campo.value = String(meses);
+            info.textContent = 'Sin fecha final: calculado hasta hoy (' + meses + ' meses)';
+          }
+          return;
+        }
+
+        // Ambas fechas disponibles
+        var fi = new Date(inicio);
+        var ff = new Date(final);
+        if (ff < fi) {
+          campo.value = '';
+          info.textContent = 'La fecha final no puede ser antes de la de inicio';
+          return;
+        }
+        var meses = (ff.getFullYear() - fi.getFullYear()) * 12 + (ff.getMonth() - fi.getMonth());
+        var dias  = ff.getDate() - fi.getDate();
+        if (dias < 0) meses--;
+        if (meses < 1) {
+          var diffDias = Math.floor((ff - fi) / (1000 * 60 * 60 * 24));
+          campo.value = '0';
+          info.textContent = diffDias + ' dias (menos de 1 mes)';
+        } else {
+          campo.value = String(meses);
+          info.textContent = meses + ' meses calculados automaticamente';
+        }
+      }
+
+      // Calcular al cargar el formulario
+      calcularDuracion();
+
       function guardar() {
         var empresa = document.getElementById('empresa').value.trim();
         var cargo   = document.getElementById('cargo').value.trim();
@@ -1408,22 +1509,26 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
         document.getElementById('btnGuardar').textContent = 'Guardando...';
 
         var datos = {
-          filaGraduado:  ${filaGraduado},
-          hojaOrigen:    '${hojaOrigen}',
-          creamosId:     '${creamosId}',
-          nombreCompleto:'${nombre}',
-          tipo:          document.getElementById('tipo').value.trim(),
-          programa:      document.getElementById('programa').value.trim(),
-          proyecto:      document.getElementById('proyecto').value.trim(),
-          especialidad:  document.getElementById('especialidad').value.trim(),
-          empresa:       empresa,
-          cargo:         cargo,
-          tipoDuracion:  document.getElementById('tipoDuracion').value.trim(),
-          tipoContrato:  document.getElementById('tipoContrato').value.trim(),
-          fechaInicio:   document.getElementById('fechaInicio').value,
-          fechaFinal:    document.getElementById('fechaFinal').value,
-          duracion:      document.getElementById('duracion').value,
-          salario:       document.getElementById('salario').value.trim()
+          filaGraduado:   ${filaGraduado},
+          hojaOrigen:     '${hojaOrigen}',
+          creamosId:      '${creamosId}',
+          nombreCompleto: '${nombre}',
+          telefono:       '${telefono}',
+          genero:         '${genero}',
+          edad:           '${edad}',
+          nivelEducativo: '${nivelEducativo}',
+          tipo:           document.getElementById('tipo').value.trim(),
+          programa:       document.getElementById('programa').value.trim(),
+          proyecto:       document.getElementById('proyecto').value.trim(),
+          especialidad:   document.getElementById('especialidad').value.trim(),
+          empresa:        empresa,
+          cargo:          cargo,
+          tipoDuracion:   document.getElementById('tipoDuracion').value.trim(),
+          tipoContrato:   document.getElementById('tipoContrato').value.trim(),
+          fechaInicio:    document.getElementById('fechaInicio').value,
+          fechaFinal:     document.getElementById('fechaFinal').value,
+          duracion:       document.getElementById('duracion').value,
+          salario:        document.getElementById('salario').value.trim()
         };
 
         google.script.run
@@ -1484,24 +1589,24 @@ function guardarConexionLaboral(datos) {
     }
 
     const fila = [
-      creamosId,                    // 1  Creamos ID
-      nombreCompleto,               // 2  Nombre completo
-      '',                           // 3  Número de teléfono (manual)
-      '',                           // 4  Género (manual)
-      '',                           // 5  Edad (manual)
-      '',                           // 6  Nivel educativo (manual)
-      datos.tipo         || '',     // 7  Tipo
-      datos.programa     || '',     // 8  Programa
-      datos.proyecto     || '',     // 9  Proyecto
-      datos.especialidad || '',     // 10 Especialidad
-      datos.empresa,                // 11 Empresa
-      datos.cargo,                  // 12 Cargo que desempena
-      datos.tipoDuracion || '',     // 13 Tipo de duracion de contrato
-      datos.tipoContrato || '',     // 14 Tipo de contrato
-      fechaInicio,                  // 15 Fecha de inicio
-      fechaFinal,                   // 16 Fecha de final
-      datos.duracion     || '',     // 17 Duracion (meses)
-      datos.salario      || ''      // 18 Salario mensual
+      creamosId,                        // 1  Creamos ID
+      nombreCompleto,                   // 2  Nombre completo
+      datos.telefono       || '',       // 3  Número de teléfono
+      datos.genero         || '',       // 4  Género
+      datos.edad           || '',       // 5  Edad
+      datos.nivelEducativo || '',       // 6  Nivel educativo
+      datos.tipo           || '',       // 7  Tipo
+      datos.programa       || '',       // 8  Programa
+      datos.proyecto       || '',       // 9  Proyecto
+      datos.especialidad   || '',       // 10 Especialidad
+      datos.empresa,                    // 11 Empresa
+      datos.cargo,                      // 12 Cargo que desempena
+      datos.tipoDuracion   || '',       // 13 Tipo de duracion de contrato
+      datos.tipoContrato   || '',       // 14 Tipo de contrato
+      fechaInicio,                      // 15 Fecha de inicio
+      fechaFinal,                       // 16 Fecha de final
+      datos.duracion       || '',       // 17 Duracion (meses)
+      datos.salario        || ''        // 18 Salario mensual
     ];
 
     obtenerHoja('Conexiones Laborales').appendRow(fila);
