@@ -528,7 +528,9 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'D7 Comentario',           ancho: 250, tipo: 'texto'  },
       { nombre: 'Puntaje Total',           ancho: 110, tipo: 'texto'  },
       { nombre: 'Perfil Asignado',         ancho: 300, tipo: 'dropdown', opciones: PERFILES_CLASIFICACION },
-      { nombre: 'Notas de observación',    ancho: 350, tipo: 'texto'  }
+      { nombre: 'Notas de observación',    ancho: 350, tipo: 'texto'  },
+      { nombre: 'Barreras activas',        ancho: 130, tipo: 'texto'  },
+      { nombre: 'Desmotivación',           ancho: 130, tipo: 'texto'  }
     ]
   },
 
@@ -1076,74 +1078,98 @@ function importarClasificacionPerfiles() {
  */
 function procesarClasificacionPerfiles(datos) {
   const hoja = obtenerHoja('Clasificación de Perfiles');
-  let nuevos = 0;
-  let actualizados = 0;
+  var nuevos = 0;
+  var actualizados = 0;
 
   // Leer IDs existentes para evitar duplicados
-  const datosExistentes = hoja.getDataRange().getValues();
-  const idsExistentes = {};
-  for (var i = 1; i < datosExistentes.length; i++) {
-    if (datosExistentes[i][0]) idsExistentes[datosExistentes[i][0].toString()] = i + 1;
+  var datosExist = hoja.getDataRange().getValues();
+  var idsExistentes = {};
+  for (var i = 1; i < datosExist.length; i++) {
+    if (datosExist[i][0]) idsExistentes[datosExist[i][0].toString()] = i + 1;
   }
 
+  // Prefijo exacto de todas las columnas del módulo en el CSV
+  var M = 'MÓDULO DE OBSERVACIÓN - Evaluación de Perfil / ';
+
   datos.forEach(function(dato) {
-    var creamosId = _buscarCampo(dato, ['Creamos_ID_del_participante', 'creamos_id', 'Creamos_ID', 'id']);
+    var creamosId = (dato['Creamos ID del participante:'] || '').toString().trim();
     if (!creamosId) return;
 
-    // Extraer puntajes de cada dimensión
-    var d1 = _extraerPuntaje(dato, ['D1', 'dimension_1', 'Barreras_de_cuidado', 'DIMENSI_N_1']);
-    var d2 = _extraerPuntaje(dato, ['D2', 'dimension_2', 'Barreras_de_violencia', 'DIMENSI_N_2']);
-    var d3 = _extraerPuntaje(dato, ['D3', 'dimension_3', 'Barreras_de_movilidad', 'DIMENSI_N_3']);
-    var d4 = _extraerPuntaje(dato, ['D4', 'dimension_4', 'Barreras_legales', 'DIMENSI_N_4']);
-    var d5 = _extraerPuntaje(dato, ['D5', 'dimension_5', 'Motivaci_n_real', 'DIMENSI_N_5']);
-    var d6 = _extraerPuntaje(dato, ['D6', 'dimension_6', 'Experiencia_previa', 'DIMENSI_N_6']);
-    var d7 = _extraerPuntaje(dato, ['D7', 'dimension_7', 'Autonom_a', 'DIMENSI_N_7']);
+    // Puntajes: valor completo viene como "(4 pts) Texto descriptivo"
+    var d1 = _puntajeDesdeTexto(dato[M + 'DIMENSIÓN 1: Barreras de cuidado Basado en la conversación sobre responsabilidades en casa:']);
+    var c1 = dato[M + 'Agrega comentario sobre DIEMENSIÓN 1'] || '';
 
-    // Comentarios
-    var c1 = _buscarCampo(dato, ['comentario_D1', 'Agrega_comentario_sobre_DI', 'comentario_1']);
-    var c2 = _buscarCampo(dato, ['comentario_D2', 'Agrega_comentario_sobre_001', 'comentario_2']);
-    var c3 = _buscarCampo(dato, ['comentario_D3', 'Agrega_comentario_sobre_002', 'comentario_3']);
-    var c4 = _buscarCampo(dato, ['comentario_D4', 'Agrega_comentario_sobre_003', 'comentario_4']);
-    var c5 = _buscarCampo(dato, ['comentario_D5', 'Agrega_comentario_sobre_004', 'comentario_5']);
-    var c6 = _buscarCampo(dato, ['comentario_D6', 'Agrega_comentario_sobre_005', 'comentario_6']);
-    var c7 = _buscarCampo(dato, ['comentario_D7', 'Agrega_comentario_sobre_006', 'comentario_7']);
+    var d2 = _puntajeDesdeTexto(dato[M + 'DIMENSIÓN 2: Barreras de violencia/control Basado en las respuestas sobre trabajo en horarios variados / grupos mixtos / apoyo en casa:']);
+    var c2 = dato[M + 'Agrega comentario sobre DIMENSIÓN 2'] || '';
 
-    // Calcular puntaje total
-    var puntajes = [d1, d2, d3, d4, d5, d6, d7].map(function(p) {
-      return parseInt(p) || 0;
-    });
-    var puntajeTotal = puntajes.reduce(function(a, b) { return a + b; }, 0);
+    var d3 = _puntajeDesdeTexto(dato[M + 'DIMENSIÓN 3: Barreras de movilidad/seguridad Basado en las respuestas sobre transporte y movilidad en la ciudad:']);
+    var c3 = dato[M + 'Agrega comentario sobre DIMENSIÓN 3'] || '';
 
-    // Asignar perfil según puntaje
-    var perfil = _asignarPerfil(puntajeTotal);
+    var d4 = _puntajeDesdeTexto(dato[M + 'DIMENSIÓN 4: Barreras legales/salud Basado en respuestas sobre antecedentes penales, casos legales, salud:']);
+    var c4 = dato[M + 'Agrega comentario sobre DIMENSIÓN 4'] || '';
 
-    // Notas
-    var notas = _buscarCampo(dato, ['Notas_de_observaci_n', 'notas', 'Frases_textuales']);
+    var d5 = _puntajeDesdeTexto(dato[M + 'DIMENSIÓN 5: Motivación real / Prioridades Basado en las respuestas sobre qué quiere hacer en los próximos meses y qué tan importante es conseguir empleo:']);
+    var c5 = dato[M + 'Agrega comentario sobre DIMENSIÓN 5'] || '';
 
-    // Buscar datos del graduado para completar info personal
+    var d6 = _puntajeDesdeTexto(dato[M + 'DIMENSIÓN 6: Experiencia previa en búsqueda de empleo Basado en si ha trabajado antes / buscado empleo / sabe qué hacer:']);
+    var c6 = dato[M + 'Agrega comentario sobre DIMENSIÓN 6'] || '';
+
+    var d7 = _puntajeDesdeTexto(dato[M + 'DIMENSIÓN 7: Autonomía / Autoeficacia percibida Basado en el tono general, lenguaje corporal, y respuestas sobre planes y capacidad:']);
+    var c7 = dato[M + 'Agrega comentario sobre DIMENSIÓN 7'] || '';
+
+    // Puntaje total: usar el del formulario si existe, si no calcular
+    var puntajeForm = parseInt(dato[M + 'puntaje_total']) || 0;
+    var puntajeCalc = [d1,d2,d3,d4,d5,d6,d7].reduce(function(a,b){ return a+b; }, 0);
+    var puntajeTotal = puntajeForm > 0 ? puntajeForm : puntajeCalc;
+
+    // Flags del formulario
+    var tieneBarreras = dato[M + 'tiene_barreras_activas'] || '';
+    var tieneDesmot   = dato[M + 'tiene_desmotivacion']    || '';
+
+    // Perfil: usar el calculado por KoboToolbox si viene, si no calcular por puntaje
+    var perfilKobo = dato[M + 'perfil_asignado'] || '';
+    var perfil     = _mapearPerfil(perfilKobo, puntajeTotal);
+
+    // Notas del entrevistador
+    var notas = dato[M + 'Notas de observación (opcional): Frases textuales, lenguaje corporal, o contexto adicional que influyó en tu evaluación:'] || '';
+
+    // Fecha de envío desde _submission_time
+    var fechaEval = new Date().toLocaleDateString('es-ES');
+    if (dato['_submission_time']) {
+      var dt = new Date(dato['_submission_time']);
+      if (!isNaN(dt.getTime())) {
+        fechaEval = ('0'+dt.getDate()).slice(-2) + '/' +
+                    ('0'+(dt.getMonth()+1)).slice(-2) + '/' +
+                    dt.getFullYear();
+      }
+    }
+
+    // Datos personales del graduado desde la hoja Graduados
     var datosGrad = _buscarGraduadoPorCreamosId(creamosId);
 
     var fila = [
-      creamosId,
-      datosGrad.nombre    || _buscarCampo(dato, ['nombre', 'name']) || '',
-      datosGrad.telefono  || '',
-      datosGrad.genero    || '',
-      datosGrad.edad      || '',
-      datosGrad.nivelEdu  || '',
-      new Date().toLocaleDateString('es-ES'),
-      d1, c1,
-      d2, c2,
-      d3, c3,
-      d4, c4,
-      d5, c5,
-      d6, c6,
-      d7, c7,
-      puntajeTotal + ' / 28',
-      perfil,
-      notas
+      creamosId,                  // 1  Creamos ID
+      datosGrad.nombre   || '',   // 2  Nombre completo
+      datosGrad.telefono || '',   // 3  Número de teléfono
+      datosGrad.genero   || '',   // 4  Género
+      datosGrad.edad     || '',   // 5  Edad
+      datosGrad.nivelEdu || '',   // 6  Nivel educativo
+      fechaEval,                  // 7  Fecha de evaluación
+      d1, c1,                     // 8-9  D1
+      d2, c2,                     // 10-11 D2
+      d3, c3,                     // 12-13 D3
+      d4, c4,                     // 14-15 D4
+      d5, c5,                     // 16-17 D5
+      d6, c6,                     // 18-19 D6
+      d7, c7,                     // 20-21 D7
+      puntajeTotal + ' / 28',     // 22 Puntaje Total
+      perfil,                     // 23 Perfil Asignado
+      notas,                      // 24 Notas
+      tieneBarreras,              // 25 Barreras activas
+      tieneDesmot                 // 26 Desmotivación
     ];
 
-    var filaExistente = idsExistentes[creamosId.toString()];
+    var filaExistente = idsExistentes[creamosId];
     if (filaExistente) {
       hoja.getRange(filaExistente, 1, 1, fila.length).setValues([fila]);
       actualizados++;
@@ -1153,51 +1179,41 @@ function procesarClasificacionPerfiles(datos) {
     }
   });
 
-  var total = hoja.getLastRow() - 1;
-  return { nuevos: nuevos, actualizados: actualizados, total: total };
+  return { nuevos: nuevos, actualizados: actualizados, total: hoja.getLastRow() - 1 };
 }
 
 /**
- * Busca un campo en el objeto dato probando varios nombres posibles
+ * Extrae el número de puntaje desde un texto como "(4 pts) No tiene personas..."
+ * @return {number}
  */
-function _buscarCampo(dato, nombres) {
-  for (var i = 0; i < nombres.length; i++) {
-    // Búsqueda exacta
-    if (dato[nombres[i]] !== undefined && dato[nombres[i]] !== '') return dato[nombres[i]];
-    // Búsqueda parcial en las keys
-    var keys = Object.keys(dato);
-    for (var j = 0; j < keys.length; j++) {
-      if (keys[j].indexOf(nombres[i]) !== -1 && dato[keys[j]] !== '') return dato[keys[j]];
-    }
-  }
-  return '';
-}
-
-/**
- * Extrae el puntaje numérico de una respuesta de dimensión
- * Busca patrones como "(4 pts)", "(3 pts)", etc.
- */
-function _extraerPuntaje(dato, nombres) {
-  var valor = _buscarCampo(dato, nombres);
-  if (!valor) return '0';
+function _puntajeDesdeTexto(valor) {
+  if (!valor) return 0;
   var match = valor.toString().match(/\((\d+)\s*pt/i);
-  if (match) return match[1];
+  if (match) return parseInt(match[1]);
   var num = parseInt(valor);
-  return isNaN(num) ? '0' : String(num);
+  return isNaN(num) ? 0 : num;
 }
 
 /**
- * Asigna perfil según puntaje total (de 28 pts)
+ * Mapea el valor perfil_asignado de KoboToolbox a nuestros nombres estándar.
+ * Si no coincide, calcula por puntaje.
  */
-function _asignarPerfil(puntaje) {
-  if (puntaje >= 22) return PERFILES_CLASIFICACION[0]; // Alto
-  if (puntaje >= 15) return PERFILES_CLASIFICACION[1]; // Medio-Alto
-  if (puntaje >= 8)  return PERFILES_CLASIFICACION[2]; // Medio-Bajo
-  return PERFILES_CLASIFICACION[3];                    // Bajo
+function _mapearPerfil(perfilKobo, puntaje) {
+  var p = (perfilKobo || '').toString().toLowerCase();
+  if (p.indexOf('sin condiciones') !== -1 || p === 'perfil_1' || p === 'perfil 1') return PERFILES_CLASIFICACION[0];
+  if (p.indexOf('con acompañamiento') !== -1 || p === 'perfil_2' || p === 'perfil 2') return PERFILES_CLASIFICACION[1];
+  if (p.indexOf('intensivo') !== -1 || p === 'perfil_3' || p === 'perfil 3') return PERFILES_CLASIFICACION[2];
+  if (p.indexOf('no acepta') !== -1 || p === 'perfil_4' || p === 'perfil 4') return PERFILES_CLASIFICACION[3];
+  // Fallback: calcular por puntaje
+  if (puntaje >= 22) return PERFILES_CLASIFICACION[0];
+  if (puntaje >= 15) return PERFILES_CLASIFICACION[1];
+  if (puntaje >= 8)  return PERFILES_CLASIFICACION[2];
+  return PERFILES_CLASIFICACION[3];
 }
 
 /**
- * Busca datos de un graduado por Creamos ID para llenar info personal
+ * Busca datos personales de un graduado por Creamos ID en la hoja Graduados.
+ * Graduados: col3=Creamos ID, col4=Nombre, col5=Género, col6=Edad, col7=Nivel edu, col8=Teléfono
  */
 function _buscarGraduadoPorCreamosId(creamosId) {
   try {
@@ -1205,7 +1221,7 @@ function _buscarGraduadoPorCreamosId(creamosId) {
     if (!hoja || hoja.getLastRow() <= 1) return {};
     var datos = hoja.getDataRange().getValues();
     for (var i = 1; i < datos.length; i++) {
-      if (datos[i][2] && datos[i][2].toString() === creamosId.toString()) {
+      if (datos[i][2] && datos[i][2].toString().trim() === creamosId.trim()) {
         return {
           nombre:   datos[i][3] || '',
           genero:   datos[i][4] || '',
@@ -1216,9 +1232,7 @@ function _buscarGraduadoPorCreamosId(creamosId) {
       }
     }
     return {};
-  } catch (e) {
-    return {};
-  }
+  } catch (e) { return {}; }
 }
 
 // ===========================================================================
