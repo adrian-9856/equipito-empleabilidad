@@ -23,7 +23,8 @@ function onOpen(e) {
   try {
     const ui = SpreadsheetApp.getUi();
     ui.createMenu('📊 Seguimiento Graduados')
-      .addItem('🔄 Importar desde KoboToolbox', 'importarDatosKobo')
+      .addItem('🔄 Importar Graduados (KoboToolbox)', 'importarDatosKobo')
+      .addItem('📋 Importar Clasificación de Perfiles', 'importarClasificacionPerfiles')
       .addSeparator()
       .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
       .addItem('📊 Generar Reporte', 'generarReporte')
@@ -256,6 +257,14 @@ const GENEROS = [
   'Trans hombre',
   'No binario',
   'Otro'
+];
+
+// Perfiles de clasificación según puntaje
+const PERFILES_CLASIFICACION = [
+  'Perfil 1 Alto: Listo para inserción laboral directa',
+  'Perfil 2 Medio-Alto: Listo con apoyo puntual',
+  'Perfil 3 Medio-Bajo: Necesita acompañamiento moderado',
+  'Perfil 4 Bajo: Necesita acompañamiento intensivo'
 ];
 
 // -----------------------------------------------------------------------------
@@ -491,6 +500,38 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
+  // -- CLASIFICACIÓN DE PERFILES -----------------------------------------------
+  // Importada desde KoboToolbox: IL_09_Módulo de Clasificación de Perfiles
+  'Clasificación de Perfiles': {
+    color: '#5c6bc0',
+    columnas: [
+      { nombre: 'Creamos ID',              ancho: 130, tipo: 'texto'  },
+      { nombre: 'Nombre completo',         ancho: 200, tipo: 'texto'  },
+      { nombre: 'Número de teléfono',      ancho: 150, tipo: 'texto'  },
+      { nombre: 'Género',                  ancho: 120, tipo: 'dropdown', opciones: GENEROS },
+      { nombre: 'Edad',                    ancho: 80,  tipo: 'texto'  },
+      { nombre: 'Nivel educativo',         ancho: 160, tipo: 'texto'  },
+      { nombre: 'Fecha de evaluación',     ancho: 150, tipo: 'fecha'  },
+      { nombre: 'D1 Cuidado',              ancho: 100, tipo: 'texto'  },
+      { nombre: 'D1 Comentario',           ancho: 250, tipo: 'texto'  },
+      { nombre: 'D2 Violencia',            ancho: 100, tipo: 'texto'  },
+      { nombre: 'D2 Comentario',           ancho: 250, tipo: 'texto'  },
+      { nombre: 'D3 Movilidad',            ancho: 100, tipo: 'texto'  },
+      { nombre: 'D3 Comentario',           ancho: 250, tipo: 'texto'  },
+      { nombre: 'D4 Legal/Salud',          ancho: 100, tipo: 'texto'  },
+      { nombre: 'D4 Comentario',           ancho: 250, tipo: 'texto'  },
+      { nombre: 'D5 Motivación',           ancho: 100, tipo: 'texto'  },
+      { nombre: 'D5 Comentario',           ancho: 250, tipo: 'texto'  },
+      { nombre: 'D6 Experiencia',          ancho: 100, tipo: 'texto'  },
+      { nombre: 'D6 Comentario',           ancho: 250, tipo: 'texto'  },
+      { nombre: 'D7 Autonomía',            ancho: 100, tipo: 'texto'  },
+      { nombre: 'D7 Comentario',           ancho: 250, tipo: 'texto'  },
+      { nombre: 'Puntaje Total',           ancho: 110, tipo: 'texto'  },
+      { nombre: 'Perfil Asignado',         ancho: 300, tipo: 'dropdown', opciones: PERFILES_CLASIFICACION },
+      { nombre: 'Notas de observación',    ancho: 350, tipo: 'texto'  }
+    ]
+  },
+
   // -- REPORTE ---------------------------------------------------------------
   // Hoja de reporte automático — no tiene columnas editables por el usuario
   // Se genera/actualiza automáticamente con generarReporte()
@@ -572,6 +613,7 @@ function _ejecutarInstalacion(borrarExistentes) {
         'Activamente busca trabajo',
         'Seguimientos',
         'Seguimiento Bot',
+        'Clasificación de Perfiles',
         'Reporte',
         'Conexiones Laborales',
         'Configuración',
@@ -611,6 +653,7 @@ function _ejecutarInstalacion(borrarExistentes) {
       'Conexiones Laborales',
       'Seguimientos',
       'Seguimiento Bot',
+      'Clasificación de Perfiles',
       'Reporte'
     ];
 
@@ -766,11 +809,12 @@ function _crearHojaConfiguracion(ss) {
   hoja.setRowHeight(1, 36);
 
   const filas = [
-    ['KOBO_EXPORT_URL', '', 'URL de exportación CSV de KoboToolbox'],
-    ['KOBO_TOKEN',      '', 'Token de autenticación de KoboToolbox'],
-    ['EMAIL_NOTIF',     '', 'Email para recibir notificaciones'],
-    ['SYNC_AUTO',       'false', 'true = sincronizar cada hora automáticamente'],
-    ['NOTIF_AUTO',      'false', 'true = enviar email diario de seguimientos pendientes']
+    ['KOBO_EXPORT_URL',       '', 'URL de exportación CSV de KoboToolbox (Graduados)'],
+    ['KOBO_CLASIFICACION_URL','', 'URL de exportación CSV de Clasificación de Perfiles'],
+    ['KOBO_TOKEN',            '', 'Token de autenticación de KoboToolbox'],
+    ['EMAIL_NOTIF',           '', 'Email para recibir notificaciones'],
+    ['SYNC_AUTO',             'false', 'true = sincronizar cada hora automáticamente'],
+    ['NOTIF_AUTO',            'false', 'true = enviar email diario de seguimientos pendientes']
   ];
   hoja.getRange(2, 1, filas.length, 3).setValues(filas);
 
@@ -968,6 +1012,213 @@ function configurarTriggerSincronizacion() {
   });
   ScriptApp.newTrigger('sincronizacionAutomatica').timeBased().everyHours(1).create();
   Logger.log('Sincronización automática configurada para ejecutarse cada hora');
+}
+
+// ===========================================================================
+// SECCIÓN 2B: IMPORTACIÓN DE CLASIFICACIÓN DE PERFILES
+// ===========================================================================
+
+/**
+ * Importa datos de Clasificación de Perfiles desde KoboToolbox
+ */
+function importarClasificacionPerfiles() {
+  try {
+    const ui     = SpreadsheetApp.getUi();
+    const config = obtenerConfiguracion();
+
+    if (!config.koboClasificacionUrl) {
+      ui.alert('⚠️ URL no configurada',
+        'Configura la URL de exportación de Clasificación de Perfiles.\n\n' +
+        'Ve a la hoja Configuración y pega la URL en KOBO_CLASIFICACION_URL.',
+        ui.ButtonSet.OK);
+      return;
+    }
+
+    ui.alert('🔄 Importando Clasificaciones',
+      'Importando datos de Clasificación de Perfiles desde KoboToolbox...',
+      ui.ButtonSet.OK);
+
+    // Obtener CSV
+    const opciones = { method: 'get', headers: {}, muteHttpExceptions: true };
+    if (config.koboToken) {
+      opciones.headers['Authorization'] = 'Token ' + config.koboToken;
+    }
+    const respuesta = UrlFetchApp.fetch(config.koboClasificacionUrl, opciones);
+    if (respuesta.getResponseCode() !== 200) {
+      throw new Error('Error HTTP ' + respuesta.getResponseCode());
+    }
+
+    const datos = parsearCSV(respuesta.getContentText());
+    if (!datos || datos.length === 0) {
+      ui.alert('⚠️ Sin Datos', 'No se encontraron datos para importar.', ui.ButtonSet.OK);
+      return;
+    }
+
+    const resultado = procesarClasificacionPerfiles(datos);
+    ui.alert('✅ Importación Completada',
+      'Se importaron ' + resultado.nuevos + ' clasificaciones nuevas.\n' +
+      'Se actualizaron ' + resultado.actualizados + ' existentes.\n' +
+      'Total: ' + resultado.total,
+      ui.ButtonSet.OK);
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('❌ Error',
+      'Error al importar clasificaciones: ' + error.message,
+      SpreadsheetApp.getUi().ButtonSet.OK);
+    Logger.log('Error en importarClasificacionPerfiles: ' + error);
+  }
+}
+
+/**
+ * Procesa los datos de clasificación y los inserta en la hoja
+ * @param {Array} datos - Array de objetos del CSV
+ * @return {Object}
+ */
+function procesarClasificacionPerfiles(datos) {
+  const hoja = obtenerHoja('Clasificación de Perfiles');
+  let nuevos = 0;
+  let actualizados = 0;
+
+  // Leer IDs existentes para evitar duplicados
+  const datosExistentes = hoja.getDataRange().getValues();
+  const idsExistentes = {};
+  for (var i = 1; i < datosExistentes.length; i++) {
+    if (datosExistentes[i][0]) idsExistentes[datosExistentes[i][0].toString()] = i + 1;
+  }
+
+  datos.forEach(function(dato) {
+    var creamosId = _buscarCampo(dato, ['Creamos_ID_del_participante', 'creamos_id', 'Creamos_ID', 'id']);
+    if (!creamosId) return;
+
+    // Extraer puntajes de cada dimensión
+    var d1 = _extraerPuntaje(dato, ['D1', 'dimension_1', 'Barreras_de_cuidado', 'DIMENSI_N_1']);
+    var d2 = _extraerPuntaje(dato, ['D2', 'dimension_2', 'Barreras_de_violencia', 'DIMENSI_N_2']);
+    var d3 = _extraerPuntaje(dato, ['D3', 'dimension_3', 'Barreras_de_movilidad', 'DIMENSI_N_3']);
+    var d4 = _extraerPuntaje(dato, ['D4', 'dimension_4', 'Barreras_legales', 'DIMENSI_N_4']);
+    var d5 = _extraerPuntaje(dato, ['D5', 'dimension_5', 'Motivaci_n_real', 'DIMENSI_N_5']);
+    var d6 = _extraerPuntaje(dato, ['D6', 'dimension_6', 'Experiencia_previa', 'DIMENSI_N_6']);
+    var d7 = _extraerPuntaje(dato, ['D7', 'dimension_7', 'Autonom_a', 'DIMENSI_N_7']);
+
+    // Comentarios
+    var c1 = _buscarCampo(dato, ['comentario_D1', 'Agrega_comentario_sobre_DI', 'comentario_1']);
+    var c2 = _buscarCampo(dato, ['comentario_D2', 'Agrega_comentario_sobre_001', 'comentario_2']);
+    var c3 = _buscarCampo(dato, ['comentario_D3', 'Agrega_comentario_sobre_002', 'comentario_3']);
+    var c4 = _buscarCampo(dato, ['comentario_D4', 'Agrega_comentario_sobre_003', 'comentario_4']);
+    var c5 = _buscarCampo(dato, ['comentario_D5', 'Agrega_comentario_sobre_004', 'comentario_5']);
+    var c6 = _buscarCampo(dato, ['comentario_D6', 'Agrega_comentario_sobre_005', 'comentario_6']);
+    var c7 = _buscarCampo(dato, ['comentario_D7', 'Agrega_comentario_sobre_006', 'comentario_7']);
+
+    // Calcular puntaje total
+    var puntajes = [d1, d2, d3, d4, d5, d6, d7].map(function(p) {
+      return parseInt(p) || 0;
+    });
+    var puntajeTotal = puntajes.reduce(function(a, b) { return a + b; }, 0);
+
+    // Asignar perfil según puntaje
+    var perfil = _asignarPerfil(puntajeTotal);
+
+    // Notas
+    var notas = _buscarCampo(dato, ['Notas_de_observaci_n', 'notas', 'Frases_textuales']);
+
+    // Buscar datos del graduado para completar info personal
+    var datosGrad = _buscarGraduadoPorCreamosId(creamosId);
+
+    var fila = [
+      creamosId,
+      datosGrad.nombre    || _buscarCampo(dato, ['nombre', 'name']) || '',
+      datosGrad.telefono  || '',
+      datosGrad.genero    || '',
+      datosGrad.edad      || '',
+      datosGrad.nivelEdu  || '',
+      new Date().toLocaleDateString('es-ES'),
+      d1, c1,
+      d2, c2,
+      d3, c3,
+      d4, c4,
+      d5, c5,
+      d6, c6,
+      d7, c7,
+      puntajeTotal + ' / 28',
+      perfil,
+      notas
+    ];
+
+    var filaExistente = idsExistentes[creamosId.toString()];
+    if (filaExistente) {
+      hoja.getRange(filaExistente, 1, 1, fila.length).setValues([fila]);
+      actualizados++;
+    } else {
+      hoja.appendRow(fila);
+      nuevos++;
+    }
+  });
+
+  var total = hoja.getLastRow() - 1;
+  return { nuevos: nuevos, actualizados: actualizados, total: total };
+}
+
+/**
+ * Busca un campo en el objeto dato probando varios nombres posibles
+ */
+function _buscarCampo(dato, nombres) {
+  for (var i = 0; i < nombres.length; i++) {
+    // Búsqueda exacta
+    if (dato[nombres[i]] !== undefined && dato[nombres[i]] !== '') return dato[nombres[i]];
+    // Búsqueda parcial en las keys
+    var keys = Object.keys(dato);
+    for (var j = 0; j < keys.length; j++) {
+      if (keys[j].indexOf(nombres[i]) !== -1 && dato[keys[j]] !== '') return dato[keys[j]];
+    }
+  }
+  return '';
+}
+
+/**
+ * Extrae el puntaje numérico de una respuesta de dimensión
+ * Busca patrones como "(4 pts)", "(3 pts)", etc.
+ */
+function _extraerPuntaje(dato, nombres) {
+  var valor = _buscarCampo(dato, nombres);
+  if (!valor) return '0';
+  var match = valor.toString().match(/\((\d+)\s*pt/i);
+  if (match) return match[1];
+  var num = parseInt(valor);
+  return isNaN(num) ? '0' : String(num);
+}
+
+/**
+ * Asigna perfil según puntaje total (de 28 pts)
+ */
+function _asignarPerfil(puntaje) {
+  if (puntaje >= 22) return PERFILES_CLASIFICACION[0]; // Alto
+  if (puntaje >= 15) return PERFILES_CLASIFICACION[1]; // Medio-Alto
+  if (puntaje >= 8)  return PERFILES_CLASIFICACION[2]; // Medio-Bajo
+  return PERFILES_CLASIFICACION[3];                    // Bajo
+}
+
+/**
+ * Busca datos de un graduado por Creamos ID para llenar info personal
+ */
+function _buscarGraduadoPorCreamosId(creamosId) {
+  try {
+    var hoja = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Graduados');
+    if (!hoja || hoja.getLastRow() <= 1) return {};
+    var datos = hoja.getDataRange().getValues();
+    for (var i = 1; i < datos.length; i++) {
+      if (datos[i][2] && datos[i][2].toString() === creamosId.toString()) {
+        return {
+          nombre:   datos[i][3] || '',
+          genero:   datos[i][4] || '',
+          edad:     datos[i][5] || '',
+          nivelEdu: datos[i][6] || '',
+          telefono: datos[i][7] || ''
+        };
+      }
+    }
+    return {};
+  } catch (e) {
+    return {};
+  }
 }
 
 // ===========================================================================
@@ -1901,10 +2152,11 @@ function verificarConfiguracion() {
 function obtenerConfiguracion() {
   const props = PropertiesService.getScriptProperties();
   return {
-    koboExportUrl:        props.getProperty('KOBO_EXPORT_URL') || '',
-    koboToken:            props.getProperty('KOBO_TOKEN')      || '',
-    emailNotificaciones:  props.getProperty('EMAIL_NOTIFICACIONES') || '',
-    sincronizacionAuto:   props.getProperty('SINCRONIZACION_AUTO') === 'true'
+    koboExportUrl:           props.getProperty('KOBO_EXPORT_URL') || '',
+    koboClasificacionUrl:    props.getProperty('KOBO_CLASIFICACION_URL') || '',
+    koboToken:               props.getProperty('KOBO_TOKEN')      || '',
+    emailNotificaciones:     props.getProperty('EMAIL_NOTIFICACIONES') || '',
+    sincronizacionAuto:      props.getProperty('SINCRONIZACION_AUTO') === 'true'
   };
 }
 
