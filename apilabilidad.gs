@@ -25,12 +25,14 @@ function onOpen(e) {
     ui.createMenu('📊 Seguimiento Graduados')
       .addItem('🔄 Importar Graduados (KoboToolbox)', 'importarDatosKobo')
       .addItem('📋 Importar Clasificación de Perfiles', 'importarClasificacionPerfiles')
+      .addItem('🔄 Sincronizar Todo (Graduados + Perfiles)', 'sincronizarTodoManual')
       .addSeparator()
       .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
       .addItem('📊 Generar Reporte', 'generarReporte')
       .addItem('📞 Ver Seguimientos Pendientes', 'mostrarSeguimientosPendientes')
       .addSeparator()
       .addItem('⚙️ Configurar Credenciales', 'mostrarConfiguracion')
+      .addItem('⏱️ Activar sincronización automática', 'configurarTriggerSincronizacion')
       .addSeparator()
       .addItem('🚀 Instalar Sistema (primera vez)', 'instalarSistema')
       .addItem('🔁 Reinstalar Sistema (borra todo)', 'reinstalarSistema')
@@ -249,6 +251,9 @@ function mostrarConfiguracion() {
 // -----------------------------------------------------------------------------
 // CONSTANTES DE OPCIONES DE DROPDOWN
 // -----------------------------------------------------------------------------
+
+// URL de exportación de Clasificación de Perfiles (KoboToolbox)
+const URL_CLASIFICACION_PERFILES = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/export-settings/esQRaR2qPsjyboQtpNEiFy3/data.csv';
 
 // Géneros — opciones del dropdown Género en todas las hojas
 const GENEROS = [
@@ -682,15 +687,20 @@ function _ejecutarInstalacion(borrarExistentes) {
     // -- 6. Instalar trigger de onEdit para Conexiones Laborales -------------
     configurarEditTrigger();
 
+    // -- 7. Instalar sincronización automática cada hora ---------------------
+    configurarTriggerSincronizacion();
+
     ss.toast('', '', 1);
 
     ui.alert(
       '✅ Sistema Instalado',
       `El sistema está listo.\n\n` +
-      `Se crearon ${ordenHojas.length + 1} hojas con sus columnas.\n\n` +
+      `Se crearon ${ordenHojas.length + 1} hojas con sus columnas.\n` +
+      'Sincronización automática activada (cada hora).\n' +
+      'URL de Clasificación de Perfiles ya configurada.\n\n' +
       'Próximo paso:\n' +
-      '1. Configura las credenciales de KoboToolbox\n' +
-      '2. Importa los graduados\n' +
+      '1. Configura las credenciales de KoboToolbox (token)\n' +
+      '2. Usa el menú para importar Graduados y Clasificaciones\n' +
       '3. Comienza a clasificar',
       ui.ButtonSet.OK
     );
@@ -812,7 +822,7 @@ function _crearHojaConfiguracion(ss) {
 
   const filas = [
     ['KOBO_EXPORT_URL',       '', 'URL de exportación CSV de KoboToolbox (Graduados)'],
-    ['KOBO_CLASIFICACION_URL','', 'URL de exportación CSV de Clasificación de Perfiles'],
+    ['KOBO_CLASIFICACION_URL', URL_CLASIFICACION_PERFILES, 'URL de exportación CSV de Clasificación de Perfiles'],
     ['KOBO_TOKEN',            '', 'Token de autenticación de KoboToolbox'],
     ['EMAIL_NOTIF',           '', 'Email para recibir notificaciones'],
     ['SYNC_AUTO',             'false', 'true = sincronizar cada hora automáticamente'],
@@ -992,24 +1002,92 @@ function graduadoExiste(id) {
 /**
  * Sincronización automática (puede usarse con trigger)
  */
+/**
+ * Sincronización manual desde el menú: importa Graduados + Clasificación de Perfiles
+ */
+function sincronizarTodoManual() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  ss.toast('Sincronizando Graduados y Clasificación de Perfiles...', '🔄 Sincronizando', -1);
+
+  var resumen = [];
+
+  try {
+    var datos = obtenerDatosKoboToolbox();
+    var res   = procesarDatosGraduados(datos);
+    resumen.push('Graduados: ' + res.nuevos + ' nuevos, ' + res.total + ' total');
+  } catch (e) {
+    resumen.push('Graduados: ' + (e.message || 'sin URL configurada'));
+  }
+
+  try {
+    var res2 = _syncClasificacionPerfiles();
+    resumen.push('Clasificación: ' + res2.nuevos + ' nuevos, ' + res2.actualizados + ' actualizados');
+  } catch (e) {
+    resumen.push('Clasificación: ' + (e.message || 'error'));
+  }
+
+  ss.toast('', '', 1);
+  ui.alert('✅ Sincronización Completada', resumen.join('\n'), ui.ButtonSet.OK);
+}
+
 function sincronizacionAutomatica() {
   try {
     Logger.log('Iniciando sincronización automática...');
-    const datos     = obtenerDatosKoboToolbox();
-    const resultado = procesarDatosGraduados(datos);
-    Logger.log(`Sincronización completada: ${resultado.nuevos} nuevos, ${resultado.total} total`);
-    if (resultado.nuevos > 0) enviarNotificacionNuevosGraduados(resultado.nuevos);
+
+    // 1. Sincronizar Graduados (si tiene URL configurada)
+    try {
+      const datos     = obtenerDatosKoboToolbox();
+      const resultado = procesarDatosGraduados(datos);
+      Logger.log('Graduados: ' + resultado.nuevos + ' nuevos, ' + resultado.total + ' total');
+      if (resultado.nuevos > 0) enviarNotificacionNuevosGraduados(resultado.nuevos);
+    } catch (e) {
+      Logger.log('Sync graduados omitido: ' + e.message);
+    }
+
+    // 2. Sincronizar Clasificación de Perfiles
+    try {
+      var resultClasif = _syncClasificacionPerfiles();
+      Logger.log('Clasificación: ' + resultClasif.nuevos + ' nuevos, ' + resultClasif.total + ' total');
+    } catch (e) {
+      Logger.log('Sync clasificación omitido: ' + e.message);
+    }
+
   } catch (error) {
     Logger.log('Error en sincronización automática: ' + error);
   }
 }
 
 /**
+ * Sincroniza solo Clasificación de Perfiles (usado por sync automática y manual)
+ */
+function _syncClasificacionPerfiles() {
+  var config = obtenerConfiguracion();
+  var url    = config.koboClasificacionUrl || URL_CLASIFICACION_PERFILES;
+  if (!url) throw new Error('Sin URL de clasificación');
+
+  var opciones = { method: 'get', headers: {}, muteHttpExceptions: true };
+  if (config.koboToken) {
+    opciones.headers['Authorization'] = 'Token ' + config.koboToken;
+  }
+
+  var respuesta = UrlFetchApp.fetch(url, opciones);
+  if (respuesta.getResponseCode() !== 200) {
+    throw new Error('HTTP ' + respuesta.getResponseCode());
+  }
+
+  var datos = parsearCSV(respuesta.getContentText());
+  if (!datos || datos.length === 0) return { nuevos: 0, actualizados: 0, total: 0 };
+
+  return procesarClasificacionPerfiles(datos);
+}
+
+/**
  * Configura un trigger para sincronización automática cada hora
  */
 function configurarTriggerSincronizacion() {
-  const triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(t => {
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(t) {
     if (t.getHandlerFunction() === 'sincronizacionAutomatica') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('sincronizacionAutomatica').timeBased().everyHours(1).create();
@@ -1028,39 +1106,42 @@ function importarClasificacionPerfiles() {
     const ui     = SpreadsheetApp.getUi();
     const config = obtenerConfiguracion();
 
-    if (!config.koboClasificacionUrl) {
+    // Usar URL de config o la constante pre-configurada
+    const url = config.koboClasificacionUrl || URL_CLASIFICACION_PERFILES;
+    if (!url) {
       ui.alert('⚠️ URL no configurada',
-        'Configura la URL de exportación de Clasificación de Perfiles.\n\n' +
-        'Ve a la hoja Configuración y pega la URL en KOBO_CLASIFICACION_URL.',
+        'No se encontró la URL de exportación de Clasificación de Perfiles.',
         ui.ButtonSet.OK);
       return;
     }
 
-    ui.alert('🔄 Importando Clasificaciones',
-      'Importando datos de Clasificación de Perfiles desde KoboToolbox...',
-      ui.ButtonSet.OK);
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'Descargando datos de KoboToolbox...', '🔄 Importando', -1
+    );
 
     // Obtener CSV
     const opciones = { method: 'get', headers: {}, muteHttpExceptions: true };
     if (config.koboToken) {
       opciones.headers['Authorization'] = 'Token ' + config.koboToken;
     }
-    const respuesta = UrlFetchApp.fetch(config.koboClasificacionUrl, opciones);
+    const respuesta = UrlFetchApp.fetch(url, opciones);
     if (respuesta.getResponseCode() !== 200) {
-      throw new Error('Error HTTP ' + respuesta.getResponseCode());
+      throw new Error('Error HTTP ' + respuesta.getResponseCode() + ': ' + respuesta.getContentText().substring(0, 200));
     }
 
     const datos = parsearCSV(respuesta.getContentText());
     if (!datos || datos.length === 0) {
-      ui.alert('⚠️ Sin Datos', 'No se encontraron datos para importar.', ui.ButtonSet.OK);
+      SpreadsheetApp.getActiveSpreadsheet().toast('', '', 1);
+      ui.alert('⚠️ Sin Datos', 'No se encontraron datos nuevos para importar.', ui.ButtonSet.OK);
       return;
     }
 
     const resultado = procesarClasificacionPerfiles(datos);
+    SpreadsheetApp.getActiveSpreadsheet().toast('', '', 1);
     ui.alert('✅ Importación Completada',
-      'Se importaron ' + resultado.nuevos + ' clasificaciones nuevas.\n' +
-      'Se actualizaron ' + resultado.actualizados + ' existentes.\n' +
-      'Total: ' + resultado.total,
+      'Clasificaciones nuevas: ' + resultado.nuevos + '\n' +
+      'Actualizadas: ' + resultado.actualizados + '\n' +
+      'Total en hoja: ' + resultado.total,
       ui.ButtonSet.OK);
 
   } catch (error) {
