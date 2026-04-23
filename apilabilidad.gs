@@ -27,6 +27,7 @@ function onOpen(e) {
       .addItem('📋 Importar Clasificación de Perfiles', 'importarClasificacionPerfiles')
       .addItem('😊 Importar Satisfacción Empleo (IL-06)', 'importarSatisfaccionEmpleo')
       .addItem('🤝 Importar Sesiones Acompañamiento (IL-08)', 'importarSesionesAcompanamiento')
+      .addItem('♻️ Reimportar Sesiones desde cero (limpiar columnas)', 'reimportarSesionesDesdeCero')
       .addItem('🧹 Limpiar duplicados (Clasificación)', 'limpiarDuplicadosClasificacion')
       .addSeparator()
       .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
@@ -494,24 +495,25 @@ const ESTRUCTURA_HOJAS = {
   },
 
   // -- IL_08: SESIONES ACOMPAÑAMIENTO PROFESIONAL ----------------------------
+  // Columnas exactas del NOMBRES whitelist (excluye columnas redundantes de KoboToolbox)
   'Sesiones Acompañamiento': {
     color: '#5e35b1',
     columnas: [
       { nombre: 'Creamos ID',          ancho: 130, tipo: 'texto' },
-      { nombre: 'Fecha envío',         ancho: 160, tipo: 'texto' },
+      { nombre: 'Fecha envío',         ancho: 170, tipo: 'texto' },
       { nombre: 'Inicio sesión',       ancho: 160, tipo: 'texto' },
-      { nombre: 'Tipo acompañamiento', ancho: 200, tipo: 'texto' },
-      { nombre: 'Proyecto',            ancho: 160, tipo: 'texto' },
-      { nombre: 'Nombre',              ancho: 140, tipo: 'texto' },
-      { nombre: 'Apellidos',           ancho: 140, tipo: 'texto' },
+      { nombre: 'Tipo acompañamiento', ancho: 190, tipo: 'texto' },
+      { nombre: 'Proyecto',            ancho: 150, tipo: 'texto' },
+      { nombre: 'Nombre',              ancho: 130, tipo: 'texto' },
+      { nombre: 'Apellidos',           ancho: 130, tipo: 'texto' },
       { nombre: 'Teléfono',            ancho: 130, tipo: 'texto' },
-      { nombre: 'Fecha nacimiento',    ancho: 140, tipo: 'texto' },
-      { nombre: 'Edad',                ancho: 70,  tipo: 'texto' },
-      { nombre: 'Género',              ancho: 110, tipo: 'dropdown', opciones: GENEROS },
-      { nombre: 'Año ingreso Creamos', ancho: 160, tipo: 'texto' },
+      { nombre: 'Fecha nacimiento',    ancho: 130, tipo: 'texto' },
+      { nombre: 'Edad',                ancho: 65,  tipo: 'texto' },
+      { nombre: 'Género',              ancho: 100, tipo: 'texto' },
+      { nombre: 'Año ingreso Creamos', ancho: 150, tipo: 'texto' },
       { nombre: 'En qué año',          ancho: 100, tipo: 'texto' },
-      { nombre: 'Grado académico',     ancho: 160, tipo: 'texto' },
-      { nombre: 'Tipo servicio',       ancho: 160, tipo: 'texto' },
+      { nombre: 'Grado académico',     ancho: 150, tipo: 'texto' },
+      { nombre: 'Tipo servicio',       ancho: 200, tipo: 'texto' },
       { nombre: 'Comentario',          ancho: 280, tipo: 'texto' }
     ]
   },
@@ -1479,40 +1481,33 @@ function _syncSesionesSoloNuevos() {
     if (!datos || datos.length === 0) return { nuevos: 0, actualizados: 0, total: 0 };
 
     var NOMBRES = {
-      'Creamos ID':                  'Creamos ID',
-      '_submission_time':            'Fecha envío',
-      'start':                       'Inicio sesión',
-      'Acompañamiento profesional':  'Tipo acompañamiento',
-      'Proyecto':                    'Proyecto',
-      'Nombre':                      'Nombre',
-      'Apellidos':                   'Apellidos',
-      'Teléfono':                    'Teléfono',
-      'Fecha de nacimiento':         'Fecha nacimiento',
-      'Edad_001':                    'Edad',
-      'Género':                      'Género',
-      'Año que ingreso a Creamos':   'Año ingreso Creamos',
-      'En que año':                  'En qué año',
-      'Grado académico':             'Grado académico',
-      'Tipo de servicio':            'Tipo servicio',
-      'Comentario':                  'Comentario'
+      'Creamos ID':                 'Creamos ID',
+      '_submission_time':           'Fecha envío',
+      'start':                      'Inicio sesión',
+      'Acompañamiento profesional': 'Tipo acompañamiento',
+      'Proyecto':                   'Proyecto',
+      'Nombre':                     'Nombre',
+      'Apellidos':                  'Apellidos',
+      'Teléfono':                   'Teléfono',
+      'Fecha de nacimiento':        'Fecha nacimiento',
+      'Edad_001':                   'Edad',
+      'Género':                     'Género',
+      'Año que ingreso a Creamos':  'Año ingreso Creamos',
+      'En que año':                 'En qué año',
+      'Grado académico':            'Grado académico',
+      'Tipo de servicio':           'Tipo servicio',
+      'Comentario':                 'Comentario'
     };
-    var EXCLUIR = ['_id','_uuid','_validation_status','_notes','_status',
-                   '_submitted_by','_tags','_index','__version__','meta/rootUuid',
-                   'end','Edad ${Edad_001}'];
+    // Lista blanca: SOLO las columnas de NOMBRES, en ese orden exacto
+    var ORDEN  = Object.keys(NOMBRES);
     var CAMPO_ID    = 'Creamos ID';
     var CAMPO_FECHA = '_submission_time';
 
     var hoja = obtenerHoja('Sesiones Acompañamiento');
 
-    // Primera importación
+    // --- Primera importación (hoja vacía) ----------------------------------
     if (hoja.getLastRow() <= 1) {
-      var todasCols = Object.keys(datos[0]);
-      var orden = [CAMPO_ID, CAMPO_FECHA].concat(
-        todasCols.filter(function(c) {
-          return c !== CAMPO_ID && c !== CAMPO_FECHA && EXCLUIR.indexOf(c) === -1;
-        })
-      );
-      var headers = orden.map(function(c) { return NOMBRES[c] || c; });
+      var headers = ORDEN.map(function(k) { return NOMBRES[k]; });
       hoja.clearContents();
       var hr = hoja.getRange(1, 1, 1, headers.length);
       hr.setValues([headers]);
@@ -1522,19 +1517,15 @@ function _syncSesionesSoloNuevos() {
       datos.forEach(function(d) {
         var id = (d[CAMPO_ID] || '').toString().trim();
         if (!id) return;
-        hoja.appendRow(orden.map(function(k) { return d[k] || ''; }));
+        hoja.appendRow(ORDEN.map(function(k) { return d[k] || ''; }));
         nuevos++;
       });
       return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
     }
 
-    // Importación incremental
-    var INVERSO = {};
-    Object.keys(NOMBRES).forEach(function(k) { INVERSO[NOMBRES[k]] = k; });
-    var numCols  = hoja.getLastColumn();
-    var ordenKobo = hoja.getRange(1, 1, 1, numCols).getValues()[0].map(function(h) {
-      return INVERSO[h] || h;
-    });
+    // --- Importación incremental (hoja ya tiene datos) ---------------------
+    // Siempre usamos ORDEN (whitelist), no lo que diga la hoja,
+    // para evitar incluir columnas basura de KoboToolbox.
     var existentes = {};
     var uf = hoja.getLastRow();
     if (uf > 1) {
@@ -1551,7 +1542,7 @@ function _syncSesionesSoloNuevos() {
       var fecha = (d[CAMPO_FECHA] || '').toString().trim();
       var key   = id + '||' + fecha;
       if (existentes[key]) return;
-      hoja.appendRow(ordenKobo.map(function(k) { return d[k] || ''; }));
+      hoja.appendRow(ORDEN.map(function(k) { return d[k] || ''; }));
       existentes[key] = true;
       nuevos++;
     });
@@ -1573,6 +1564,35 @@ function importarSesionesAcompanamiento() {
     ss.toast('', '', 1);
     ui.alert('✅ Sesiones Acompañamiento importadas',
       'Nuevos: ' + res.nuevos + '\nTotal en hoja: ' + res.total, ui.ButtonSet.OK);
+  } catch (e) {
+    ss.toast('', '', 1);
+    ui.alert('❌ Error', e.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Limpia la hoja "Sesiones Acompañamiento" y la reimporta desde cero
+ * con solo las columnas limpias (sin duplicados ni sub-columnas de Kobo).
+ */
+function reimportarSesionesDesdeCero() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  var confirmar = ui.alert(
+    '🔄 Reimportar Sesiones Acompañamiento',
+    'Esto borrará toda la hoja "Sesiones Acompañamiento" y la volverá a importar\n' +
+    'desde KoboToolbox con las columnas correctas (sin columnas repetidas).\n\n¿Continuar?',
+    ui.ButtonSet.YES_NO
+  );
+  if (confirmar !== ui.Button.YES) return;
+  var hoja = ss.getSheetByName('Sesiones Acompañamiento');
+  if (hoja) { hoja.clearContents(); hoja.clearFormats(); }
+  ss.toast('Reimportando Sesiones Acompañamiento...', '🔄', -1);
+  try {
+    var res = _syncSesionesSoloNuevos();
+    ss.toast('', '', 1);
+    ui.alert('✅ Reimportación completada',
+      'Registros importados: ' + res.nuevos + '\nTotal en hoja: ' + res.total,
+      ui.ButtonSet.OK);
   } catch (e) {
     ss.toast('', '', 1);
     ui.alert('❌ Error', e.message, ui.ButtonSet.OK);
