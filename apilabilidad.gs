@@ -25,6 +25,8 @@ function onOpen(e) {
     ui.createMenu('📊 Seguimiento Graduados')
       .addItem('🔄 Importar Graduados', 'importarDatosKobo')
       .addItem('📋 Importar Clasificación de Perfiles', 'importarClasificacionPerfiles')
+      .addItem('😊 Importar Satisfacción Empleo (IL-06)', 'importarSatisfaccionEmpleo')
+      .addItem('🤝 Importar Sesiones Acompañamiento (IL-08)', 'importarSesionesAcompanamiento')
       .addItem('🧹 Limpiar duplicados (Clasificación)', 'limpiarDuplicadosClasificacion')
       .addSeparator()
       .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
@@ -262,8 +264,12 @@ const KOBO_TOKEN = '64cc018b88067397addd36b09288be8b6539cf39';
 // TODO: Agregar URL de Graduados cuando esté disponible
 const URL_GRADUADOS              = ''; // pendiente — pegar URL cuando la tengas
 const URL_GRADUADOS_FALLBACK     = '';
-const URL_CLASIFICACION_PERFILES = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/export-settings/esQRaR2qPsjyboQtpNEiFy3/data.csv';
-const URL_CLASIFICACION_FALLBACK = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/data/?format=csv';
+const URL_CLASIFICACION_PERFILES  = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/export-settings/esQRaR2qPsjyboQtpNEiFy3/data.csv';
+const URL_CLASIFICACION_FALLBACK  = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/data/?format=csv';
+// IL_06 — Cuestionario de satisfacción-Empleo
+const URL_SATISFACCION_EMPLEO     = 'https://kf.kobotoolbox.org/api/v2/assets/aKPtMoCx6tFzagpLoWysuq/export-settings/esoDGnReKRANZHjqdVVZZm8/data.csv';
+// IL_08 — Sesiones Acompañamiento profesional
+const URL_SESIONES_ACOMPANAMIENTO = 'https://kf.kobotoolbox.org/api/v2/assets/azWEsFBnHSUvfVugsTcgTD/export-settings/esr7u8sHX95HjFXmUpjunam/data.csv';
 
 // -----------------------------------------------------------------------------
 // CONSTANTES DE OPCIONES DE DROPDOWN
@@ -465,6 +471,51 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
+  // -- IL_06: SATISFACCIÓN EMPLEO --------------------------------------------
+  'Satisfacción Empleo': {
+    color: '#00897b',
+    columnas: [
+      { nombre: 'Creamos ID',         ancho: 130, tipo: 'texto' },
+      { nombre: 'Fecha envío',        ancho: 160, tipo: 'texto' },
+      { nombre: 'Nombre',             ancho: 140, tipo: 'texto' },
+      { nombre: 'Apellido',           ancho: 140, tipo: 'texto' },
+      { nombre: 'Primera vez',        ancho: 100, tipo: 'texto' },
+      { nombre: 'Formación recibida', ancho: 200, tipo: 'texto' },
+      { nombre: 'P1',                 ancho: 60,  tipo: 'texto' },
+      { nombre: 'P2',                 ancho: 60,  tipo: 'texto' },
+      { nombre: 'P3',                 ancho: 60,  tipo: 'texto' },
+      { nombre: 'P4',                 ancho: 60,  tipo: 'texto' },
+      { nombre: 'P5',                 ancho: 60,  tipo: 'texto' },
+      { nombre: 'P6',                 ancho: 60,  tipo: 'texto' },
+      { nombre: 'Comentarios',        ancho: 280, tipo: 'texto' },
+      { nombre: 'Puntaje AAPI',       ancho: 110, tipo: 'texto' },
+      { nombre: 'Satisfacción',       ancho: 120, tipo: 'texto' }
+    ]
+  },
+
+  // -- IL_08: SESIONES ACOMPAÑAMIENTO PROFESIONAL ----------------------------
+  'Sesiones Acompañamiento': {
+    color: '#5e35b1',
+    columnas: [
+      { nombre: 'Creamos ID',          ancho: 130, tipo: 'texto' },
+      { nombre: 'Fecha envío',         ancho: 160, tipo: 'texto' },
+      { nombre: 'Inicio sesión',       ancho: 160, tipo: 'texto' },
+      { nombre: 'Tipo acompañamiento', ancho: 200, tipo: 'texto' },
+      { nombre: 'Proyecto',            ancho: 160, tipo: 'texto' },
+      { nombre: 'Nombre',              ancho: 140, tipo: 'texto' },
+      { nombre: 'Apellidos',           ancho: 140, tipo: 'texto' },
+      { nombre: 'Teléfono',            ancho: 130, tipo: 'texto' },
+      { nombre: 'Fecha nacimiento',    ancho: 140, tipo: 'texto' },
+      { nombre: 'Edad',                ancho: 70,  tipo: 'texto' },
+      { nombre: 'Género',              ancho: 110, tipo: 'dropdown', opciones: GENEROS },
+      { nombre: 'Año ingreso Creamos', ancho: 160, tipo: 'texto' },
+      { nombre: 'En qué año',          ancho: 100, tipo: 'texto' },
+      { nombre: 'Grado académico',     ancho: 160, tipo: 'texto' },
+      { nombre: 'Tipo servicio',       ancho: 160, tipo: 'texto' },
+      { nombre: 'Comentario',          ancho: 280, tipo: 'texto' }
+    ]
+  },
+
   // -- SEGUIMIENTOS -----------------------------------------------------------
   'Seguimientos': {
     color: '#673ab7',
@@ -622,6 +673,8 @@ function _ejecutarInstalacion(borrarExistentes) {
         'Seguimientos',
         'Seguimiento Bot',
         'Clasificación de Perfiles',
+        'Satisfacción Empleo',
+        'Sesiones Acompañamiento',
         'Reporte',
         'Conexiones Laborales',
         'Configuración', // por si existe de versión anterior
@@ -661,6 +714,8 @@ function _ejecutarInstalacion(borrarExistentes) {
       'Seguimientos',
       'Seguimiento Bot',
       'Clasificación de Perfiles',
+      'Satisfacción Empleo',
+      'Sesiones Acompañamiento',
       'Reporte'
     ];
 
@@ -1250,6 +1305,264 @@ function _syncClasificacionSoloNuevos() {
   }
 }
 
+// ===========================================================================
+// SECCIÓN 2D: SYNC IL_06 — SATISFACCIÓN EMPLEO
+// ===========================================================================
+
+/**
+ * Sincroniza la hoja "Satisfacción Empleo" desde KoboToolbox (IL_06).
+ * Solo agrega filas nuevas. Clave: Creamos ID + _submission_time.
+ */
+function _syncSatisfaccionSoloNuevos() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(0)) {
+    Logger.log('_syncSatisfaccionSoloNuevos: otra instancia en ejecución, omitiendo.');
+    return { nuevos: 0, actualizados: 0, total: 0 };
+  }
+  try {
+    var opciones = {
+      method: 'get',
+      headers: { 'Authorization': 'Token ' + KOBO_TOKEN, 'Accept': 'text/csv' },
+      muteHttpExceptions: true
+    };
+    var resp = UrlFetchApp.fetch(URL_SATISFACCION_EMPLEO, opciones);
+    if (resp.getResponseCode() !== 200) throw new Error('HTTP ' + resp.getResponseCode());
+    var body = resp.getContentText();
+    if (body.trim().charAt(0) === '{' || body.trim().charAt(0) === '[') {
+      throw new Error('KoboToolbox devolvió JSON en vez de CSV.');
+    }
+    var datos = parsearCSV(body);
+    if (!datos || datos.length === 0) return { nuevos: 0, actualizados: 0, total: 0 };
+
+    var NOMBRES = {
+      'Creamos_ID':              'Creamos ID',
+      '_submission_time':        'Fecha envío',
+      'primer_nombre':           'Nombre',
+      'apellido':                'Apellido',
+      'primera_vez':             'Primera vez',
+      '_Qu_formaci_n_recibiste': 'Formación recibida',
+      'group_aapi/P1':           'P1',
+      'group_aapi/P2':           'P2',
+      'group_aapi/P3':           'P3',
+      'group_aapi/P4':           'P4',
+      'group_aapi/P5':           'P5',
+      'group_aapi/P6':           'P6',
+      'Comentarios_adicionales': 'Comentarios',
+      'aapi_puntaje':            'Puntaje AAPI',
+      'grado_satisfaccion':      'Satisfacción'
+    };
+    var EXCLUIR = ['_id','_uuid','_validation_status','_notes','_status',
+                   '_submitted_by','_tags','_index','__version__','meta/rootUuid','today'];
+    var CAMPO_ID    = 'Creamos_ID';
+    var CAMPO_FECHA = '_submission_time';
+
+    var hoja = obtenerHoja('Satisfacción Empleo');
+
+    // Primera importación: construir hoja desde cero
+    if (hoja.getLastRow() <= 1) {
+      var todasCols = Object.keys(datos[0]);
+      var orden = [CAMPO_ID, CAMPO_FECHA].concat(
+        todasCols.filter(function(c) {
+          return c !== CAMPO_ID && c !== CAMPO_FECHA && EXCLUIR.indexOf(c) === -1;
+        })
+      );
+      var headers = orden.map(function(c) { return NOMBRES[c] || c; });
+      hoja.clearContents();
+      var hr = hoja.getRange(1, 1, 1, headers.length);
+      hr.setValues([headers]);
+      hr.setBackground('#00897b').setFontColor('#ffffff').setFontWeight('bold').setFontSize(11);
+      hoja.setFrozenRows(1);
+      var nuevos = 0;
+      datos.forEach(function(d) {
+        var id = (d[CAMPO_ID] || '').toString().trim();
+        if (!id) return;
+        hoja.appendRow(orden.map(function(k) { return d[k] || ''; }));
+        nuevos++;
+      });
+      return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
+    }
+
+    // Importación incremental
+    var INVERSO = {};
+    Object.keys(NOMBRES).forEach(function(k) { INVERSO[NOMBRES[k]] = k; });
+    var numCols  = hoja.getLastColumn();
+    var ordenKobo = hoja.getRange(1, 1, 1, numCols).getValues()[0].map(function(h) {
+      return INVERSO[h] || h;
+    });
+    var existentes = {};
+    var uf = hoja.getLastRow();
+    if (uf > 1) {
+      hoja.getRange(2, 1, uf - 1, 2).getValues().forEach(function(r) {
+        var id = (r[0] || '').toString().trim();
+        var f  = (r[1] || '').toString().trim();
+        if (id) existentes[id + '||' + f] = true;
+      });
+    }
+    var nuevos = 0;
+    datos.forEach(function(d) {
+      var id    = (d[CAMPO_ID] || '').toString().trim();
+      if (!id) return;
+      var fecha = (d[CAMPO_FECHA] || '').toString().trim();
+      var key   = id + '||' + fecha;
+      if (existentes[key]) return;
+      hoja.appendRow(ordenKobo.map(function(k) { return d[k] || ''; }));
+      existentes[key] = true;
+      nuevos++;
+    });
+    return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Importa manualmente la hoja "Satisfacción Empleo" desde el menú.
+ */
+function importarSatisfaccionEmpleo() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  ss.toast('Descargando Satisfacción Empleo...', '🔄 Importando', -1);
+  try {
+    var res = _syncSatisfaccionSoloNuevos();
+    ss.toast('', '', 1);
+    ui.alert('✅ Satisfacción Empleo importada',
+      'Nuevos: ' + res.nuevos + '\nTotal en hoja: ' + res.total, ui.ButtonSet.OK);
+  } catch (e) {
+    ss.toast('', '', 1);
+    ui.alert('❌ Error', e.message, ui.ButtonSet.OK);
+  }
+}
+
+// ===========================================================================
+// SECCIÓN 2E: SYNC IL_08 — SESIONES ACOMPAÑAMIENTO PROFESIONAL
+// ===========================================================================
+
+/**
+ * Sincroniza la hoja "Sesiones Acompañamiento" desde KoboToolbox (IL_08).
+ * Solo agrega filas nuevas. Clave: Creamos ID + _submission_time.
+ */
+function _syncSesionesSoloNuevos() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(0)) {
+    Logger.log('_syncSesionesSoloNuevos: otra instancia en ejecución, omitiendo.');
+    return { nuevos: 0, actualizados: 0, total: 0 };
+  }
+  try {
+    var opciones = {
+      method: 'get',
+      headers: { 'Authorization': 'Token ' + KOBO_TOKEN, 'Accept': 'text/csv' },
+      muteHttpExceptions: true
+    };
+    var resp = UrlFetchApp.fetch(URL_SESIONES_ACOMPANAMIENTO, opciones);
+    if (resp.getResponseCode() !== 200) throw new Error('HTTP ' + resp.getResponseCode());
+    var body = resp.getContentText();
+    if (body.trim().charAt(0) === '{' || body.trim().charAt(0) === '[') {
+      throw new Error('KoboToolbox devolvió JSON en vez de CSV.');
+    }
+    var datos = parsearCSV(body);
+    if (!datos || datos.length === 0) return { nuevos: 0, actualizados: 0, total: 0 };
+
+    var NOMBRES = {
+      'Creamos ID':                  'Creamos ID',
+      '_submission_time':            'Fecha envío',
+      'start':                       'Inicio sesión',
+      'Acompañamiento profesional':  'Tipo acompañamiento',
+      'Proyecto':                    'Proyecto',
+      'Nombre':                      'Nombre',
+      'Apellidos':                   'Apellidos',
+      'Teléfono':                    'Teléfono',
+      'Fecha de nacimiento':         'Fecha nacimiento',
+      'Edad_001':                    'Edad',
+      'Género':                      'Género',
+      'Año que ingreso a Creamos':   'Año ingreso Creamos',
+      'En que año':                  'En qué año',
+      'Grado académico':             'Grado académico',
+      'Tipo de servicio':            'Tipo servicio',
+      'Comentario':                  'Comentario'
+    };
+    var EXCLUIR = ['_id','_uuid','_validation_status','_notes','_status',
+                   '_submitted_by','_tags','_index','__version__','meta/rootUuid',
+                   'end','Edad ${Edad_001}'];
+    var CAMPO_ID    = 'Creamos ID';
+    var CAMPO_FECHA = '_submission_time';
+
+    var hoja = obtenerHoja('Sesiones Acompañamiento');
+
+    // Primera importación
+    if (hoja.getLastRow() <= 1) {
+      var todasCols = Object.keys(datos[0]);
+      var orden = [CAMPO_ID, CAMPO_FECHA].concat(
+        todasCols.filter(function(c) {
+          return c !== CAMPO_ID && c !== CAMPO_FECHA && EXCLUIR.indexOf(c) === -1;
+        })
+      );
+      var headers = orden.map(function(c) { return NOMBRES[c] || c; });
+      hoja.clearContents();
+      var hr = hoja.getRange(1, 1, 1, headers.length);
+      hr.setValues([headers]);
+      hr.setBackground('#5e35b1').setFontColor('#ffffff').setFontWeight('bold').setFontSize(11);
+      hoja.setFrozenRows(1);
+      var nuevos = 0;
+      datos.forEach(function(d) {
+        var id = (d[CAMPO_ID] || '').toString().trim();
+        if (!id) return;
+        hoja.appendRow(orden.map(function(k) { return d[k] || ''; }));
+        nuevos++;
+      });
+      return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
+    }
+
+    // Importación incremental
+    var INVERSO = {};
+    Object.keys(NOMBRES).forEach(function(k) { INVERSO[NOMBRES[k]] = k; });
+    var numCols  = hoja.getLastColumn();
+    var ordenKobo = hoja.getRange(1, 1, 1, numCols).getValues()[0].map(function(h) {
+      return INVERSO[h] || h;
+    });
+    var existentes = {};
+    var uf = hoja.getLastRow();
+    if (uf > 1) {
+      hoja.getRange(2, 1, uf - 1, 2).getValues().forEach(function(r) {
+        var id = (r[0] || '').toString().trim();
+        var f  = (r[1] || '').toString().trim();
+        if (id) existentes[id + '||' + f] = true;
+      });
+    }
+    var nuevos = 0;
+    datos.forEach(function(d) {
+      var id    = (d[CAMPO_ID] || '').toString().trim();
+      if (!id) return;
+      var fecha = (d[CAMPO_FECHA] || '').toString().trim();
+      var key   = id + '||' + fecha;
+      if (existentes[key]) return;
+      hoja.appendRow(ordenKobo.map(function(k) { return d[k] || ''; }));
+      existentes[key] = true;
+      nuevos++;
+    });
+    return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Importa manualmente "Sesiones Acompañamiento" desde el menú.
+ */
+function importarSesionesAcompanamiento() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  ss.toast('Descargando Sesiones Acompañamiento...', '🔄 Importando', -1);
+  try {
+    var res = _syncSesionesSoloNuevos();
+    ss.toast('', '', 1);
+    ui.alert('✅ Sesiones Acompañamiento importadas',
+      'Nuevos: ' + res.nuevos + '\nTotal en hoja: ' + res.total, ui.ButtonSet.OK);
+  } catch (e) {
+    ss.toast('', '', 1);
+    ui.alert('❌ Error', e.message, ui.ButtonSet.OK);
+  }
+}
+
 /**
  * Función llamada por el trigger de tiempo. Sin alertas — solo toast y Logger.
  */
@@ -1269,6 +1582,16 @@ function autoImportarNuevos() {
       var resC = _syncClasificacionSoloNuevos();
       if (resC.nuevos > 0) msgs.push('Clasificación: +' + resC.nuevos);
     } catch(e) { Logger.log('Auto-import Clasificación omitido: ' + e.message); }
+
+    try {
+      var resS = _syncSatisfaccionSoloNuevos();
+      if (resS.nuevos > 0) msgs.push('Satisfacción: +' + resS.nuevos);
+    } catch(e) { Logger.log('Auto-import Satisfacción omitido: ' + e.message); }
+
+    try {
+      var resSe = _syncSesionesSoloNuevos();
+      if (resSe.nuevos > 0) msgs.push('Sesiones: +' + resSe.nuevos);
+    } catch(e) { Logger.log('Auto-import Sesiones omitido: ' + e.message); }
 
     if (msgs.length > 0) {
       ss.toast(msgs.join(' | '), '✅ Nuevos registros importados', 10);
@@ -1364,8 +1687,14 @@ function limpiarDuplicadosClasificacion() {
   filas.forEach(function(fila) {
     var id    = (fila[0] || '').toString().trim();
     var fecha = (fila[1] || '').toString().trim();
-    if (!id) return; // omite filas sin ID
-    var clave = id + '||' + fecha;
+    var clave;
+    if (id) {
+      clave = id + '||' + fecha;
+    } else if (fecha) {
+      clave = 'SIN_ID||' + fecha; // deduplicar por fecha cuando no hay ID
+    } else {
+      return; // fila completamente vacía, descartar
+    }
     if (vistos[clave]) {
       eliminadas++;
     } else {
@@ -2801,274 +3130,345 @@ function registrarMovimientoEtapa(creamosId, nombreCompleto, etapa, nota) {
  * Se puede ejecutar desde el menú o se llama automáticamente.
  */
 function generarReporte() {
-  const ss   = SpreadsheetApp.getActiveSpreadsheet();
-  var hoja = ss.getSheetByName('Reporte');
-  if (!hoja) {
-    hoja = ss.getSheetByName('Estado actual del participante');
-    if (!hoja) {
-      hoja = ss.insertSheet('Reporte');
-    } else {
-      hoja.setName('Reporte');
-    }
-  }
-
-  // Limpiar toda la hoja
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  var hoja = ss.getSheetByName('Reporte') || ss.insertSheet('Reporte');
   hoja.clear();
   hoja.setTabColor('#e91e63');
 
-  // -- Colores ------------------------------------------------------------
-  const C_TITULO     = '#1a237e';
-  const C_TITULO_FG  = '#ffffff';
-  const C_HEADER     = '#3949ab';
-  const C_HEADER_FG  = '#ffffff';
-  const C_PAR        = '#e8eaf6';
-  const C_IMPAR      = '#ffffff';
-  const C_TOTAL      = '#c5cae9';
-  const C_SECCION    = '#283593';
-  const C_ACCENT     = '#0d47a1';
-  const C_CONEXIONES = '#e65100';
-  const MESES_NOMBRE = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  const BORDER_STYLE = SpreadsheetApp.BorderStyle.SOLID;
+  // ── Paleta de colores ─────────────────────────────────────────────────────
+  const C = {
+    bannerBg:   '#1a237e', bannerFg:   '#ffffff',
+    secBg:      '#283593', secFg:      '#ffffff',
+    headerBg:   '#3949ab', headerFg:   '#ffffff',
+    kpiBg:      '#0d47a1', kpiFg:      '#ffffff',
+    par:        '#e8eaf6', impar:      '#ffffff',
+    total:      '#c5cae9', totalFg:    '#1a237e',
+    koboBg:     '#e0f2f1', koboAcc:    '#00695c',
+    satisfBg:   '#e8f5e9', satisfAcc:  '#2e7d32',
+    sessBg:     '#ede7f6', sessAcc:    '#4527a0',
+    conBg:      '#fff3e0', conAcc:     '#e65100',
+    border:     '#b0bec5'
+  };
+  const BS    = SpreadsheetApp.BorderStyle.SOLID;
+  const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const W     = 6; // ancho total en columnas
 
-  // -- Leer conteos de cada hoja de clasificacion -------------------------
-  // Contamos filas que tengan Nombre completo (no filas vacias con checkboxes)
-  // Hojas clasificacion: col 3 (indice 2) = Nombre completo
-  // Conexiones Laborales: col 2 (indice 1) = Nombre completo
+  // ── Anchos de columna ─────────────────────────────────────────────────────
+  hoja.setColumnWidth(1, 220);
+  hoja.setColumnWidth(2, 110);
+  hoja.setColumnWidth(3, 80);
+  hoja.setColumnWidth(4, 100);
+  hoja.setColumnWidth(5, 100);
+  hoja.setColumnWidth(6, 100);
+
+  // ── Helpers internos ──────────────────────────────────────────────────────
+  function contarFilas(nombreHoja, colNombre) {
+    var h = ss.getSheetByName(nombreHoja);
+    if (!h || h.getLastRow() <= 1) return 0;
+    var vals = h.getRange(2, colNombre + 1, h.getLastRow() - 1, 1).getValues();
+    return vals.filter(function(r) { return r[0] && r[0].toString().trim() !== ''; }).length;
+  }
+  function titulo(f, texto, bg, fg, sz) {
+    hoja.getRange(f, 1, 1, W).merge()
+        .setValue(texto)
+        .setBackground(bg).setFontColor(fg)
+        .setFontWeight('bold').setFontSize(sz || 12)
+        .setHorizontalAlignment('center')
+        .setVerticalAlignment('middle');
+    hoja.setRowHeight(f, 34);
+    return f + 1;
+  }
+  function fila2(f, label, valor, bg, valBg) {
+    hoja.getRange(f, 1, 1, 4).merge()
+        .setValue(label).setBackground(bg || C.par).setFontSize(11)
+        .setVerticalAlignment('middle');
+    hoja.getRange(f, 5, 1, 2).merge()
+        .setValue(valor).setBackground(valBg || C.par)
+        .setHorizontalAlignment('center').setFontWeight('bold').setFontSize(13)
+        .setVerticalAlignment('middle');
+    hoja.setRowHeight(f, 30);
+    return f + 1;
+  }
+  function borde(r1, c1, nr, nc) {
+    hoja.getRange(r1, c1, nr, nc)
+        .setBorder(true, true, true, true, true, true, C.border, BS);
+  }
+
+  // ── DATOS ─────────────────────────────────────────────────────────────────
+  // Seguimiento (etapas)
   const conteos = {};
-  let totalParticipantes = 0;
-  ETAPAS_FLUJO.forEach(nombreHoja => {
-    const h = ss.getSheetByName(nombreHoja);
-    if (!h || h.getLastRow() <= 1) { conteos[nombreHoja] = 0; return; }
-    const datos = h.getDataRange().getValues();
-    var cant = 0;
-    var colNombre = (nombreHoja === 'Conexiones Laborales') ? 1 : 2; // indice de Nombre completo
-    for (var i = 1; i < datos.length; i++) {
-      if (datos[i][colNombre] && datos[i][colNombre].toString().trim() !== '') {
-        cant++;
-      }
-    }
-    conteos[nombreHoja] = cant;
-    totalParticipantes += cant;
+  var totalParticipantes = 0;
+  ETAPAS_FLUJO.forEach(function(e) {
+    var col = (e === 'Conexiones Laborales') ? 1 : 2;
+    conteos[e] = contarFilas(e, col);
+    totalParticipantes += conteos[e];
   });
 
-  // Conexiones Laborales (ya incluida arriba si esta en ETAPAS_FLUJO)
-  var totalConexiones = conteos['Conexiones Laborales'] || 0;
-
-  // Total graduados (col 4, indice 3 = Nombre completo)
-  const hojaGrad = ss.getSheetByName('Graduados');
-  var totalGraduados = 0;
-  if (hojaGrad && hojaGrad.getLastRow() > 1) {
-    var datosGr = hojaGrad.getDataRange().getValues();
-    for (var i = 1; i < datosGr.length; i++) {
-      if (datosGr[i][3] && datosGr[i][3].toString().trim() !== '') totalGraduados++;
-    }
-  }
+  // Graduados (col 4 → índice 3)
+  var totalGraduados = contarFilas('Graduados', 3);
 
   // Seguimientos pendientes
-  const totalSeguimientos = obtenerSeguimientosPendientes().length;
+  var totalPendientes = obtenerSeguimientosPendientes().length;
 
-  // -- Leer fechas de ingreso por mes desde cada hoja clasificación -------
-  const ingresosPorMes = {}; // { 'Ene 2026': { 'Aliados': 2, ... } }
-  ETAPAS_FLUJO.forEach(nombreHoja => {
-    const h = ss.getSheetByName(nombreHoja);
+  // Registros KoboToolbox
+  var totalClasif   = (function() {
+    var h = ss.getSheetByName('Clasificación de Perfiles');
+    return (!h || h.getLastRow() <= 1) ? 0 : h.getLastRow() - 1;
+  })();
+  var totalSatisf   = (function() {
+    var h = ss.getSheetByName('Satisfacción Empleo');
+    return (!h || h.getLastRow() <= 1) ? 0 : h.getLastRow() - 1;
+  })();
+  var totalSesiones = (function() {
+    var h = ss.getSheetByName('Sesiones Acompañamiento');
+    return (!h || h.getLastRow() <= 1) ? 0 : h.getLastRow() - 1;
+  })();
+  var totalConexiones = conteos['Conexiones Laborales'] || 0;
+
+  // Ingresos por mes (hojas de etapas)
+  const ipm = {};
+  ETAPAS_FLUJO.forEach(function(nombreHoja) {
+    var h = ss.getSheetByName(nombreHoja);
     if (!h || h.getLastRow() <= 1) return;
-    const datos = h.getDataRange().getValues();
-    // Col 1 (indice 0) = Fecha de ingreso en todas las hojas de clasificacion
-    var colNom = (nombreHoja === 'Conexiones Laborales') ? 1 : 2;
-    for (let i = 1; i < datos.length; i++) {
-      // Ignorar filas sin nombre (vacias por checkboxes/validaciones)
+    var datos   = h.getDataRange().getValues();
+    var colNom  = (nombreHoja === 'Conexiones Laborales') ? 1 : 2;
+    for (var i = 1; i < datos.length; i++) {
       if (!datos[i][colNom] || datos[i][colNom].toString().trim() === '') continue;
-      const fechaRaw = datos[i][0];
-      var fecha;
-      if (fechaRaw instanceof Date) {
-        fecha = fechaRaw;
-      } else if (typeof fechaRaw === 'string' && fechaRaw.indexOf('/') !== -1) {
-        const p = fechaRaw.split('/');
-        fecha = new Date(p[2], parseInt(p[1]) - 1, p[0]);
-      } else {
-        continue;
+      var raw = datos[i][0];
+      var fch;
+      if (raw instanceof Date) { fch = raw; }
+      else if (typeof raw === 'string' && raw.indexOf('/') !== -1) {
+        var p = raw.split('/'); fch = new Date(p[2], parseInt(p[1]) - 1, p[0]);
+      } else { continue; }
+      var clave = MESES[fch.getMonth()] + ' ' + fch.getFullYear();
+      if (!ipm[clave]) {
+        ipm[clave] = { _t: fch.getTime() };
+        ETAPAS_FLUJO.forEach(function(e) { ipm[clave][e] = 0; });
       }
-      const claveMes = MESES_NOMBRE[fecha.getMonth()] + ' ' + fecha.getFullYear();
-      if (!ingresosPorMes[claveMes]) {
-        ingresosPorMes[claveMes] = { _orden: fecha.getTime() };
-        ETAPAS_FLUJO.forEach(e => { ingresosPorMes[claveMes][e] = 0; });
-      }
-      ingresosPorMes[claveMes][nombreHoja]++;
+      ipm[clave][nombreHoja]++;
     }
   });
-  const mesesOrdenados = Object.keys(ingresosPorMes).sort(
-    (a, b) => ingresosPorMes[a]._orden - ingresosPorMes[b]._orden
-  );
+  var meses = Object.keys(ipm).sort(function(a, b) { return ipm[a]._t - ipm[b]._t; });
 
-  // -- Ajustar anchos de columna ------------------------------------------
-  hoja.setColumnWidth(1, 200);
-  hoja.setColumnWidth(2, 120);
-  hoja.setColumnWidth(3, 80);
-  for (let c = 4; c <= 10; c++) hoja.setColumnWidth(c, 110);
+  // ── RENDER ────────────────────────────────────────────────────────────────
+  var f = 1;
+  var ahora = new Date();
 
-  let fila = 1;
+  // ╔══════════════════════════════════════════╗
+  // ║  BANNER PRINCIPAL                        ║
+  // ╚══════════════════════════════════════════╝
+  hoja.setRowHeight(f, 46);
+  hoja.getRange(f, 1, 1, W).merge()
+      .setValue('REPORTE DE SEGUIMIENTO — EMPLEABILIDAD')
+      .setBackground(C.bannerBg).setFontColor(C.bannerFg)
+      .setFontWeight('bold').setFontSize(16)
+      .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  f++;
+  hoja.getRange(f, 1, 1, W).merge()
+      .setValue('Actualizado: ' + ahora.toLocaleDateString('es-ES') + ' · ' +
+                ahora.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'}))
+      .setFontColor('#9e9e9e').setFontStyle('italic').setFontSize(10)
+      .setHorizontalAlignment('center').setBackground('#f5f5f5');
+  hoja.setRowHeight(f, 22);
+  f += 2;
 
-  // ======================================================================
-  // BLOQUE 1: RESUMEN GENERAL
-  // ======================================================================
-  const anchoBloq1 = 3;
-  hoja.getRange(fila, 1, 1, anchoBloq1).merge()
-      .setValue('REPORTE DE PARTICIPANTES')
-      .setBackground(C_TITULO).setFontColor(C_TITULO_FG)
-      .setFontWeight('bold').setFontSize(14)
-      .setHorizontalAlignment('center');
-  fila++;
+  // ╔══════════════════════════════════════════╗
+  // ║  BLOQUE 1 — KPIs PRINCIPALES            ║
+  // ╚══════════════════════════════════════════╝
+  f = titulo(f, '📊  RESUMEN GENERAL', C.kpiBg, C.kpiFg, 13);
 
-  hoja.getRange(fila, 1, 1, anchoBloq1).merge()
-      .setValue('Actualizado: ' + new Date().toLocaleDateString('es-ES') + ' ' +
-                new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }))
-      .setFontColor('#666666').setFontStyle('italic')
-      .setHorizontalAlignment('center').setFontSize(10);
-  fila += 2;
-
-  // Indicadores clave
-  const indicadores = [
-    ['Total graduados registrados', totalGraduados],
-    ['Participantes clasificados', totalParticipantes],
-    ['Conexiones laborales', totalConexiones],
-    ['Seguimientos pendientes', totalSeguimientos]
+  // Fila de 3 KPIs lado a lado
+  var kpiRows = [
+    [['Graduados registrados', totalGraduados, C.headerBg, C.headerFg],
+     ['En seguimiento activo', totalParticipantes, '#1565c0', '#ffffff'],
+     ['Conexiones laborales',  totalConexiones,  '#e65100', '#ffffff']],
+    [['Evaluaciones de perfil', totalClasif,    C.koboAcc, '#ffffff'],
+     ['Encuestas satisfacción', totalSatisf,    C.satisfAcc, '#ffffff'],
+     ['Sesiones acompañamiento',totalSesiones,  C.sessAcc, '#ffffff']]
   ];
-  hoja.getRange(fila, 1, 1, 2)
-      .setValues([['Indicador', 'Cantidad']])
-      .setBackground(C_ACCENT).setFontColor(C_TITULO_FG)
-      .setFontWeight('bold').setHorizontalAlignment('center');
-  fila++;
-  indicadores.forEach((ind, idx) => {
-    const bg = idx % 2 === 0 ? C_PAR : C_IMPAR;
-    hoja.getRange(fila, 1).setValue(ind[0]).setBackground(bg).setFontSize(11);
-    hoja.getRange(fila, 2).setValue(ind[1]).setBackground(bg)
-        .setHorizontalAlignment('center').setFontWeight('bold').setFontSize(13);
-    fila++;
-  });
-  hoja.getRange(fila - indicadores.length - 1, 1, indicadores.length + 1, 2)
-      .setBorder(true, true, true, true, true, true, '#cccccc', BORDER_STYLE);
-  fila += 2;
-
-  // ======================================================================
-  // BLOQUE 2: DISTRIBUCIÓN POR ETAPA
-  // ======================================================================
-  hoja.getRange(fila, 1, 1, anchoBloq1).merge()
-      .setValue('DISTRIBUCIÓN POR ETAPA')
-      .setBackground(C_SECCION).setFontColor(C_TITULO_FG)
-      .setFontWeight('bold').setFontSize(12)
-      .setHorizontalAlignment('center');
-  fila++;
-
-  hoja.getRange(fila, 1, 1, 3)
-      .setValues([['Etapa', 'Participantes', '%']])
-      .setBackground(C_HEADER).setFontColor(C_HEADER_FG)
-      .setFontWeight('bold').setHorizontalAlignment('center');
-  fila++;
-
-  ETAPAS_FLUJO.forEach((etapa, idx) => {
-    const cant = conteos[etapa];
-    const pct  = totalParticipantes > 0 ? Math.round((cant / totalParticipantes) * 100) : 0;
-    const bg   = idx % 2 === 0 ? C_PAR : C_IMPAR;
-    hoja.getRange(fila, 1).setValue(etapa).setBackground(bg).setFontSize(11);
-    hoja.getRange(fila, 2).setValue(cant).setBackground(bg)
-        .setHorizontalAlignment('center').setFontWeight('bold').setFontSize(12);
-    hoja.getRange(fila, 3).setValue(pct + '%').setBackground(bg)
-        .setHorizontalAlignment('center').setFontSize(11);
-    fila++;
+  kpiRows.forEach(function(row) {
+    hoja.setRowHeight(f, 26);
+    hoja.setRowHeight(f + 1, 42);
+    for (var c = 0; c < 3; c++) {
+      var col = c * 2 + 1;
+      var kpi = row[c];
+      hoja.getRange(f, col, 1, 2).merge()
+          .setValue(kpi[0]).setBackground(kpi[2]).setFontColor(kpi[3])
+          .setFontSize(10).setFontWeight('bold')
+          .setHorizontalAlignment('center').setVerticalAlignment('middle');
+      hoja.getRange(f + 1, col, 1, 2).merge()
+          .setValue(kpi[1]).setBackground(kpi[2]).setFontColor(kpi[3])
+          .setFontSize(22).setFontWeight('bold')
+          .setHorizontalAlignment('center').setVerticalAlignment('middle');
+    }
+    borde(f, 1, 2, W);
+    f += 2;
   });
 
-  hoja.getRange(fila, 1, 1, 3)
-      .setValues([['TOTAL', totalParticipantes, totalParticipantes > 0 ? '100%' : '0%']])
-      .setBackground(C_TOTAL).setFontWeight('bold')
-      .setHorizontalAlignment('center').setFontSize(12);
-  hoja.getRange(fila, 1).setHorizontalAlignment('left');
-  fila++;
+  // Seguimientos pendientes (fila completa)
+  hoja.setRowHeight(f, 30);
+  hoja.getRange(f, 1, 1, 4).merge()
+      .setValue('⏰  Seguimientos pendientes')
+      .setBackground('#fff8e1').setFontSize(11).setVerticalAlignment('middle');
+  hoja.getRange(f, 5, 1, 2).merge()
+      .setValue(totalPendientes)
+      .setBackground('#fff8e1').setFontColor('#f57f17')
+      .setFontWeight('bold').setFontSize(14)
+      .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  borde(f, 1, 1, W);
+  f += 2;
 
-  hoja.getRange(fila - ETAPAS_FLUJO.length - 2, 1, ETAPAS_FLUJO.length + 2, 3)
-      .setBorder(true, true, true, true, true, true, '#cccccc', BORDER_STYLE);
-  fila += 2;
+  // ╔══════════════════════════════════════════╗
+  // ║  BLOQUE 2 — DISTRIBUCIÓN POR ETAPA      ║
+  // ╚══════════════════════════════════════════╝
+  f = titulo(f, '🗂  DISTRIBUCIÓN POR ETAPA DE SEGUIMIENTO', C.secBg, C.secFg);
 
-  // ======================================================================
-  // BLOQUE 3: INGRESOS POR MES
-  // ======================================================================
-  if (mesesOrdenados.length > 0) {
-    const headerMes = ['Mes'];
-    ETAPAS_FLUJO.forEach(e => {
-      const corto = e === 'Activamente busca trabajo' ? 'Act. busca' :
-                    e === 'Derivaciones' ? 'Deriv.' : e;
-      headerMes.push(corto);
+  // Header
+  hoja.getRange(f, 1, 1, 4).merge()
+      .setValue('Etapa').setBackground(C.headerBg).setFontColor(C.headerFg)
+      .setFontWeight('bold').setHorizontalAlignment('center').setFontSize(11);
+  hoja.getRange(f, 5, 1, 1)
+      .setValue('Personas').setBackground(C.headerBg).setFontColor(C.headerFg)
+      .setFontWeight('bold').setHorizontalAlignment('center').setFontSize(11);
+  hoja.getRange(f, 6, 1, 1)
+      .setValue('%').setBackground(C.headerBg).setFontColor(C.headerFg)
+      .setFontWeight('bold').setHorizontalAlignment('center').setFontSize(11);
+  hoja.setRowHeight(f, 28);
+  f++;
+
+  var filaInicioEtapas = f;
+  ETAPAS_FLUJO.forEach(function(etapa, idx) {
+    var cant = conteos[etapa] || 0;
+    var pct  = totalParticipantes > 0 ? (cant / totalParticipantes * 100).toFixed(1) : '0.0';
+    var bg   = idx % 2 === 0 ? C.par : C.impar;
+    hoja.setRowHeight(f, 26);
+    hoja.getRange(f, 1, 1, 4).merge()
+        .setValue(etapa).setBackground(bg).setFontSize(11).setVerticalAlignment('middle');
+    hoja.getRange(f, 5).setValue(cant).setBackground(bg)
+        .setHorizontalAlignment('center').setFontWeight('bold').setFontSize(12)
+        .setVerticalAlignment('middle');
+    hoja.getRange(f, 6).setValue(pct + '%').setBackground(bg)
+        .setHorizontalAlignment('center').setFontSize(11).setVerticalAlignment('middle');
+    f++;
+  });
+  // Fila total
+  hoja.setRowHeight(f, 28);
+  hoja.getRange(f, 1, 1, 4).merge()
+      .setValue('TOTAL').setBackground(C.total).setFontColor(C.totalFg)
+      .setFontWeight('bold').setFontSize(12).setVerticalAlignment('middle');
+  hoja.getRange(f, 5).setValue(totalParticipantes)
+      .setBackground(C.total).setFontColor(C.totalFg)
+      .setFontWeight('bold').setHorizontalAlignment('center').setFontSize(13)
+      .setVerticalAlignment('middle');
+  hoja.getRange(f, 6).setValue('100%')
+      .setBackground(C.total).setFontColor(C.totalFg)
+      .setHorizontalAlignment('center').setFontWeight('bold').setVerticalAlignment('middle');
+  borde(filaInicioEtapas - 1, 1, ETAPAS_FLUJO.length + 2, W);
+  f += 2;
+
+  // ╔══════════════════════════════════════════╗
+  // ║  BLOQUE 3 — DATOS KOBO (detalle)        ║
+  // ╚══════════════════════════════════════════╝
+  f = titulo(f, '📋  FORMULARIOS KOBO — DETALLE', C.secBg, C.secFg);
+
+  var koboItems = [
+    ['🧩  Clasificación de Perfiles',  totalClasif,    'Evaluaciones realizadas',   C.koboBg,   C.koboAcc],
+    ['😊  Satisfacción Empleo (IL-06)', totalSatisf,   'Encuestas completadas',     C.satisfBg, C.satisfAcc],
+    ['🤝  Sesiones Acompañamiento (IL-08)', totalSesiones, 'Sesiones registradas',  C.sessBg,   C.sessAcc]
+  ];
+  var filaInicioKobo = f;
+  koboItems.forEach(function(item) {
+    hoja.setRowHeight(f, 28);
+    hoja.getRange(f, 1, 1, 3).merge()
+        .setValue(item[0]).setBackground(item[3]).setFontSize(11)
+        .setFontWeight('bold').setVerticalAlignment('middle');
+    hoja.getRange(f, 4, 1, 1)
+        .setValue(item[2]).setBackground(item[3]).setFontSize(10)
+        .setFontColor('#555555').setVerticalAlignment('middle');
+    hoja.getRange(f, 5, 1, 2).merge()
+        .setValue(item[1]).setBackground(item[3]).setFontColor(item[4])
+        .setFontWeight('bold').setFontSize(16)
+        .setHorizontalAlignment('center').setVerticalAlignment('middle');
+    f++;
+  });
+  borde(filaInicioKobo, 1, koboItems.length, W);
+  f += 2;
+
+  // ╔══════════════════════════════════════════╗
+  // ║  BLOQUE 4 — INGRESOS POR MES            ║
+  // ╚══════════════════════════════════════════╝
+  if (meses.length > 0) {
+    var etapasCortas = ETAPAS_FLUJO.map(function(e) {
+      if (e === 'Activamente busca trabajo') return 'Act.';
+      if (e === 'Conexiones Laborales')      return 'Conex.';
+      if (e === 'Derivaciones')              return 'Deriv.';
+      if (e === 'Paso a paso')               return 'P.Paso';
+      return e;
     });
-    headerMes.push('Total');
-    const numColsMes = headerMes.length;
+    // Solo caben 5 columnas de etapa + 1 de mes si W=6; usamos todas las etapas y dejamos Total abajo
+    var numEtapas  = ETAPAS_FLUJO.length; // 6
+    var numColsMes = 1 + numEtapas + 1;   // Mes + etapas + Total
 
-    hoja.getRange(fila, 1, 1, numColsMes).merge()
-        .setValue('INGRESOS POR MES')
-        .setBackground(C_SECCION).setFontColor(C_TITULO_FG)
-        .setFontWeight('bold').setFontSize(12)
-        .setHorizontalAlignment('center');
-    fila++;
+    // Si necesitamos más columnas, ampliar
+    for (var cx = W + 1; cx <= numColsMes; cx++) hoja.setColumnWidth(cx, 85);
 
-    hoja.getRange(fila, 1, 1, numColsMes)
-        .setValues([headerMes])
-        .setBackground(C_HEADER).setFontColor(C_HEADER_FG)
+    f = titulo(f, '📅  INGRESOS POR MES (por etapa)', C.secBg, C.secFg);
+
+    // Header mes
+    hoja.setRowHeight(f, 28);
+    var headerMes = [['Mes']];
+    etapasCortas.forEach(function(e) { headerMes[0].push(e); });
+    headerMes[0].push('Total');
+    hoja.getRange(f, 1, 1, numColsMes).setValues(headerMes)
+        .setBackground(C.headerBg).setFontColor(C.headerFg)
         .setFontWeight('bold').setHorizontalAlignment('center').setFontSize(10);
-    fila++;
+    f++;
 
-    const totalesPorEtapa = {};
-    ETAPAS_FLUJO.forEach(e => { totalesPorEtapa[e] = 0; });
-    let granTotal = 0;
+    var totEtapa = {};
+    ETAPAS_FLUJO.forEach(function(e) { totEtapa[e] = 0; });
+    var granTotal = 0;
+    var filaInicioMeses = f;
 
-    mesesOrdenados.forEach((mes, idx) => {
-      const bg = idx % 2 === 0 ? C_PAR : C_IMPAR;
-      const filaMes = [mes];
-      let totalMes = 0;
-      ETAPAS_FLUJO.forEach(e => {
-        const cant = ingresosPorMes[mes][e];
-        filaMes.push(cant);
-        totalesPorEtapa[e] += cant;
-        totalMes += cant;
+    meses.forEach(function(mes, idx) {
+      var bg = idx % 2 === 0 ? C.par : C.impar;
+      hoja.setRowHeight(f, 24);
+      var row = [mes];
+      var totalMes = 0;
+      ETAPAS_FLUJO.forEach(function(e) {
+        var v = ipm[mes][e] || 0;
+        row.push(v);
+        totEtapa[e] += v;
+        totalMes    += v;
       });
-      filaMes.push(totalMes);
+      row.push(totalMes);
       granTotal += totalMes;
-
-      hoja.getRange(fila, 1, 1, numColsMes)
-          .setValues([filaMes]).setBackground(bg)
-          .setHorizontalAlignment('center').setFontSize(10);
-      hoja.getRange(fila, 1).setHorizontalAlignment('left');
-      fila++;
+      hoja.getRange(f, 1, 1, numColsMes).setValues([row])
+          .setBackground(bg).setHorizontalAlignment('center').setFontSize(10);
+      hoja.getRange(f, 1).setHorizontalAlignment('left');
+      f++;
     });
 
-    const filaTotales = ['TOTAL'];
-    ETAPAS_FLUJO.forEach(e => { filaTotales.push(totalesPorEtapa[e]); });
-    filaTotales.push(granTotal);
-    hoja.getRange(fila, 1, 1, numColsMes)
-        .setValues([filaTotales])
-        .setBackground(C_TOTAL).setFontWeight('bold')
-        .setHorizontalAlignment('center').setFontSize(11);
-    hoja.getRange(fila, 1).setHorizontalAlignment('left');
-
-    hoja.getRange(fila - mesesOrdenados.length - 1, 1, mesesOrdenados.length + 2, numColsMes)
-        .setBorder(true, true, true, true, true, true, '#cccccc', BORDER_STYLE);
-    fila += 2;
+    // Fila totales
+    hoja.setRowHeight(f, 26);
+    var rowTot = ['TOTAL'];
+    ETAPAS_FLUJO.forEach(function(e) { rowTot.push(totEtapa[e]); });
+    rowTot.push(granTotal);
+    hoja.getRange(f, 1, 1, numColsMes).setValues([rowTot])
+        .setBackground(C.total).setFontColor(C.totalFg)
+        .setFontWeight('bold').setHorizontalAlignment('center').setFontSize(11);
+    hoja.getRange(f, 1).setHorizontalAlignment('left');
+    borde(filaInicioMeses - 1, 1, meses.length + 2, numColsMes);
+    f += 2;
   }
 
-  // ======================================================================
-  // BLOQUE 4: CONEXIONES LABORALES
-  // ======================================================================
-  hoja.getRange(fila, 1, 1, 2).merge()
-      .setValue('CONEXIONES LABORALES')
-      .setBackground(C_CONEXIONES).setFontColor(C_TITULO_FG)
-      .setFontWeight('bold').setFontSize(12)
+  // ── Footer ────────────────────────────────────────────────────────────────
+  hoja.getRange(f, 1, 1, W).merge()
+      .setValue('Generado automáticamente · Sistema Empleabilidad Creamos')
+      .setFontColor('#bdbdbd').setFontStyle('italic').setFontSize(9)
       .setHorizontalAlignment('center');
-  fila++;
 
-  hoja.getRange(fila, 1).setValue('Total conexiones registradas').setFontSize(11);
-  hoja.getRange(fila, 2).setValue(totalConexiones)
-      .setHorizontalAlignment('center').setFontWeight('bold').setFontSize(13);
-  hoja.getRange(fila, 1, 1, 2)
-      .setBorder(true, true, true, true, true, true, '#cccccc', BORDER_STYLE);
-
-  Logger.log('Reporte generado exitosamente');
+  SpreadsheetApp.flush();
+  Logger.log('Reporte generado exitosamente.');
 }
 
 /**
