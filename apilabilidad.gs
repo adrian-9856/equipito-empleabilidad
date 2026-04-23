@@ -1080,9 +1080,9 @@ function sincronizacionAutomatica() {
       Logger.log('Sync graduados omitido: ' + e.message);
     }
 
-    // 2. Sincronizar Clasificación de Perfiles
+    // 2. Sincronizar Clasificación de Perfiles (solo nuevos, sin borrar hoja)
     try {
-      var resultClasif = _syncClasificacionPerfiles();
+      var resultClasif = _syncClasificacionSoloNuevos();
       Logger.log('Clasificación: ' + resultClasif.nuevos + ' nuevos, ' + resultClasif.total + ' total');
     } catch (e) {
       Logger.log('Sync clasificación omitido: ' + e.message);
@@ -1164,6 +1164,14 @@ function configurarTriggerSincronizacion() {
  * Si la hoja está vacía delega en procesarClasificacionPerfiles (import completo).
  */
 function _syncClasificacionSoloNuevos() {
+  // Prevenir ejecuciones concurrentes que generan duplicados
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(0)) {
+    Logger.log('_syncClasificacionSoloNuevos: otra instancia en ejecución, omitiendo.');
+    return { nuevos: 0, actualizados: 0, total: 0 };
+  }
+  try {
+
   var opciones = {
     method: 'get',
     headers: { 'Authorization': 'Token ' + KOBO_TOKEN, 'Accept': 'text/csv' },
@@ -1246,6 +1254,10 @@ function _syncClasificacionSoloNuevos() {
   });
 
   return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
