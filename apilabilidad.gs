@@ -173,37 +173,22 @@ function configurarMenuTrigger() {
 function importarDatosKobo() {
   try {
     const ui = SpreadsheetApp.getUi();
-    const config = obtenerConfiguracion();
-    if (!config.koboExportUrl) {
-      ui.alert('⚠️ URL no configurada',
-               'La URL de exportación de Graduados aún no está configurada.\n\n' +
-               'Para configurarla, en el Editor de Apps Script (Extensions > Apps Script)\n' +
-               'agrega en el código la constante:\n\n' +
-               'const KOBO_GRADUADOS_URL = "tu-url-aqui";\n\n' +
-               'O solicita la URL a quien administra el formulario de KoboToolbox.',
-               ui.ButtonSet.OK);
-      return;
-    }
-    ui.alert('🔄 Importando Datos',
-             'Iniciando importación desde KoboToolbox...\n' +
-             'Esto puede tardar unos momentos.',
-             ui.ButtonSet.OK);
+    SpreadsheetApp.getActiveSpreadsheet().toast('Descargando datos de Graduados...', '🔄 Importando', -1);
     const datos = obtenerDatosKoboToolbox();
+    SpreadsheetApp.getActiveSpreadsheet().toast('', '', 1);
     if (!datos || datos.length === 0) {
-      ui.alert('⚠️ Sin Datos',
-               'No se encontraron datos nuevos para importar.',
-               ui.ButtonSet.OK);
+      ui.alert('⚠️ Sin Datos', 'No se encontraron datos para importar.', ui.ButtonSet.OK);
       return;
     }
     const resultado = procesarDatosGraduados(datos);
     ui.alert('✅ Importación Completada',
-             `Se importaron ${resultado.nuevos} graduados nuevos.\n` +
-             `Total de graduados: ${resultado.total}`,
+             'Graduados nuevos: ' + resultado.nuevos + '\n' +
+             'Actualizados: ' + resultado.actualizados + '\n' +
+             'Total: ' + resultado.total,
              ui.ButtonSet.OK);
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Error',
-                                  'Error al importar datos: ' + error.message,
-                                  SpreadsheetApp.getUi().ButtonSet.OK);
+    SpreadsheetApp.getActiveSpreadsheet().toast('', '', 1);
+    SpreadsheetApp.getUi().alert('❌ Error', 'Error al importar Graduados: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
     Logger.log('Error en importarDatosKobo: ' + error);
   }
 }
@@ -269,9 +254,10 @@ function mostrarConfiguracion() {
 const KOBO_TOKEN = '64cc018b88067397addd36b09288be8b6539cf39';
 
 // URLs de exportación de KoboToolbox
-// Clasificación de Perfiles — se prueba primero export-settings, luego data directo con format=csv
+const URL_GRADUADOS             = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/export-settings/esQRaR2qPsjyboQtpNEiFy3/data.csv';
 const URL_CLASIFICACION_PERFILES = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/export-settings/esQRaR2qPsjyboQtpNEiFy3/data.csv';
 const URL_CLASIFICACION_FALLBACK = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/data/?format=csv';
+const URL_GRADUADOS_FALLBACK     = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/data/?format=csv';
 
 // -----------------------------------------------------------------------------
 // CONSTANTES DE OPCIONES DE DROPDOWN
@@ -867,30 +853,37 @@ function obtenerGraduadosSinClasificar() {
  * @return {Array}
  */
 function obtenerDatosKoboToolbox() {
-  try {
-    const config = obtenerConfiguracion();
-    if (!config.koboExportUrl) {
-      throw new Error('URL de exportación de KoboToolbox no configurada');
-    }
-    const opciones = {
-      method: 'get',
-      headers: {},
-      muteHttpExceptions: true
-    };
-    opciones.headers['Authorization'] = 'Token ' + KOBO_TOKEN;
-    Logger.log('Obteniendo datos de KoboToolbox...');
-    const respuesta = UrlFetchApp.fetch(config.koboExportUrl, opciones);
-    const codigo    = respuesta.getResponseCode();
+  var opciones = {
+    method: 'get',
+    headers: { 'Authorization': 'Token ' + KOBO_TOKEN, 'Accept': 'text/csv' },
+    muteHttpExceptions: true
+  };
+  var urls = [URL_GRADUADOS, URL_GRADUADOS_FALLBACK];
+  var contenido;
+  var respuesta;
+  for (var u = 0; u < urls.length; u++) {
+    Logger.log('Graduados URL ' + (u+1) + ': ' + urls[u]);
+    respuesta = UrlFetchApp.fetch(urls[u], opciones);
+    var codigo = respuesta.getResponseCode();
+    Logger.log('HTTP ' + codigo);
     if (codigo !== 200) {
-      throw new Error(`Error HTTP ${codigo}: ${respuesta.getContentText()}`);
+      Logger.log(respuesta.getContentText().substring(0, 300));
+      continue;
     }
-    const datosParseados = parsearCSV(respuesta.getContentText());
-    Logger.log(`Se obtuvieron ${datosParseados.length} registros de KoboToolbox`);
-    return datosParseados;
-  } catch (error) {
-    Logger.log('Error al obtener datos de KoboToolbox: ' + error);
-    throw error;
+    contenido = respuesta.getContentText();
+    if (contenido.trim().charAt(0) === '{' || contenido.trim().charAt(0) === '[') {
+      Logger.log('Respuesta JSON en URL ' + (u+1) + ', intentando siguiente...');
+      contenido = null;
+      continue;
+    }
+    break;
   }
+  if (!contenido) {
+    throw new Error('No se pudo obtener CSV de Graduados. HTTP: ' + (respuesta ? respuesta.getResponseCode() : 0));
+  }
+  var datos = parsearCSV(contenido);
+  Logger.log('Graduados parseados: ' + datos.length);
+  return datos;
 }
 
 /**
