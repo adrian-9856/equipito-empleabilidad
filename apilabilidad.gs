@@ -1133,6 +1133,22 @@ function sincronizacionAutomatica() {
       Logger.log('Sync clasificación omitido: ' + e.message);
     }
 
+    // 3. Sincronizar Satisfacción Empleo (IL-06)
+    try {
+      var resultSatisf = _syncSatisfaccionSoloNuevos();
+      Logger.log('Satisfacción: ' + resultSatisf.nuevos + ' nuevos, ' + resultSatisf.total + ' total');
+    } catch (e) {
+      Logger.log('Sync Satisfacción omitido: ' + e.message);
+    }
+
+    // 4. Sincronizar Sesiones Acompañamiento (IL-08)
+    try {
+      var resultSes = _syncSesionesSoloNuevos();
+      Logger.log('Sesiones: ' + resultSes.nuevos + ' nuevos, ' + resultSes.total + ' total');
+    } catch (e) {
+      Logger.log('Sync Sesiones omitido: ' + e.message);
+    }
+
   } catch (error) {
     Logger.log('Error en sincronización automática: ' + error);
   }
@@ -1741,12 +1757,10 @@ function importarClasificacionPerfiles() {
       'Descargando Clasificación de Perfiles...', '🔄 Importando', -1
     );
 
-    // Usar _syncClasificacionPerfiles que ya maneja URLs y fallback
-    const resultado = _syncClasificacionPerfiles();
+    const resultado = _syncClasificacionSoloNuevos();
     SpreadsheetApp.getActiveSpreadsheet().toast('', '', 1);
     ui.alert('✅ Importación Completada',
       'Clasificaciones nuevas: ' + resultado.nuevos + '\n' +
-      'Actualizadas: ' + resultado.actualizados + '\n' +
       'Total en hoja: ' + resultado.total,
       ui.ButtonSet.OK);
 
