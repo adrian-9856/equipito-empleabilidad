@@ -889,29 +889,74 @@ function obtenerDatosKoboToolbox() {
  * @param {string} csvContent
  * @return {Array}
  */
+/**
+ * Parsea CSV completo manejando:
+ *  - Campos multilínea entre comillas (los textos de KoboToolbox tienen saltos de línea)
+ *  - Auto-detección de separador , o ;
+ *  - Comillas dobles escapadas ""
+ */
 function parsearCSV(csvContent) {
   try {
-    const lineas = csvContent.split('\n');
-    if (lineas.length < 2) return [];
+    // Auto-detectar separador mirando la primera línea NO quoted
+    var sep = _detectarSeparadorCSV(csvContent);
+    Logger.log('Separador CSV detectado: "' + sep + '"');
 
-    // Auto-detectar separador: si la primera línea tiene más ";" que "," usamos ";"
-    var primeraLinea = lineas[0];
-    var cantComas     = (primeraLinea.match(/,/g)  || []).length;
-    var cantPuntoComa = (primeraLinea.match(/;/g)  || []).length;
-    var sep = cantPuntoComa > cantComas ? ';' : ',';
-    Logger.log('Separador CSV detectado: "' + sep + '" (comas=' + cantComas + ', puntoycoma=' + cantPuntoComa + ')');
+    // Parsear carácter a carácter para respetar campos multilínea
+    var filas    = [];
+    var fila     = [];
+    var campo    = '';
+    var enComilla = false;
+    var n        = csvContent.length;
 
-    const headers = parsearLineaCSV(lineas[0], sep);
-    const datos   = [];
-    for (let i = 1; i < lineas.length; i++) {
-      if (lineas[i].trim() === '') continue;
-      const valores = parsearLineaCSV(lineas[i], sep);
-      const objeto  = {};
-      headers.forEach((header, index) => {
-        objeto[header] = valores[index] || '';
-      });
-      datos.push(objeto);
+    for (var i = 0; i < n; i++) {
+      var c = csvContent[i];
+
+      if (c === '"') {
+        // Comilla doble escapada ""
+        if (enComilla && i + 1 < n && csvContent[i + 1] === '"') {
+          campo += '"';
+          i++;
+        } else {
+          enComilla = !enComilla;
+        }
+        continue;
+      }
+
+      if (!enComilla && c === sep) {
+        fila.push(campo.trim());
+        campo = '';
+        continue;
+      }
+
+      if (!enComilla && (c === '\n' || c === '\r')) {
+        // Saltar \r de \r\n
+        if (c === '\r' && i + 1 < n && csvContent[i + 1] === '\n') i++;
+        fila.push(campo.trim());
+        campo = '';
+        if (fila.some(function(f) { return f !== ''; })) filas.push(fila);
+        fila = [];
+        continue;
+      }
+
+      campo += c;
     }
+    // Última celda / fila
+    if (campo || fila.length > 0) {
+      fila.push(campo.trim());
+      if (fila.some(function(f) { return f !== ''; })) filas.push(fila);
+    }
+
+    if (filas.length < 2) return [];
+
+    var headers = filas[0];
+    var datos   = [];
+    for (var r = 1; r < filas.length; r++) {
+      var vals = filas[r];
+      var obj  = {};
+      headers.forEach(function(h, idx) { obj[h] = vals[idx] || ''; });
+      datos.push(obj);
+    }
+    Logger.log('CSV parseado: ' + (filas.length - 1) + ' filas, ' + headers.length + ' columnas');
     return datos;
   } catch (error) {
     Logger.log('Error al parsear CSV: ' + error);
@@ -919,29 +964,34 @@ function parsearCSV(csvContent) {
   }
 }
 
-/**
- * Parsea una línea de CSV respetando comillas, con separador configurable
- * @param {string} linea
- * @param {string} sep - separador (',' o ';')
- * @return {Array}
- */
+function _detectarSeparadorCSV(contenido) {
+  // Recorre hasta el primer \n fuera de comillas para contar , vs ;
+  var enComilla = false;
+  var comas = 0, puntoycoma = 0;
+  for (var i = 0; i < contenido.length; i++) {
+    var c = contenido[i];
+    if (c === '"') { enComilla = !enComilla; continue; }
+    if (enComilla) continue;
+    if (c === '\n') break;
+    if (c === ',') comas++;
+    if (c === ';') puntoycoma++;
+  }
+  return puntoycoma > comas ? ';' : ',';
+}
+
+// parsearLineaCSV se conserva para compatibilidad con código existente
 function parsearLineaCSV(linea, sep) {
   var separador = sep || ',';
-  const valores = [];
-  let valorActual      = '';
-  let dentroDeComillas = false;
-  for (let i = 0; i < linea.length; i++) {
-    const char = linea[i];
-    if (char === '"') {
-      dentroDeComillas = !dentroDeComillas;
-    } else if (char === separador && !dentroDeComillas) {
-      valores.push(valorActual.trim());
-      valorActual = '';
-    } else {
-      valorActual += char;
-    }
+  var valores = [];
+  var val = '';
+  var enComilla = false;
+  for (var i = 0; i < linea.length; i++) {
+    var c = linea[i];
+    if (c === '"') { enComilla = !enComilla; }
+    else if (c === separador && !enComilla) { valores.push(val.trim()); val = ''; }
+    else { val += c; }
   }
-  valores.push(valorActual.trim());
+  valores.push(val.trim());
   return valores;
 }
 
