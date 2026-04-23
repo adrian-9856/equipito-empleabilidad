@@ -22,24 +22,30 @@
 function onOpen(e) {
   try {
     const ui = SpreadsheetApp.getUi();
+
+    const submenuImport = ui.createMenu('📂 Importar por separado')
+      .addItem('🔄 Graduados',                           'importarDatosKobo')
+      .addItem('📋 Clasificación de Perfiles',           'importarClasificacionPerfiles')
+      .addItem('😊 Satisfacción Empleo (IL-06)',         'importarSatisfaccionEmpleo')
+      .addItem('🤝 Sesiones Acompañamiento (IL-08)',     'importarSesionesAcompanamiento')
+      .addSeparator()
+      .addItem('♻️ Reimportar Sesiones desde cero',      'reimportarSesionesDesdeCero')
+      .addItem('🧹 Limpiar duplicados (Clasificación)',  'limpiarDuplicadosClasificacion')
+      .addItem('🔍 Diagnosticar Clasificación de Perfiles', 'diagnosticarClasificacionPerfiles');
+
     ui.createMenu('📊 Seguimiento Graduados')
-      .addItem('🔄 Importar Graduados', 'importarDatosKobo')
-      .addItem('📋 Importar Clasificación de Perfiles', 'importarClasificacionPerfiles')
-      .addItem('😊 Importar Satisfacción Empleo (IL-06)', 'importarSatisfaccionEmpleo')
-      .addItem('🤝 Importar Sesiones Acompañamiento (IL-08)', 'importarSesionesAcompanamiento')
-      .addItem('♻️ Reimportar Sesiones desde cero (limpiar columnas)', 'reimportarSesionesDesdeCero')
-      .addItem('🧹 Limpiar duplicados (Clasificación)', 'limpiarDuplicadosClasificacion')
+      .addItem('📥 Importar todos los datos',       'importarTodosLosDatos')
       .addSeparator()
-      .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
-      .addItem('📊 Generar Reporte', 'generarReporte')
-      .addItem('📞 Ver Seguimientos Pendientes', 'mostrarSeguimientosPendientes')
+      .addItem('📊 Generar Reporte',                'generarReporte')
+      .addItem('📝 Clasificar Graduados',           'mostrarFormularioClasificacion')
+      .addItem('📞 Ver Seguimientos Pendientes',    'mostrarSeguimientosPendientes')
       .addSeparator()
-      .addItem('🔍 Diagnosticar Clasificación de Perfiles', 'diagnosticarClasificacionPerfiles')
+      .addSubMenu(submenuImport)
       .addSeparator()
       .addItem('⏱ Activar auto-import (cada X min)', 'activarAutoImport')
-      .addItem('⏹ Desactivar auto-import', 'desactivarAutoImport')
+      .addItem('⏹ Desactivar auto-import',           'desactivarAutoImport')
       .addSeparator()
-      .addItem('🚀 Instalar Sistema (primera vez)', 'instalarSistema')
+      .addItem('🚀 Instalar Sistema (primera vez)',  'instalarSistema')
       .addItem('🔁 Reinstalar Sistema (borra todo)', 'reinstalarSistema')
       .addToUi();
   } catch (error) {
@@ -200,6 +206,46 @@ function importarDatosKobo() {
     SpreadsheetApp.getUi().alert('❌ Error', 'Error al importar Graduados: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
     Logger.log('Error en importarDatosKobo: ' + error);
   }
+}
+
+/**
+ * Importa todos los formularios de KoboToolbox en una sola acción.
+ * Muestra un resumen al final con los nuevos registros de cada fuente.
+ */
+function importarTodosLosDatos() {
+  var ss  = SpreadsheetApp.getActiveSpreadsheet();
+  var ui  = SpreadsheetApp.getUi();
+  var res = [];
+
+  ss.toast('Importando todos los datos...', '📥 Importando', -1);
+
+  // 1. Graduados
+  try {
+    var d = obtenerDatosKoboToolbox();
+    var g = procesarDatosGraduados(d);
+    res.push('✅ Graduados: ' + g.nuevos + ' nuevos (total ' + g.total + ')');
+  } catch (e) { res.push('⚠️ Graduados: ' + e.message); }
+
+  // 2. Clasificación de Perfiles
+  try {
+    var c = _syncClasificacionSoloNuevos();
+    res.push('✅ Clasificación de Perfiles: ' + c.nuevos + ' nuevos (total ' + c.total + ')');
+  } catch (e) { res.push('⚠️ Clasificación: ' + e.message); }
+
+  // 3. Satisfacción Empleo (IL-06)
+  try {
+    var s = _syncSatisfaccionSoloNuevos();
+    res.push('✅ Satisfacción Empleo: ' + s.nuevos + ' nuevos (total ' + s.total + ')');
+  } catch (e) { res.push('⚠️ Satisfacción: ' + e.message); }
+
+  // 4. Sesiones Acompañamiento (IL-08)
+  try {
+    var se = _syncSesionesSoloNuevos();
+    res.push('✅ Sesiones Acompañamiento: ' + se.nuevos + ' nuevos (total ' + se.total + ')');
+  } catch (e) { res.push('⚠️ Sesiones: ' + e.message); }
+
+  ss.toast('', '', 1);
+  ui.alert('📥 Importación completada', res.join('\n'), ui.ButtonSet.OK);
 }
 
 /**
