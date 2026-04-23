@@ -948,7 +948,10 @@ function parsearCSV(csvContent) {
 
     if (filas.length < 2) return [];
 
-    var headers = filas[0];
+    // Normalizar headers: eliminar saltos de línea dentro del nombre de columna
+    var headers = filas[0].map(function(h) {
+      return h.replace(/[\r\n]+/g, ' ').replace(/  +/g, ' ').trim();
+    });
     var datos   = [];
     for (var r = 1; r < filas.length; r++) {
       var vals = filas[r];
@@ -1263,7 +1266,7 @@ function procesarClasificacionPerfiles(datos) {
   }
 
   // Prefijo exacto de todas las columnas del módulo en el CSV
-  var M = 'MÓDULO DE OBSERVACIÓN - Evaluación de Perfil / ';
+  var M = 'MÓDULO DE OBSERVACIÓN - Evaluación de Perfil/';
 
   datos.forEach(function(dato) {
     var creamosId = (dato['Creamos ID del participante:'] || '').toString().trim();
@@ -1374,11 +1377,12 @@ function _puntajeDesdeTexto(valor) {
  */
 function _mapearPerfil(perfilKobo, puntaje) {
   var p = (perfilKobo || '').toString().toLowerCase();
-  if (p.indexOf('sin condiciones') !== -1 || p === 'perfil_1' || p === 'perfil 1') return PERFILES_CLASIFICACION[0];
-  if (p.indexOf('con acompañamiento') !== -1 || p === 'perfil_2' || p === 'perfil 2') return PERFILES_CLASIFICACION[1];
-  if (p.indexOf('intensivo') !== -1 || p === 'perfil_3' || p === 'perfil 3') return PERFILES_CLASIFICACION[2];
-  if (p.indexOf('no acepta') !== -1 || p === 'perfil_4' || p === 'perfil 4') return PERFILES_CLASIFICACION[3];
-  // Fallback: calcular por puntaje
+  // Usar indexOf para que funcione con "Perfil 1: Completamente independiente" etc.
+  if (p.indexOf('perfil 1') !== -1 || p.indexOf('perfil_1') !== -1 || p.indexOf('sin condiciones') !== -1 || p.indexOf('completamente independiente') !== -1) return PERFILES_CLASIFICACION[0];
+  if (p.indexOf('perfil 2') !== -1 || p.indexOf('perfil_2') !== -1 || p.indexOf('con acompañamiento') !== -1 || p.indexOf('necesita apoyo') !== -1) return PERFILES_CLASIFICACION[1];
+  if (p.indexOf('perfil 3') !== -1 || p.indexOf('perfil_3') !== -1 || p.indexOf('intensivo') !== -1 || p.indexOf('barreras activas') !== -1 || p.indexOf('no puede') !== -1) return PERFILES_CLASIFICACION[2];
+  if (p.indexOf('perfil 4') !== -1 || p.indexOf('perfil_4') !== -1 || p.indexOf('no acepta') !== -1) return PERFILES_CLASIFICACION[3];
+  // Fallback: calcular por puntaje si KoboToolbox no envió perfil reconocible
   if (puntaje >= 22) return PERFILES_CLASIFICACION[0];
   if (puntaje >= 15) return PERFILES_CLASIFICACION[1];
   if (puntaje >= 8)  return PERFILES_CLASIFICACION[2];
