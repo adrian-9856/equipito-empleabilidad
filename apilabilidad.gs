@@ -893,11 +893,19 @@ function parsearCSV(csvContent) {
   try {
     const lineas = csvContent.split('\n');
     if (lineas.length < 2) return [];
-    const headers = parsearLineaCSV(lineas[0]);
+
+    // Auto-detectar separador: si la primera línea tiene más ";" que "," usamos ";"
+    var primeraLinea = lineas[0];
+    var cantComas     = (primeraLinea.match(/,/g)  || []).length;
+    var cantPuntoComa = (primeraLinea.match(/;/g)  || []).length;
+    var sep = cantPuntoComa > cantComas ? ';' : ',';
+    Logger.log('Separador CSV detectado: "' + sep + '" (comas=' + cantComas + ', puntoycoma=' + cantPuntoComa + ')');
+
+    const headers = parsearLineaCSV(lineas[0], sep);
     const datos   = [];
     for (let i = 1; i < lineas.length; i++) {
       if (lineas[i].trim() === '') continue;
-      const valores = parsearLineaCSV(lineas[i]);
+      const valores = parsearLineaCSV(lineas[i], sep);
       const objeto  = {};
       headers.forEach((header, index) => {
         objeto[header] = valores[index] || '';
@@ -912,11 +920,13 @@ function parsearCSV(csvContent) {
 }
 
 /**
- * Parsea una línea de CSV respetando comillas
+ * Parsea una línea de CSV respetando comillas, con separador configurable
  * @param {string} linea
+ * @param {string} sep - separador (',' o ';')
  * @return {Array}
  */
-function parsearLineaCSV(linea) {
+function parsearLineaCSV(linea, sep) {
+  var separador = sep || ',';
   const valores = [];
   let valorActual      = '';
   let dentroDeComillas = false;
@@ -924,7 +934,7 @@ function parsearLineaCSV(linea) {
     const char = linea[i];
     if (char === '"') {
       dentroDeComillas = !dentroDeComillas;
-    } else if (char === ',' && !dentroDeComillas) {
+    } else if (char === separador && !dentroDeComillas) {
       valores.push(valorActual.trim());
       valorActual = '';
     } else {
