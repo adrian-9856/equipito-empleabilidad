@@ -277,10 +277,11 @@ const GENEROS = [
 
 // Perfiles de clasificación según puntaje
 const PERFILES_CLASIFICACION = [
-  'Perfil 1 Alto: Listo para inserción laboral directa',
-  'Perfil 2 Medio-Alto: Listo con apoyo puntual',
-  'Perfil 3 Medio-Bajo: Necesita acompañamiento moderado',
-  'Perfil 4 Bajo: Necesita acompañamiento intensivo'
+  'Perfil 1: Completamente independiente',
+  'Perfil 2: Quiere, puede, necesita apoyo',
+  'Perfil 2 Bajo: Necesita acompañamiento intensivo',
+  'Perfil 3: Quiere pero no puede (Barreras activas)',
+  'Perfil 4: No quiere / Otras prioridades'
 ];
 
 // -----------------------------------------------------------------------------
@@ -540,7 +541,7 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Puntaje Total',       ancho: 110, tipo: 'texto' },
       { nombre: 'Barreras activas',    ancho: 130, tipo: 'texto' },
       { nombre: 'Desmotivación',       ancho: 130, tipo: 'texto' },
-      { nombre: 'Perfil Asignado',     ancho: 300, tipo: 'dropdown', opciones: PERFILES_CLASIFICACION },
+      { nombre: 'Perfil Asignado',     ancho: 300, tipo: 'texto' },
       { nombre: 'Notas de observación', ancho: 380, tipo: 'texto' }
     ]
   },
@@ -1357,12 +1358,13 @@ function _puntajeDesdeTexto(valor) {
  */
 function _mapearPerfil(perfilKobo, puntaje) {
   var p = (perfilKobo || '').toString().toLowerCase();
-  // Usar indexOf para que funcione con "Perfil 1: Completamente independiente" etc.
-  if (p.indexOf('perfil 1') !== -1 || p.indexOf('perfil_1') !== -1 || p.indexOf('sin condiciones') !== -1 || p.indexOf('completamente independiente') !== -1) return PERFILES_CLASIFICACION[0];
-  if (p.indexOf('perfil 2') !== -1 || p.indexOf('perfil_2') !== -1 || p.indexOf('con acompañamiento') !== -1 || p.indexOf('necesita apoyo') !== -1) return PERFILES_CLASIFICACION[1];
-  if (p.indexOf('perfil 3') !== -1 || p.indexOf('perfil_3') !== -1 || p.indexOf('intensivo') !== -1 || p.indexOf('barreras activas') !== -1 || p.indexOf('no puede') !== -1) return PERFILES_CLASIFICACION[2];
-  if (p.indexOf('perfil 4') !== -1 || p.indexOf('perfil_4') !== -1 || p.indexOf('no acepta') !== -1) return PERFILES_CLASIFICACION[3];
-  // Fallback: calcular por puntaje si KoboToolbox no envió perfil reconocible
+  // "Perfil 2 Bajo" antes que "Perfil 2" para evitar falsa coincidencia
+  if (p.indexOf('perfil 1') !== -1 || p.indexOf('completamente independiente') !== -1) return PERFILES_CLASIFICACION[0];
+  if (p.indexOf('perfil 2 bajo') !== -1 || p.indexOf('acompañamiento intensivo') !== -1) return PERFILES_CLASIFICACION[2];
+  if (p.indexOf('perfil 2') !== -1 || p.indexOf('necesita apoyo') !== -1) return PERFILES_CLASIFICACION[1];
+  if (p.indexOf('perfil 3') !== -1 || p.indexOf('barreras activas') !== -1 || p.indexOf('no puede') !== -1) return PERFILES_CLASIFICACION[3];
+  if (p.indexOf('perfil 4') !== -1 || p.indexOf('no quiere') !== -1 || p.indexOf('otras prioridades') !== -1) return PERFILES_CLASIFICACION[4];
+  // Fallback: calcular por puntaje
   if (puntaje >= 22) return PERFILES_CLASIFICACION[0];
   if (puntaje >= 15) return PERFILES_CLASIFICACION[1];
   if (puntaje >= 8)  return PERFILES_CLASIFICACION[2];
