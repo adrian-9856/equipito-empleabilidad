@@ -215,9 +215,8 @@ function mostrarFormularioClasificacion() {
     '  • Aliados\n' +
     '  • Plataforma\n' +
     '  • Derivaciones\n' +
-    '  • Por su cuenta\n' +
+    '  • Activamente busca trabajo (incluye "Por su cuenta")\n' +
     '  • Paso a paso\n' +
-    '  • Activamente busca trabajo\n' +
     '  • Conexiones Laborales (abre formulario de conexión)',
     SpreadsheetApp.getUi().ButtonSet.OK
   );
@@ -310,9 +309,8 @@ const ETAPAS_FLUJO = [
   'Aliados',
   'Plataforma',
   'Derivaciones',
-  'Por su cuenta',
-  'Paso a paso',
   'Activamente busca trabajo',
+  'Paso a paso',
   'Conexiones Laborales'
 ];
 
@@ -412,18 +410,6 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // -- 4. POR SU CUENTA ------------------------------------------------------
-  'Por su cuenta': {
-    color: '#4285f4',
-    columnas: [
-      ...COLUMNAS_COMUNES,
-      { nombre: 'Mensaje', ancho: 120, tipo: 'texto' },
-      { nombre: 'Llamada', ancho: 120, tipo: 'texto' },
-      { nombre: 'Nota',    ancho: 300, tipo: 'texto' },
-      { nombre: 'Activo',  ancho: 90,  tipo: 'siNo'  }
-    ]
-  },
-
   // -- 5. PASO A PASO --------------------------------------------------------
   'Paso a paso': {
     color: '#9e9e9e',
@@ -438,14 +424,18 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // -- 6. ACTIVAMENTE BUSCA TRABAJO ------------------------------------------
+  // -- 6. ACTIVAMENTE BUSCA TRABAJO (fusionado con "Por su cuenta") ----------
   'Activamente busca trabajo': {
     color: '#0f9d58',
     columnas: [
       ...COLUMNAS_COMUNES,
-      { nombre: 'Entrevista', ancho: 130, tipo: 'texto' },
-      { nombre: 'Trámites',   ancho: 200, tipo: 'texto' },
-      { nombre: 'Activo',     ancho: 90,  tipo: 'siNo'  }
+      { nombre: 'Tipo de búsqueda', ancho: 180, tipo: 'dropdown', opciones: ['Activamente busca trabajo', 'Por su cuenta'] },
+      { nombre: 'Mensaje',          ancho: 120, tipo: 'texto' },
+      { nombre: 'Llamada',          ancho: 120, tipo: 'texto' },
+      { nombre: 'Nota',             ancho: 300, tipo: 'texto' },
+      { nombre: 'Entrevista',       ancho: 130, tipo: 'texto' },
+      { nombre: 'Trámites',         ancho: 200, tipo: 'texto' },
+      { nombre: 'Activo',           ancho: 90,  tipo: 'siNo'  }
     ]
   },
 
@@ -664,7 +654,6 @@ function _ejecutarInstalacion(borrarExistentes) {
       'Aliados',
       'Plataforma',
       'Derivaciones',
-      'Por su cuenta',
       'Paso a paso',
       'Activamente busca trabajo',
       'Conexiones Laborales',
@@ -1719,7 +1708,6 @@ function obtenerNombreHojaClasificacion(clasificacion) {
     'Aliados':                    'Aliados',
     'Plataforma':                 'Plataforma',
     'Derivaciones':               'Derivaciones',
-    'Por su cuenta':              'Por su cuenta',
     'Paso a paso':                'Paso a paso',
     // legacy
     'No busca trabajo':           'Paso a paso',
@@ -1727,8 +1715,9 @@ function obtenerNombreHojaClasificacion(clasificacion) {
     'No busca trabajo - Fito':    'Paso a paso',
     'Activamente busca trabajo':  'Activamente busca trabajo',
     'Conexiones Laborales':       'Conexiones Laborales',
-    // legacy
-    'Por su Cuenta':              'Por su cuenta',
+    // legacy / fusionado
+    'Por su cuenta':              'Activamente busca trabajo',
+    'Por su Cuenta':              'Activamente busca trabajo',
     'Busca Trabajo':              'Derivaciones',
     'Empleado':                   'Activamente busca trabajo'
   };
@@ -1805,9 +1794,12 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
     case 'Por su cuenta':
     case 'Por su Cuenta':
       return filaBase.concat([
+        'Por su cuenta',              // Tipo de búsqueda
         datosAdicionales.mensaje || '',
         datosAdicionales.llamada || '',
         datosAdicionales.nota    || '',
+        '',                           // Entrevista
+        '',                           // Trámites
         datosAdicionales.activo  || 'Sí'
       ]);
 
@@ -1826,6 +1818,10 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
     case 'Activamente busca trabajo':
     case 'Empleado':
       return filaBase.concat([
+        'Activamente busca trabajo',  // Tipo de búsqueda
+        '',                           // Mensaje
+        '',                           // Llamada
+        '',                           // Nota
         datosAdicionales.entrevista || '',
         datosAdicionales.tramites   || '',
         datosAdicionales.activo     || 'Sí'
@@ -1884,7 +1880,7 @@ function enviarAConexionesLaborales() {
   // Hojas válidas para enviar a Conexiones Laborales
   const hojasValidas = [
     'Graduados', 'Aliados', 'Plataforma', 'Derivaciones',
-    'Por su cuenta', 'Paso a paso', 'Activamente busca trabajo'
+    'Paso a paso', 'Activamente busca trabajo'
   ];
 
   if (hojasValidas.indexOf(nombreHoja) === -1) {
@@ -2931,7 +2927,6 @@ function generarReporte() {
     const headerMes = ['Mes'];
     ETAPAS_FLUJO.forEach(e => {
       const corto = e === 'Activamente busca trabajo' ? 'Act. busca' :
-                    e === 'Por su cuenta' ? 'Por su cta.' :
                     e === 'Derivaciones' ? 'Deriv.' : e;
       headerMes.push(corto);
     });
