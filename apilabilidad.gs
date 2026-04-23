@@ -1270,9 +1270,25 @@ function configurarTriggerSincronizacion() {
 // SECCIÓN 2C: AUTO-IMPORT — solo registros nuevos, cada N minutos
 // ===========================================================================
 
+// Claves PropertiesService para recordar la última fecha importada por hoja
+var PROP_LAST_CLASIF  = 'LAST_SYNC_CLASIF';
+var PROP_LAST_SATISF  = 'LAST_SYNC_SATISF';
+var PROP_LAST_SESIONES = 'LAST_SYNC_SESIONES';
+
+function _leerUltimaFecha(clave) {
+  return PropertiesService.getScriptProperties().getProperty(clave) || '';
+}
+function _guardarUltimaFecha(clave, fechaISO) {
+  if (fechaISO) PropertiesService.getScriptProperties().setProperty(clave, fechaISO);
+}
+function _resetearUltimaFecha(clave) {
+  PropertiesService.getScriptProperties().deleteProperty(clave);
+}
+
 /**
  * Sincroniza Clasificación de Perfiles agregando SOLO filas nuevas (sin borrar).
- * Si la hoja está vacía delega en procesarClasificacionPerfiles (import completo).
+ * Usa la última fecha importada (PropertiesService) para ignorar registros viejos
+ * sin necesidad de leer toda la hoja en cada ejecución.
  */
 function _syncClasificacionSoloNuevos() {
   // Prevenir ejecuciones concurrentes que generan duplicados
@@ -1305,8 +1321,22 @@ function _syncClasificacionSoloNuevos() {
   if (!datos || datos.length === 0) return { nuevos: 0, actualizados: 0, total: 0 };
 
   var hoja = obtenerHoja('Clasificación de Perfiles');
-  // Sin headers → importación completa
-  if (hoja.getLastRow() <= 1) return procesarClasificacionPerfiles(datos);
+
+  // Leer la última fecha que ya importamos
+  var ultimaFechaImportada = _leerUltimaFecha(PROP_LAST_CLASIF);
+
+  // Sin headers → importación completa (ignorar filtro de fecha, importar todo)
+  if (hoja.getLastRow() <= 1) {
+    var resultado = procesarClasificacionPerfiles(datos);
+    // Guardar la fecha máxima de lo que se importó
+    var maxFecha = '';
+    datos.forEach(function(d) {
+      var f = (d['_submission_time'] || '').toString().trim();
+      if (f > maxFecha) maxFecha = f;
+    });
+    _guardarUltimaFecha(PROP_LAST_CLASIF, maxFecha);
+    return resultado;
+  }
 
   // Mapa inverso: nombre en hoja → clave KoboToolbox
   var M = 'MÓDULO DE OBSERVACIÓN - Evaluación de Perfil/';
@@ -1341,28 +1371,42 @@ function _syncClasificacionSoloNuevos() {
   });
 
   // Registros ya existentes: clave = "Creamos ID || submission_time"
+  // Solo se lee la hoja si no tenemos una fecha de referencia guardada
   var existentes = {};
-  var ultimaFila = hoja.getLastRow();
-  if (ultimaFila > 1) {
-    hoja.getRange(2, 1, ultimaFila - 1, 2).getValues().forEach(function(r) {
-      var id = (r[0] || '').toString().trim();
-      var f  = (r[1] || '').toString().trim();
-      if (id) existentes[id + '||' + f] = true;
-    });
+  if (!ultimaFechaImportada) {
+    var ultimaFila = hoja.getLastRow();
+    if (ultimaFila > 1) {
+      hoja.getRange(2, 1, ultimaFila - 1, 2).getValues().forEach(function(r) {
+        var id = (r[0] || '').toString().trim();
+        var f  = (r[1] || '').toString().trim();
+        if (id) existentes[id + '||' + f] = true;
+      });
+    }
   }
 
-  // Agregar solo registros nuevos
+  // Agregar solo registros nuevos (más nuevos que la última fecha importada)
   var nuevos = 0;
+  var maxFecha = ultimaFechaImportada;
   datos.forEach(function(dato) {
     var id    = (dato['Creamos ID del participante:'] || '').toString().trim();
     if (!id) return;
     var fecha = (dato['_submission_time'] || '').toString().trim();
-    var key   = id + '||' + fecha;
+
+    // Saltar registros que ya teníamos (filtro por fecha)
+    if (ultimaFechaImportada && fecha <= ultimaFechaImportada) return;
+
+    // Segunda comprobación: clave compuesta (seguridad extra)
+    var key = id + '||' + fecha;
     if (existentes[key]) return;
+
     hoja.appendRow(ordenKobo.map(function(k) { return dato[k] || ''; }));
     existentes[key] = true;
     nuevos++;
+    if (fecha > maxFecha) maxFecha = fecha;
   });
+
+  // Guardar la nueva fecha máxima importada
+  _guardarUltimaFecha(PROP_LAST_CLASIF, maxFecha);
 
   // Auto-limpieza silenciosa: elimina cualquier duplicado que haya quedado
   _limpiarDuplicadosSilencioso(hoja);
@@ -1459,6 +1503,8 @@ function _syncSatisfaccionSoloNuevos() {
 
     var hoja = obtenerHoja('Satisfacción Empleo');
 
+    var ultimaFechaSatisf = _leerUltimaFecha(PROP_LAST_SATISF);
+
     // --- Primera importación (hoja vacía) ----------------------------------
     if (hoja.getLastRow() <= 1) {
       var headers = ORDEN.map(function(k) { return NOMBRES[k]; });
@@ -1468,36 +1514,46 @@ function _syncSatisfaccionSoloNuevos() {
       hr.setBackground('#00897b').setFontColor('#ffffff').setFontWeight('bold').setFontSize(11);
       hoja.setFrozenRows(1);
       var nuevos = 0;
+      var maxF = '';
       datos.forEach(function(d) {
         var id = (d[CAMPO_ID] || '').toString().trim();
         if (!id) return;
         hoja.appendRow(ORDEN.map(function(k) { return d[k] || ''; }));
         nuevos++;
+        var f = (d[CAMPO_FECHA] || '').toString().trim();
+        if (f > maxF) maxF = f;
       });
+      _guardarUltimaFecha(PROP_LAST_SATISF, maxF);
       return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
     }
 
-    // --- Importación incremental -------------------------------------------
+    // --- Importación incremental (solo registros más nuevos que la última fecha) ---
     var existentes = {};
-    var uf = hoja.getLastRow();
-    if (uf > 1) {
-      hoja.getRange(2, 1, uf - 1, 2).getValues().forEach(function(r) {
-        var id = (r[0] || '').toString().trim();
-        var f  = (r[1] || '').toString().trim();
-        if (id) existentes[id + '||' + f] = true;
-      });
+    if (!ultimaFechaSatisf) {
+      var uf = hoja.getLastRow();
+      if (uf > 1) {
+        hoja.getRange(2, 1, uf - 1, 2).getValues().forEach(function(r) {
+          var id = (r[0] || '').toString().trim();
+          var f  = (r[1] || '').toString().trim();
+          if (id) existentes[id + '||' + f] = true;
+        });
+      }
     }
     var nuevos = 0;
+    var maxFecha = ultimaFechaSatisf;
     datos.forEach(function(d) {
       var id    = (d[CAMPO_ID] || '').toString().trim();
       if (!id) return;
       var fecha = (d[CAMPO_FECHA] || '').toString().trim();
+      if (ultimaFechaSatisf && fecha <= ultimaFechaSatisf) return;
       var key   = id + '||' + fecha;
       if (existentes[key]) return;
       hoja.appendRow(ORDEN.map(function(k) { return d[k] || ''; }));
       existentes[key] = true;
       nuevos++;
+      if (fecha > maxFecha) maxFecha = fecha;
     });
+    _guardarUltimaFecha(PROP_LAST_SATISF, maxFecha);
     return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
   } finally {
     lock.releaseLock();
@@ -1575,6 +1631,8 @@ function _syncSesionesSoloNuevos() {
 
     var hoja = obtenerHoja('Sesiones Acompañamiento');
 
+    var ultimaFechaSesiones = _leerUltimaFecha(PROP_LAST_SESIONES);
+
     // --- Primera importación (hoja vacía) ----------------------------------
     if (hoja.getLastRow() <= 1) {
       var headers = ORDEN.map(function(k) { return NOMBRES[k]; });
@@ -1584,38 +1642,46 @@ function _syncSesionesSoloNuevos() {
       hr.setBackground('#5e35b1').setFontColor('#ffffff').setFontWeight('bold').setFontSize(11);
       hoja.setFrozenRows(1);
       var nuevos = 0;
+      var maxF = '';
       datos.forEach(function(d) {
         var id = (d[CAMPO_ID] || '').toString().trim();
         if (!id) return;
         hoja.appendRow(ORDEN.map(function(k) { return d[k] || ''; }));
         nuevos++;
+        var f = (d[CAMPO_FECHA] || '').toString().trim();
+        if (f > maxF) maxF = f;
       });
+      _guardarUltimaFecha(PROP_LAST_SESIONES, maxF);
       return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
     }
 
-    // --- Importación incremental (hoja ya tiene datos) ---------------------
-    // Siempre usamos ORDEN (whitelist), no lo que diga la hoja,
-    // para evitar incluir columnas basura de KoboToolbox.
+    // --- Importación incremental (solo registros más nuevos que la última fecha) ---
     var existentes = {};
-    var uf = hoja.getLastRow();
-    if (uf > 1) {
-      hoja.getRange(2, 1, uf - 1, 2).getValues().forEach(function(r) {
-        var id = (r[0] || '').toString().trim();
-        var f  = (r[1] || '').toString().trim();
-        if (id) existentes[id + '||' + f] = true;
-      });
+    if (!ultimaFechaSesiones) {
+      var uf = hoja.getLastRow();
+      if (uf > 1) {
+        hoja.getRange(2, 1, uf - 1, 2).getValues().forEach(function(r) {
+          var id = (r[0] || '').toString().trim();
+          var f  = (r[1] || '').toString().trim();
+          if (id) existentes[id + '||' + f] = true;
+        });
+      }
     }
     var nuevos = 0;
+    var maxFecha = ultimaFechaSesiones;
     datos.forEach(function(d) {
       var id    = (d[CAMPO_ID] || '').toString().trim();
       if (!id) return;
       var fecha = (d[CAMPO_FECHA] || '').toString().trim();
+      if (ultimaFechaSesiones && fecha <= ultimaFechaSesiones) return;
       var key   = id + '||' + fecha;
       if (existentes[key]) return;
       hoja.appendRow(ORDEN.map(function(k) { return d[k] || ''; }));
       existentes[key] = true;
       nuevos++;
+      if (fecha > maxFecha) maxFecha = fecha;
     });
+    _guardarUltimaFecha(PROP_LAST_SESIONES, maxFecha);
     return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
   } finally {
     lock.releaseLock();
@@ -1656,6 +1722,7 @@ function reimportarSesionesDesdeCero() {
   if (confirmar !== ui.Button.YES) return;
   var hoja = ss.getSheetByName('Sesiones Acompañamiento');
   if (hoja) { hoja.clearContents(); hoja.clearFormats(); }
+  _resetearUltimaFecha(PROP_LAST_SESIONES); // reiniciar marca de tiempo para reimportar todo
   ss.toast('Reimportando Sesiones Acompañamiento...', '🔄', -1);
   try {
     var res = _syncSesionesSoloNuevos();
