@@ -32,6 +32,9 @@ function onOpen(e) {
       .addSeparator()
       .addItem('🔍 Diagnosticar Clasificación de Perfiles', 'diagnosticarClasificacionPerfiles')
       .addSeparator()
+      .addItem('⏱ Activar auto-import (cada X min)', 'activarAutoImport')
+      .addItem('⏹ Desactivar auto-import', 'desactivarAutoImport')
+      .addSeparator()
       .addItem('🚀 Instalar Sistema (primera vez)', 'instalarSistema')
       .addItem('🔁 Reinstalar Sistema (borra todo)', 'reinstalarSistema')
       .addToUi();
@@ -1150,6 +1153,179 @@ function configurarTriggerSincronizacion() {
   });
   ScriptApp.newTrigger('sincronizacionAutomatica').timeBased().everyHours(1).create();
   Logger.log('Sincronización automática configurada para ejecutarse cada hora');
+}
+
+// ===========================================================================
+// SECCIÓN 2C: AUTO-IMPORT — solo registros nuevos, cada N minutos
+// ===========================================================================
+
+/**
+ * Sincroniza Clasificación de Perfiles agregando SOLO filas nuevas (sin borrar).
+ * Si la hoja está vacía delega en procesarClasificacionPerfiles (import completo).
+ */
+function _syncClasificacionSoloNuevos() {
+  var opciones = {
+    method: 'get',
+    headers: { 'Authorization': 'Token ' + KOBO_TOKEN, 'Accept': 'text/csv' },
+    muteHttpExceptions: true
+  };
+  var contenido;
+  var urls = [URL_CLASIFICACION_PERFILES, URL_CLASIFICACION_FALLBACK];
+  for (var u = 0; u < urls.length; u++) {
+    var resp = UrlFetchApp.fetch(urls[u], opciones);
+    if (resp.getResponseCode() !== 200) continue;
+    var body = resp.getContentText();
+    var c0 = body.trim().charAt(0);
+    if (c0 === '{' || c0 === '[') continue;
+    contenido = body;
+    break;
+  }
+  if (!contenido) throw new Error('No se pudo obtener CSV de KoboToolbox.');
+
+  var datos = parsearCSV(contenido);
+  if (!datos || datos.length === 0) return { nuevos: 0, actualizados: 0, total: 0 };
+
+  var hoja = obtenerHoja('Clasificación de Perfiles');
+  // Sin headers → importación completa
+  if (hoja.getLastRow() <= 1) return procesarClasificacionPerfiles(datos);
+
+  // Mapa inverso: nombre en hoja → clave KoboToolbox
+  var M = 'MÓDULO DE OBSERVACIÓN - Evaluación de Perfil/';
+  var INVERSO = {
+    'Creamos ID':           'Creamos ID del participante:',
+    'Fecha evaluación':     '_submission_time',
+    'D1: Cuidado':          M+'DIMENSIÓN 1: Barreras de cuidado Basado en la conversación sobre responsabilidades en casa:',
+    'D1 Comentario':        M+'Agrega comentario sobre DIEMENSIÓN 1',
+    'D2: Violencia':        M+'DIMENSIÓN 2: Barreras de violencia/control Basado en las respuestas sobre trabajo en horarios variados / grupos mixtos / apoyo en casa:',
+    'D2 Comentario':        M+'Agrega comentario sobre DIMENSIÓN 2',
+    'D3: Movilidad':        M+'DIMENSIÓN 3: Barreras de movilidad/seguridad Basado en las respuestas sobre transporte y movilidad en la ciudad:',
+    'D3 Comentario':        M+'Agrega comentario sobre DIMENSIÓN 3',
+    'D4: Legal/Salud':      M+'DIMENSIÓN 4: Barreras legales/salud Basado en respuestas sobre antecedentes penales, casos legales, salud:',
+    'D4 Comentario':        M+'Agrega comentario sobre DIMENSIÓN 4',
+    'D5: Motivación':       M+'DIMENSIÓN 5: Motivación real / Prioridades Basado en las respuestas sobre qué quiere hacer en los próximos meses y qué tan importante es conseguir empleo:',
+    'D5 Comentario':        M+'Agrega comentario sobre DIMENSIÓN 5',
+    'D6: Experiencia':      M+'DIMENSIÓN 6: Experiencia previa en búsqueda de empleo Basado en si ha trabajado antes / buscado empleo / sabe qué hacer:',
+    'D6 Comentario':        M+'Agrega comentario sobre DIMENSIÓN 6',
+    'D7: Autonomía':        M+'DIMENSIÓN 7: Autonomía / Autoeficacia percibida Basado en el tono general, lenguaje corporal, y respuestas sobre planes y capacidad:',
+    'D7 Comentario':        M+'Agrega comentario sobre DIMENSIÓN 7',
+    'Puntaje Total':        M+'puntaje_total',
+    'Barreras activas':     M+'tiene_barreras_activas',
+    'Desmotivación':        M+'tiene_desmotivacion',
+    'Perfil Asignado':      M+'perfil_asignado',
+    'Notas de observación': M+'Notas de observación (opcional): Frases textuales, lenguaje corporal, o contexto adicional que influyó en tu evaluación:'
+  };
+
+  // Traducir headers de la hoja → claves KoboToolbox para leer cada fila
+  var numCols  = hoja.getLastColumn();
+  var ordenKobo = hoja.getRange(1, 1, 1, numCols).getValues()[0].map(function(h) {
+    return INVERSO[h] || h;
+  });
+
+  // Registros ya existentes: clave = "Creamos ID || submission_time"
+  var existentes = {};
+  var ultimaFila = hoja.getLastRow();
+  if (ultimaFila > 1) {
+    hoja.getRange(2, 1, ultimaFila - 1, 2).getValues().forEach(function(r) {
+      var id = (r[0] || '').toString().trim();
+      var f  = (r[1] || '').toString().trim();
+      if (id) existentes[id + '||' + f] = true;
+    });
+  }
+
+  // Agregar solo registros nuevos
+  var nuevos = 0;
+  datos.forEach(function(dato) {
+    var id    = (dato['Creamos ID del participante:'] || '').toString().trim();
+    if (!id) return;
+    var fecha = (dato['_submission_time'] || '').toString().trim();
+    var key   = id + '||' + fecha;
+    if (existentes[key]) return;
+    hoja.appendRow(ordenKobo.map(function(k) { return dato[k] || ''; }));
+    existentes[key] = true;
+    nuevos++;
+  });
+
+  return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
+}
+
+/**
+ * Función llamada por el trigger de tiempo. Sin alertas — solo toast y Logger.
+ */
+function autoImportarNuevos() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var msgs = [];
+  try {
+    ss.toast('Revisando nuevos registros en KoboToolbox...', '🔄 Auto-import', 5);
+
+    try {
+      var datos = obtenerDatosKoboToolbox();
+      var resG  = procesarDatosGraduados(datos);
+      if (resG.nuevos > 0) msgs.push('Graduados: +' + resG.nuevos);
+    } catch(e) { Logger.log('Auto-import Graduados omitido: ' + e.message); }
+
+    try {
+      var resC = _syncClasificacionSoloNuevos();
+      if (resC.nuevos > 0) msgs.push('Clasificación: +' + resC.nuevos);
+    } catch(e) { Logger.log('Auto-import Clasificación omitido: ' + e.message); }
+
+    if (msgs.length > 0) {
+      ss.toast(msgs.join(' | '), '✅ Nuevos registros importados', 10);
+    }
+    Logger.log('Auto-import: ' + (msgs.join(' | ') || 'sin cambios'));
+  } catch(e) {
+    Logger.log('Error en auto-import: ' + e.message);
+  }
+}
+
+/**
+ * Activa el trigger automático. Le pregunta al usuario el intervalo en minutos.
+ */
+function activarAutoImport() {
+  var ui  = SpreadsheetApp.getUi();
+  var res = ui.prompt(
+    '⏱ Activar Auto-import',
+    'Cada cuántos minutos revisar si hay nuevos registros?\n(mínimo 1 — recomendado: 5)',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (res.getSelectedButton() !== ui.Button.OK) return;
+  var mins = parseInt(res.getResponseText()) || 5;
+  if (mins < 1) mins = 1;
+
+  // Eliminar triggers previos del mismo handler
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'autoImportarNuevos') ScriptApp.deleteTrigger(t);
+  });
+
+  ScriptApp.newTrigger('autoImportarNuevos').timeBased().everyMinutes(mins).create();
+  PropertiesService.getScriptProperties().setProperty('AUTO_IMPORT_MINS', mins.toString());
+
+  ui.alert(
+    '✅ Auto-import activado',
+    'Cada ' + mins + ' minutos se revisará si hay nuevos registros en KoboToolbox.\n\n' +
+    '• Solo agrega filas nuevas — no borra ni modifica las existentes.\n' +
+    '• Para detenerlo: menú → ⏹ Desactivar auto-import.',
+    ui.ButtonSet.OK
+  );
+}
+
+/**
+ * Desactiva el trigger automático de auto-import.
+ */
+function desactivarAutoImport() {
+  var ui = SpreadsheetApp.getUi();
+  var encontrado = false;
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'autoImportarNuevos') {
+      ScriptApp.deleteTrigger(t);
+      encontrado = true;
+    }
+  });
+  PropertiesService.getScriptProperties().deleteProperty('AUTO_IMPORT_MINS');
+  ui.alert(
+    encontrado ? '⏹ Auto-import desactivado' : 'ℹ Auto-import',
+    encontrado ? 'Ya no se importarán datos automáticamente.' : 'El auto-import no estaba activado.',
+    ui.ButtonSet.OK
+  );
 }
 
 // ===========================================================================
