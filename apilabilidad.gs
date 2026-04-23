@@ -254,10 +254,11 @@ function mostrarConfiguracion() {
 const KOBO_TOKEN = '64cc018b88067397addd36b09288be8b6539cf39';
 
 // URLs de exportación de KoboToolbox
-const URL_GRADUADOS             = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/export-settings/esQRaR2qPsjyboQtpNEiFy3/data.csv';
+// TODO: Agregar URL de Graduados cuando esté disponible
+const URL_GRADUADOS              = ''; // pendiente — pegar URL cuando la tengas
+const URL_GRADUADOS_FALLBACK     = '';
 const URL_CLASIFICACION_PERFILES = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/export-settings/esQRaR2qPsjyboQtpNEiFy3/data.csv';
 const URL_CLASIFICACION_FALLBACK = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/data/?format=csv';
-const URL_GRADUADOS_FALLBACK     = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/data/?format=csv';
 
 // -----------------------------------------------------------------------------
 // CONSTANTES DE OPCIONES DE DROPDOWN
@@ -853,26 +854,23 @@ function obtenerGraduadosSinClasificar() {
  * @return {Array}
  */
 function obtenerDatosKoboToolbox() {
+  if (!URL_GRADUADOS) {
+    throw new Error('URL de Graduados aún no configurada. Pedila al administrador del formulario KoboToolbox.');
+  }
   var opciones = {
     method: 'get',
     headers: { 'Authorization': 'Token ' + KOBO_TOKEN, 'Accept': 'text/csv' },
     muteHttpExceptions: true
   };
-  var urls = [URL_GRADUADOS, URL_GRADUADOS_FALLBACK];
+  var urls = [URL_GRADUADOS, URL_GRADUADOS_FALLBACK].filter(function(u) { return !!u; });
   var contenido;
   var respuesta;
   for (var u = 0; u < urls.length; u++) {
-    Logger.log('Graduados URL ' + (u+1) + ': ' + urls[u]);
     respuesta = UrlFetchApp.fetch(urls[u], opciones);
     var codigo = respuesta.getResponseCode();
-    Logger.log('HTTP ' + codigo);
-    if (codigo !== 200) {
-      Logger.log(respuesta.getContentText().substring(0, 300));
-      continue;
-    }
+    if (codigo !== 200) { continue; }
     contenido = respuesta.getContentText();
     if (contenido.trim().charAt(0) === '{' || contenido.trim().charAt(0) === '[') {
-      Logger.log('Respuesta JSON en URL ' + (u+1) + ', intentando siguiente...');
       contenido = null;
       continue;
     }
@@ -881,9 +879,7 @@ function obtenerDatosKoboToolbox() {
   if (!contenido) {
     throw new Error('No se pudo obtener CSV de Graduados. HTTP: ' + (respuesta ? respuesta.getResponseCode() : 0));
   }
-  var datos = parsearCSV(contenido);
-  Logger.log('Graduados parseados: ' + datos.length);
-  return datos;
+  return parsearCSV(contenido);
 }
 
 /**
