@@ -25,6 +25,7 @@ function onOpen(e) {
     ui.createMenu('📊 Seguimiento Graduados')
       .addItem('🔄 Importar Graduados', 'importarDatosKobo')
       .addItem('📋 Importar Clasificación de Perfiles', 'importarClasificacionPerfiles')
+      .addItem('🧹 Limpiar duplicados (Clasificación)', 'limpiarDuplicadosClasificacion')
       .addSeparator()
       .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
       .addItem('📊 Generar Reporte', 'generarReporte')
@@ -1332,6 +1333,73 @@ function desactivarAutoImport() {
 // ===========================================================================
 // SECCIÓN 2B: IMPORTACIÓN DE CLASIFICACIÓN DE PERFILES
 // ===========================================================================
+
+/**
+ * Elimina filas duplicadas de "Clasificación de Perfiles".
+ * Clave de unicidad: Creamos ID (col 1) + Fecha evaluación (col 2).
+ * Conserva la primera aparición de cada registro y elimina las repetidas.
+ */
+function limpiarDuplicadosClasificacion() {
+  var ui   = SpreadsheetApp.getUi();
+  var hoja = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Clasificación de Perfiles');
+  if (!hoja) {
+    ui.alert('❌ Error', 'No se encontró la hoja "Clasificación de Perfiles".', ui.ButtonSet.OK);
+    return;
+  }
+
+  var ultimaFila = hoja.getLastRow();
+  if (ultimaFila <= 1) {
+    ui.alert('ℹ Sin datos', 'La hoja no tiene registros para limpiar.', ui.ButtonSet.OK);
+    return;
+  }
+
+  var datos   = hoja.getRange(1, 1, ultimaFila, hoja.getLastColumn()).getValues();
+  var headers = datos[0];
+  var filas   = datos.slice(1);
+
+  var vistos    = {};
+  var limpias   = [];
+  var eliminadas = 0;
+
+  filas.forEach(function(fila) {
+    var id    = (fila[0] || '').toString().trim();
+    var fecha = (fila[1] || '').toString().trim();
+    if (!id) return; // omite filas sin ID
+    var clave = id + '||' + fecha;
+    if (vistos[clave]) {
+      eliminadas++;
+    } else {
+      vistos[clave] = true;
+      limpias.push(fila);
+    }
+  });
+
+  if (eliminadas === 0) {
+    ui.alert('✅ Sin duplicados', 'No se encontraron registros duplicados.', ui.ButtonSet.OK);
+    return;
+  }
+
+  var confirmar = ui.alert(
+    '🗑 Eliminar duplicados',
+    'Se encontraron ' + eliminadas + ' fila(s) duplicada(s).\n' +
+    'Quedarán ' + limpias.length + ' registros únicos.\n\n¿Continuar?',
+    ui.ButtonSet.YES_NO
+  );
+  if (confirmar !== ui.Button.YES) return;
+
+  // Reescribir hoja con datos limpios
+  hoja.clearContents();
+  hoja.getRange(1, 1, 1, headers.length).setValues([headers]);
+  if (limpias.length > 0) {
+    hoja.getRange(2, 1, limpias.length, headers.length).setValues(limpias);
+  }
+
+  ui.alert(
+    '✅ Limpieza completada',
+    'Se eliminaron ' + eliminadas + ' duplicado(s).\nRegistros únicos: ' + limpias.length,
+    ui.ButtonSet.OK
+  );
+}
 
 /**
  * Importa datos de Clasificación de Perfiles desde KoboToolbox
