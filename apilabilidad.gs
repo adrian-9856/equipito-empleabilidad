@@ -23,16 +23,12 @@ function onOpen(e) {
   try {
     const ui = SpreadsheetApp.getUi();
     ui.createMenu('📊 Seguimiento Graduados')
-      .addItem('🔄 Importar Graduados (KoboToolbox)', 'importarDatosKobo')
+      .addItem('🔄 Importar Graduados', 'importarDatosKobo')
       .addItem('📋 Importar Clasificación de Perfiles', 'importarClasificacionPerfiles')
-      .addItem('🔄 Sincronizar Todo (Graduados + Perfiles)', 'sincronizarTodoManual')
       .addSeparator()
       .addItem('📝 Clasificar Graduados', 'mostrarFormularioClasificacion')
       .addItem('📊 Generar Reporte', 'generarReporte')
       .addItem('📞 Ver Seguimientos Pendientes', 'mostrarSeguimientosPendientes')
-      .addSeparator()
-      .addItem('⚙️ Configurar Credenciales', 'mostrarConfiguracion')
-      .addItem('⏱️ Activar sincronización automática', 'configurarTriggerSincronizacion')
       .addSeparator()
       .addItem('🚀 Instalar Sistema (primera vez)', 'instalarSistema')
       .addItem('🔁 Reinstalar Sistema (borra todo)', 'reinstalarSistema')
@@ -238,22 +234,30 @@ function mostrarSeguimientosPendientes() {
 }
 
 /**
- * Muestra la configuración del proyecto
+ * Muestra la configuración del proyecto (ya no se necesita, todo está en el código)
  */
 function mostrarConfiguracion() {
-  const html = HtmlService.createHtmlOutputFromFile('ConfiguracionKobo')
-    .setWidth(500)
-    .setHeight(400)
-    .setTitle('Configuración de KoboToolbox');
-  SpreadsheetApp.getUi().showModalDialog(html, 'Configuración');
+  SpreadsheetApp.getUi().alert('⚙️ Configuración',
+    'Las credenciales ya están configuradas en el código.\n\n' +
+    'Token: ****' + KOBO_TOKEN.slice(-6) + '\n' +
+    'URL Clasificación: configurada',
+    SpreadsheetApp.getUi().ButtonSet.OK);
 }
+
+// -----------------------------------------------------------------------------
+// CONFIGURACIÓN DE KOBOTOOLBOX
+// -----------------------------------------------------------------------------
+
+const KOBO_TOKEN = '64cc018b88067397addd36b09288be8b6539cf39';
+
+// URLs de exportación de KoboToolbox
+// Clasificación de Perfiles — se prueba primero export-settings, luego data.csv directo
+const URL_CLASIFICACION_PERFILES = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/export-settings/esQRaR2qPsjyboQtpNEiFy3/data.csv';
+const URL_CLASIFICACION_FALLBACK = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/data.csv';
 
 // -----------------------------------------------------------------------------
 // CONSTANTES DE OPCIONES DE DROPDOWN
 // -----------------------------------------------------------------------------
-
-// URL de exportación de Clasificación de Perfiles (KoboToolbox)
-const URL_CLASIFICACION_PERFILES = 'https://kf.kobotoolbox.org/api/v2/assets/aSH2JhYXLqn4o66z8L3RmK/export-settings/esQRaR2qPsjyboQtpNEiFy3/data.csv';
 
 // Géneros — opciones del dropdown Género en todas las hojas
 const GENEROS = [
@@ -833,6 +837,9 @@ function _crearHojaConfiguracion(ss) {
   hoja.setColumnWidth(1, 200);
   hoja.setColumnWidth(2, 350);
   hoja.setColumnWidth(3, 400);
+
+  // Ocultar la hoja — la configuración está en el código
+  hoja.hideSheet();
 }
 
 /**
@@ -893,9 +900,7 @@ function obtenerDatosKoboToolbox() {
       headers: {},
       muteHttpExceptions: true
     };
-    if (config.koboToken) {
-      opciones.headers['Authorization'] = 'Token ' + config.koboToken;
-    }
+    opciones.headers['Authorization'] = 'Token ' + KOBO_TOKEN;
     Logger.log('Obteniendo datos de KoboToolbox...');
     const respuesta = UrlFetchApp.fetch(config.koboExportUrl, opciones);
     const codigo    = respuesta.getResponseCode();
@@ -1062,18 +1067,18 @@ function sincronizacionAutomatica() {
  * Sincroniza solo Clasificación de Perfiles (usado por sync automática y manual)
  */
 function _syncClasificacionPerfiles() {
-  var config = obtenerConfiguracion();
-  var url    = config.koboClasificacionUrl || URL_CLASIFICACION_PERFILES;
-  if (!url) throw new Error('Sin URL de clasificación');
+  var opciones = { method: 'get', headers: { 'Authorization': 'Token ' + KOBO_TOKEN }, muteHttpExceptions: true };
 
-  var opciones = { method: 'get', headers: {}, muteHttpExceptions: true };
-  if (config.koboToken) {
-    opciones.headers['Authorization'] = 'Token ' + config.koboToken;
+  // Intentar URL principal, si falla intentar fallback
+  var urls = [URL_CLASIFICACION_PERFILES, URL_CLASIFICACION_FALLBACK];
+  var respuesta;
+  for (var u = 0; u < urls.length; u++) {
+    respuesta = UrlFetchApp.fetch(urls[u], opciones);
+    if (respuesta.getResponseCode() === 200) break;
+    Logger.log('URL ' + (u+1) + ' falló con HTTP ' + respuesta.getResponseCode());
   }
-
-  var respuesta = UrlFetchApp.fetch(url, opciones);
   if (respuesta.getResponseCode() !== 200) {
-    throw new Error('HTTP ' + respuesta.getResponseCode());
+    throw new Error('HTTP ' + respuesta.getResponseCode() + ' en todas las URLs');
   }
 
   var datos = parsearCSV(respuesta.getContentText());
@@ -1103,40 +1108,14 @@ function configurarTriggerSincronizacion() {
  */
 function importarClasificacionPerfiles() {
   try {
-    const ui     = SpreadsheetApp.getUi();
-    const config = obtenerConfiguracion();
-
-    // Usar URL de config o la constante pre-configurada
-    const url = config.koboClasificacionUrl || URL_CLASIFICACION_PERFILES;
-    if (!url) {
-      ui.alert('⚠️ URL no configurada',
-        'No se encontró la URL de exportación de Clasificación de Perfiles.',
-        ui.ButtonSet.OK);
-      return;
-    }
+    const ui = SpreadsheetApp.getUi();
 
     SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Descargando datos de KoboToolbox...', '🔄 Importando', -1
+      'Descargando Clasificación de Perfiles...', '🔄 Importando', -1
     );
 
-    // Obtener CSV
-    const opciones = { method: 'get', headers: {}, muteHttpExceptions: true };
-    if (config.koboToken) {
-      opciones.headers['Authorization'] = 'Token ' + config.koboToken;
-    }
-    const respuesta = UrlFetchApp.fetch(url, opciones);
-    if (respuesta.getResponseCode() !== 200) {
-      throw new Error('Error HTTP ' + respuesta.getResponseCode() + ': ' + respuesta.getContentText().substring(0, 200));
-    }
-
-    const datos = parsearCSV(respuesta.getContentText());
-    if (!datos || datos.length === 0) {
-      SpreadsheetApp.getActiveSpreadsheet().toast('', '', 1);
-      ui.alert('⚠️ Sin Datos', 'No se encontraron datos nuevos para importar.', ui.ButtonSet.OK);
-      return;
-    }
-
-    const resultado = procesarClasificacionPerfiles(datos);
+    // Usar _syncClasificacionPerfiles que ya maneja URLs y fallback
+    const resultado = _syncClasificacionPerfiles();
     SpreadsheetApp.getActiveSpreadsheet().toast('', '', 1);
     ui.alert('✅ Importación Completada',
       'Clasificaciones nuevas: ' + resultado.nuevos + '\n' +
@@ -1145,6 +1124,7 @@ function importarClasificacionPerfiles() {
       ui.ButtonSet.OK);
 
   } catch (error) {
+    SpreadsheetApp.getActiveSpreadsheet().toast('', '', 1);
     SpreadsheetApp.getUi().alert('❌ Error',
       'Error al importar clasificaciones: ' + error.message,
       SpreadsheetApp.getUi().ButtonSet.OK);
@@ -2237,7 +2217,7 @@ function enviarNotificacionesDiarias() {
  */
 function verificarConfiguracion() {
   const config = obtenerConfiguracion();
-  return !!(config.koboExportUrl && config.koboToken);
+  return !!(config.koboExportUrl && KOBO_TOKEN);
 }
 
 /**
@@ -2333,12 +2313,12 @@ function desactivarSincronizacionAutomatica() {
 function probarConexionKobo() {
   try {
     const config = obtenerConfiguracion();
-    if (!config.koboExportUrl || !config.koboToken) {
-      return { exito: false, mensaje: 'Configuración incompleta.' };
+    if (!config.koboExportUrl) {
+      return { exito: false, mensaje: 'URL de exportación no configurada.' };
     }
     const respuesta = UrlFetchApp.fetch(config.koboExportUrl, {
       method: 'get',
-      headers: { 'Authorization': 'Token ' + config.koboToken },
+      headers: { 'Authorization': 'Token ' + KOBO_TOKEN },
       muteHttpExceptions: true
     });
     const codigo = respuesta.getResponseCode();
