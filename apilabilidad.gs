@@ -518,10 +518,31 @@ const ESTRUCTURA_HOJAS = {
 
   // -- CLASIFICACIÓN DE PERFILES -----------------------------------------------
   // Importada desde KoboToolbox: IL_09_Módulo de Clasificación de Perfiles
-  // Clasificación de Perfiles: columnas definidas dinámicamente al importar desde KoboToolbox
   'Clasificación de Perfiles': {
     color: '#5c6bc0',
-    columnas: []
+    columnas: [
+      { nombre: 'Creamos ID',          ancho: 130, tipo: 'texto' },
+      { nombre: 'Fecha evaluación',    ancho: 130, tipo: 'fecha' },
+      { nombre: 'D1: Cuidado',         ancho: 280, tipo: 'texto' },
+      { nombre: 'D1 Comentario',       ancho: 300, tipo: 'texto' },
+      { nombre: 'D2: Violencia',       ancho: 280, tipo: 'texto' },
+      { nombre: 'D2 Comentario',       ancho: 300, tipo: 'texto' },
+      { nombre: 'D3: Movilidad',       ancho: 280, tipo: 'texto' },
+      { nombre: 'D3 Comentario',       ancho: 300, tipo: 'texto' },
+      { nombre: 'D4: Legal/Salud',     ancho: 280, tipo: 'texto' },
+      { nombre: 'D4 Comentario',       ancho: 300, tipo: 'texto' },
+      { nombre: 'D5: Motivación',      ancho: 280, tipo: 'texto' },
+      { nombre: 'D5 Comentario',       ancho: 300, tipo: 'texto' },
+      { nombre: 'D6: Experiencia',     ancho: 280, tipo: 'texto' },
+      { nombre: 'D6 Comentario',       ancho: 300, tipo: 'texto' },
+      { nombre: 'D7: Autonomía',       ancho: 280, tipo: 'texto' },
+      { nombre: 'D7 Comentario',       ancho: 300, tipo: 'texto' },
+      { nombre: 'Puntaje Total',       ancho: 110, tipo: 'texto' },
+      { nombre: 'Barreras activas',    ancho: 130, tipo: 'texto' },
+      { nombre: 'Desmotivación',       ancho: 130, tipo: 'texto' },
+      { nombre: 'Perfil Asignado',     ancho: 300, tipo: 'dropdown', opciones: PERFILES_CLASIFICACION },
+      { nombre: 'Notas de observación', ancho: 380, tipo: 'texto' }
+    ]
   },
 
   // -- REPORTE ---------------------------------------------------------------
@@ -1253,8 +1274,34 @@ function procesarClasificacionPerfiles(datos) {
     return false;
   };
 
+  // ── Mapeo: nombre KoboToolbox → nombre corto legible ──
+  var M = 'MÓDULO DE OBSERVACIÓN - Evaluación de Perfil/';
+  var NOMBRES = {
+    'Creamos ID del participante:': 'Creamos ID',
+    '_submission_time': 'Fecha evaluación',
+    [M+'DIMENSIÓN 1: Barreras de cuidado Basado en la conversación sobre responsabilidades en casa:']: 'D1: Cuidado',
+    [M+'Agrega comentario sobre DIEMENSIÓN 1']: 'D1 Comentario',
+    [M+'DIMENSIÓN 2: Barreras de violencia/control Basado en las respuestas sobre trabajo en horarios variados / grupos mixtos / apoyo en casa:']: 'D2: Violencia',
+    [M+'Agrega comentario sobre DIMENSIÓN 2']: 'D2 Comentario',
+    [M+'DIMENSIÓN 3: Barreras de movilidad/seguridad Basado en las respuestas sobre transporte y movilidad en la ciudad:']: 'D3: Movilidad',
+    [M+'Agrega comentario sobre DIMENSIÓN 3']: 'D3 Comentario',
+    [M+'DIMENSIÓN 4: Barreras legales/salud Basado en respuestas sobre antecedentes penales, casos legales, salud:']: 'D4: Legal/Salud',
+    [M+'Agrega comentario sobre DIMENSIÓN 4']: 'D4 Comentario',
+    [M+'DIMENSIÓN 5: Motivación real / Prioridades Basado en las respuestas sobre qué quiere hacer en los próximos meses y qué tan importante es conseguir empleo:']: 'D5: Motivación',
+    [M+'Agrega comentario sobre DIMENSIÓN 5']: 'D5 Comentario',
+    [M+'DIMENSIÓN 6: Experiencia previa en búsqueda de empleo Basado en si ha trabajado antes / buscado empleo / sabe qué hacer:']: 'D6: Experiencia',
+    [M+'Agrega comentario sobre DIMENSIÓN 6']: 'D6 Comentario',
+    [M+'DIMENSIÓN 7: Autonomía / Autoeficacia percibida Basado en el tono general, lenguaje corporal, y respuestas sobre planes y capacidad:']: 'D7: Autonomía',
+    [M+'Agrega comentario sobre DIMENSIÓN 7']: 'D7 Comentario',
+    [M+'puntaje_total']: 'Puntaje Total',
+    [M+'tiene_barreras_activas']: 'Barreras activas',
+    [M+'tiene_desmotivacion']: 'Desmotivación',
+    [M+'perfil_asignado']: 'Perfil Asignado',
+    [M+'Notas de observación (opcional): Frases textuales, lenguaje corporal, o contexto adicional que influyó en tu evaluación:']: 'Notas de observación'
+  };
+
   // Obtener columnas del CSV y filtrar
-  var todasColumnas   = Object.keys(datos[0]);
+  var todasColumnas     = Object.keys(datos[0]);
   var columnasFiltradas = todasColumnas.filter(function(c) { return !_excluir(c); });
 
   // Poner Creamos ID primero y _submission_time segundo
@@ -1263,17 +1310,20 @@ function procesarClasificacionPerfiles(datos) {
   var resto    = columnasFiltradas.filter(function(c) { return c !== colId && c !== colFecha; });
   var orden    = [colId, colFecha].filter(function(c) { return columnasFiltradas.indexOf(c) !== -1; }).concat(resto);
 
+  // Nombres para los headers (cortos si existe mapeo, original si no)
+  var headersLimpios = orden.map(function(col) { return NOMBRES[col] || col; });
+
   // ── Limpiar hoja y escribir headers con el mismo estilo ──
   hoja.clearContents();
   hoja.clearFormats();
   var headerRange = hoja.getRange(1, 1, 1, orden.length);
-  headerRange.setValues([orden]);
+  headerRange.setValues([headersLimpios]);
   headerRange.setBackground('#5c6bc0')
              .setFontColor('#ffffff')
              .setFontWeight('bold')
-             .setFontSize(10)
-             .setWrap(true);
-  hoja.setRowHeight(1, 60);
+             .setFontSize(11)
+             .setWrap(false);
+  hoja.setRowHeight(1, 36);
   hoja.setFrozenRows(1);
 
   // ── Escribir filas de datos ──
