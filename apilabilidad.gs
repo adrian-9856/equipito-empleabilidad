@@ -31,7 +31,10 @@ function onOpen(e) {
       .addSeparator()
       .addItem('♻️ Reimportar Sesiones desde cero',      'reimportarSesionesDesdeCero')
       .addItem('🧹 Limpiar duplicados (Clasificación)',  'limpiarDuplicadosClasificacion')
-      .addItem('🔍 Diagnosticar Clasificación de Perfiles', 'diagnosticarClasificacionPerfiles');
+      .addItem('🔍 Diagnosticar Clasificación de Perfiles', 'diagnosticarClasificacionPerfiles')
+      .addSeparator()
+      .addItem('🔧 Limpiar triggers duplicados',          'limpiarTriggersDuplicados')
+      .addItem('⏹ Desactivar sincronización horaria',    'desactivarSincronizacionAutomatica');
 
     ui.createMenu('📊 Seguimiento Graduados')
       .addItem('📥 Importar todos los datos',       'importarTodosLosDatos')
@@ -548,7 +551,6 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Creamos ID',          ancho: 130, tipo: 'texto' },
       { nombre: 'Fecha envío',         ancho: 170, tipo: 'texto' },
       { nombre: 'Inicio sesión',       ancho: 160, tipo: 'texto' },
-      { nombre: 'Tipo acompañamiento', ancho: 190, tipo: 'texto' },
       { nombre: 'Proyecto',            ancho: 150, tipo: 'texto' },
       { nombre: 'Nombre',              ancho: 130, tipo: 'texto' },
       { nombre: 'Apellidos',           ancho: 130, tipo: 'texto' },
@@ -1362,10 +1364,44 @@ function _syncClasificacionSoloNuevos() {
     nuevos++;
   });
 
+  // Auto-limpieza silenciosa: elimina cualquier duplicado que haya quedado
+  _limpiarDuplicadosSilencioso(hoja);
+
   return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
 
   } finally {
     lock.releaseLock();
+  }
+}
+
+/**
+ * Elimina filas duplicadas de una hoja sin mostrar alertas al usuario.
+ * Clave: columna 1 (Creamos ID) + columna 2 (Fecha envío).
+ * Llamada automáticamente al final de cada sync de Clasificación de Perfiles.
+ */
+function _limpiarDuplicadosSilencioso(hoja) {
+  try {
+    var uf = hoja.getLastRow();
+    if (uf <= 2) return;
+    var todos   = hoja.getRange(2, 1, uf - 1, hoja.getLastColumn()).getValues();
+    var vistos  = {};
+    var limpias = [];
+    todos.forEach(function(fila) {
+      var id    = (fila[0] || '').toString().trim();
+      var fecha = (fila[1] || '').toString().trim();
+      var clave = id ? id + '||' + fecha : (fecha ? 'SIN_ID||' + fecha : null);
+      if (!clave) return;
+      if (!vistos[clave]) { vistos[clave] = true; limpias.push(fila); }
+    });
+    if (limpias.length === todos.length) return;
+    hoja.getRange(2, 1, uf - 1, hoja.getLastColumn()).clearContent();
+    if (limpias.length > 0) {
+      hoja.getRange(2, 1, limpias.length, hoja.getLastColumn()).setValues(limpias);
+    }
+    Logger.log('Auto-limpieza: eliminados ' + (todos.length - limpias.length) +
+               ' duplicados en "' + hoja.getName() + '"');
+  } catch (e) {
+    Logger.log('_limpiarDuplicadosSilencioso error: ' + e.message);
   }
 }
 
@@ -1415,22 +1451,17 @@ function _syncSatisfaccionSoloNuevos() {
       'aapi_puntaje':            'Puntaje AAPI',
       'grado_satisfaccion':      'Satisfacción'
     };
-    var EXCLUIR = ['_id','_uuid','_validation_status','_notes','_status',
-                   '_submitted_by','_tags','_index','__version__','meta/rootUuid','today'];
+    // Lista blanca: SOLO las columnas de NOMBRES, en ese orden exacto.
+    // Cualquier columna extra de KoboToolbox (P7, P8, P9...) se ignora.
+    var ORDEN       = Object.keys(NOMBRES);
     var CAMPO_ID    = 'Creamos_ID';
     var CAMPO_FECHA = '_submission_time';
 
     var hoja = obtenerHoja('Satisfacción Empleo');
 
-    // Primera importación: construir hoja desde cero
+    // --- Primera importación (hoja vacía) ----------------------------------
     if (hoja.getLastRow() <= 1) {
-      var todasCols = Object.keys(datos[0]);
-      var orden = [CAMPO_ID, CAMPO_FECHA].concat(
-        todasCols.filter(function(c) {
-          return c !== CAMPO_ID && c !== CAMPO_FECHA && EXCLUIR.indexOf(c) === -1;
-        })
-      );
-      var headers = orden.map(function(c) { return NOMBRES[c] || c; });
+      var headers = ORDEN.map(function(k) { return NOMBRES[k]; });
       hoja.clearContents();
       var hr = hoja.getRange(1, 1, 1, headers.length);
       hr.setValues([headers]);
@@ -1440,19 +1471,13 @@ function _syncSatisfaccionSoloNuevos() {
       datos.forEach(function(d) {
         var id = (d[CAMPO_ID] || '').toString().trim();
         if (!id) return;
-        hoja.appendRow(orden.map(function(k) { return d[k] || ''; }));
+        hoja.appendRow(ORDEN.map(function(k) { return d[k] || ''; }));
         nuevos++;
       });
       return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
     }
 
-    // Importación incremental
-    var INVERSO = {};
-    Object.keys(NOMBRES).forEach(function(k) { INVERSO[NOMBRES[k]] = k; });
-    var numCols  = hoja.getLastColumn();
-    var ordenKobo = hoja.getRange(1, 1, 1, numCols).getValues()[0].map(function(h) {
-      return INVERSO[h] || h;
-    });
+    // --- Importación incremental -------------------------------------------
     var existentes = {};
     var uf = hoja.getLastRow();
     if (uf > 1) {
@@ -1469,7 +1494,7 @@ function _syncSatisfaccionSoloNuevos() {
       var fecha = (d[CAMPO_FECHA] || '').toString().trim();
       var key   = id + '||' + fecha;
       if (existentes[key]) return;
-      hoja.appendRow(ordenKobo.map(function(k) { return d[k] || ''; }));
+      hoja.appendRow(ORDEN.map(function(k) { return d[k] || ''; }));
       existentes[key] = true;
       nuevos++;
     });
@@ -1530,7 +1555,6 @@ function _syncSesionesSoloNuevos() {
       'Creamos ID':                 'Creamos ID',
       '_submission_time':           'Fecha envío',
       'start':                      'Inicio sesión',
-      'Acompañamiento profesional': 'Tipo acompañamiento',
       'Proyecto':                   'Proyecto',
       'Nombre':                     'Nombre',
       'Apellidos':                  'Apellidos',
@@ -3064,6 +3088,49 @@ function desactivarSincronizacionAutomatica() {
     if (t.getHandlerFunction() === 'sincronizacionAutomatica') ScriptApp.deleteTrigger(t);
   });
   Logger.log('Sincronización automática desactivada');
+}
+
+/**
+ * Elimina triggers duplicados: por cada función instalada más de una vez, conserva solo 1.
+ * También ofrece la opción de desactivar el trigger horario (sincronizacionAutomatica).
+ */
+function limpiarTriggersDuplicados() {
+  var ui = SpreadsheetApp.getUi();
+  var triggers = ScriptApp.getProjectTriggers();
+  var grupos = {};
+  triggers.forEach(function(t) {
+    var fn = t.getHandlerFunction();
+    if (!grupos[fn]) grupos[fn] = [];
+    grupos[fn].push(t);
+  });
+
+  var eliminados = 0;
+  var detalle = [];
+  Object.keys(grupos).forEach(function(fn) {
+    var lista = grupos[fn];
+    if (lista.length > 1) {
+      // Conservar el primero, eliminar el resto
+      for (var i = 1; i < lista.length; i++) {
+        ScriptApp.deleteTrigger(lista[i]);
+        eliminados++;
+      }
+      detalle.push('• ' + fn + ': ' + lista.length + ' → 1 (eliminados ' + (lista.length - 1) + ')');
+    }
+  });
+
+  // Mostrar resumen
+  var msg = eliminados > 0
+    ? 'Se eliminaron ' + eliminados + ' trigger(s) duplicado(s):\n\n' + detalle.join('\n')
+    : 'No se encontraron triggers duplicados. Todo está limpio.';
+
+  // Listar todos los triggers activos
+  var activos = ScriptApp.getProjectTriggers().map(function(t) {
+    return '• ' + t.getHandlerFunction() + ' (' + t.getTriggerSource() + ')';
+  });
+  msg += '\n\nTriggers activos:\n' + (activos.length > 0 ? activos.join('\n') : 'Ninguno');
+
+  ui.alert('🧹 Limpiar triggers duplicados', msg, ui.ButtonSet.OK);
+  Logger.log('limpiarTriggersDuplicados: eliminados=' + eliminados);
 }
 
 /**
