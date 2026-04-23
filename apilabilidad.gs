@@ -30,6 +30,8 @@ function onOpen(e) {
       .addItem('📊 Generar Reporte', 'generarReporte')
       .addItem('📞 Ver Seguimientos Pendientes', 'mostrarSeguimientosPendientes')
       .addSeparator()
+      .addItem('🔍 Diagnosticar Clasificación de Perfiles', 'diagnosticarClasificacionPerfiles')
+      .addSeparator()
       .addItem('🚀 Instalar Sistema (primera vez)', 'instalarSistema')
       .addItem('🔁 Reinstalar Sistema (borra todo)', 'reinstalarSistema')
       .addToUi();
@@ -1121,6 +1123,65 @@ function importarClasificacionPerfiles() {
       'Error al importar clasificaciones: ' + error.message,
       SpreadsheetApp.getUi().ButtonSet.OK);
     Logger.log('Error en importarClasificacionPerfiles: ' + error);
+  }
+}
+
+/**
+ * Diagnóstico: muestra qué devuelve KoboToolbox para Clasificación de Perfiles
+ */
+function diagnosticarClasificacionPerfiles() {
+  var ui = SpreadsheetApp.getUi();
+  try {
+    var opciones = {
+      method: 'get',
+      headers: { 'Authorization': 'Token ' + KOBO_TOKEN, 'Accept': 'text/csv' },
+      muteHttpExceptions: true
+    };
+
+    var urls = [URL_CLASIFICACION_PERFILES, URL_CLASIFICACION_FALLBACK];
+    var msg = '🔍 Diagnóstico KoboToolbox — Clasificación de Perfiles\n\n';
+
+    for (var u = 0; u < urls.length; u++) {
+      var resp = UrlFetchApp.fetch(urls[u], opciones);
+      var codigo = resp.getResponseCode();
+      var cuerpo = resp.getContentText();
+      var esJSON = cuerpo.trim().charAt(0) === '{' || cuerpo.trim().charAt(0) === '[';
+
+      msg += 'URL ' + (u + 1) + ': HTTP ' + codigo + (esJSON ? ' (JSON — no CSV)' : ' (CSV OK)') + '\n';
+
+      if (codigo === 200 && !esJSON) {
+        var lineas = cuerpo.split('\n').filter(function(l) { return l.trim(); });
+        msg += '  Filas totales: ' + (lineas.length - 1) + '\n';
+
+        if (lineas.length > 0) {
+          var headers = lineas[0].split(',').map(function(h) { return h.replace(/"/g, '').trim(); });
+          var tieneCreamos = headers.some(function(h) { return h.indexOf('Creamos ID') !== -1; });
+          msg += '  Columnas encontradas: ' + headers.length + '\n';
+          msg += '  Tiene "Creamos ID": ' + (tieneCreamos ? 'SÍ ✅' : 'NO ❌') + '\n';
+
+          // Mostrar columnas que contienen "Creamos" o "MÓDULO"
+          var relevantes = headers.filter(function(h) {
+            return h.indexOf('Creamos') !== -1 || h.indexOf('MÓDULO') !== -1 || h.indexOf('_submission') !== -1;
+          });
+          if (relevantes.length > 0) {
+            msg += '  Cols relevantes:\n';
+            relevantes.forEach(function(c) { msg += '    • ' + c.substring(0, 60) + '\n'; });
+          }
+        }
+        break;
+      } else if (codigo === 200 && esJSON) {
+        try {
+          var json = JSON.parse(cuerpo);
+          msg += '  Respuesta JSON — count: ' + (json.count || '?') + '\n';
+        } catch(e) {}
+      } else {
+        msg += '  Error: ' + cuerpo.substring(0, 100) + '\n';
+      }
+    }
+
+    ui.alert('🔍 Diagnóstico', msg, ui.ButtonSet.OK);
+  } catch (error) {
+    ui.alert('❌ Error en diagnóstico', error.message, ui.ButtonSet.OK);
   }
 }
 
