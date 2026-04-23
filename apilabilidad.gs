@@ -522,31 +522,31 @@ const ESTRUCTURA_HOJAS = {
     color: '#5c6bc0',
     columnas: [
       { nombre: 'Creamos ID',              ancho: 130, tipo: 'texto'  },
+      { nombre: 'Fecha de evaluación',     ancho: 130, tipo: 'fecha'  },
       { nombre: 'Nombre completo',         ancho: 200, tipo: 'texto'  },
-      { nombre: 'Número de teléfono',      ancho: 150, tipo: 'texto'  },
-      { nombre: 'Género',                  ancho: 120, tipo: 'dropdown', opciones: GENEROS },
-      { nombre: 'Edad',                    ancho: 80,  tipo: 'texto'  },
-      { nombre: 'Nivel educativo',         ancho: 160, tipo: 'texto'  },
-      { nombre: 'Fecha de evaluación',     ancho: 150, tipo: 'fecha'  },
-      { nombre: 'D1 Cuidado',              ancho: 100, tipo: 'texto'  },
-      { nombre: 'D1 Comentario',           ancho: 250, tipo: 'texto'  },
-      { nombre: 'D2 Violencia',            ancho: 100, tipo: 'texto'  },
-      { nombre: 'D2 Comentario',           ancho: 250, tipo: 'texto'  },
-      { nombre: 'D3 Movilidad',            ancho: 100, tipo: 'texto'  },
-      { nombre: 'D3 Comentario',           ancho: 250, tipo: 'texto'  },
-      { nombre: 'D4 Legal/Salud',          ancho: 100, tipo: 'texto'  },
-      { nombre: 'D4 Comentario',           ancho: 250, tipo: 'texto'  },
-      { nombre: 'D5 Motivación',           ancho: 100, tipo: 'texto'  },
-      { nombre: 'D5 Comentario',           ancho: 250, tipo: 'texto'  },
-      { nombre: 'D6 Experiencia',          ancho: 100, tipo: 'texto'  },
-      { nombre: 'D6 Comentario',           ancho: 250, tipo: 'texto'  },
-      { nombre: 'D7 Autonomía',            ancho: 100, tipo: 'texto'  },
-      { nombre: 'D7 Comentario',           ancho: 250, tipo: 'texto'  },
-      { nombre: 'Puntaje Total',           ancho: 110, tipo: 'texto'  },
+      { nombre: 'Número de teléfono',      ancho: 140, tipo: 'texto'  },
+      { nombre: 'Género',                  ancho: 110, tipo: 'dropdown', opciones: GENEROS },
+      { nombre: 'Edad',                    ancho: 70,  tipo: 'texto'  },
+      { nombre: 'Nivel educativo',         ancho: 150, tipo: 'texto'  },
+      { nombre: 'D1 Cuidado',              ancho: 80,  tipo: 'texto'  },
+      { nombre: 'D1 Comentario',           ancho: 260, tipo: 'texto'  },
+      { nombre: 'D2 Violencia',            ancho: 80,  tipo: 'texto'  },
+      { nombre: 'D2 Comentario',           ancho: 260, tipo: 'texto'  },
+      { nombre: 'D3 Movilidad',            ancho: 80,  tipo: 'texto'  },
+      { nombre: 'D3 Comentario',           ancho: 260, tipo: 'texto'  },
+      { nombre: 'D4 Legal/Salud',          ancho: 80,  tipo: 'texto'  },
+      { nombre: 'D4 Comentario',           ancho: 260, tipo: 'texto'  },
+      { nombre: 'D5 Motivación',           ancho: 80,  tipo: 'texto'  },
+      { nombre: 'D5 Comentario',           ancho: 260, tipo: 'texto'  },
+      { nombre: 'D6 Experiencia',          ancho: 80,  tipo: 'texto'  },
+      { nombre: 'D6 Comentario',           ancho: 260, tipo: 'texto'  },
+      { nombre: 'D7 Autonomía',            ancho: 80,  tipo: 'texto'  },
+      { nombre: 'D7 Comentario',           ancho: 260, tipo: 'texto'  },
+      { nombre: 'Puntaje Total',           ancho: 100, tipo: 'texto'  },
       { nombre: 'Perfil Asignado',         ancho: 300, tipo: 'dropdown', opciones: PERFILES_CLASIFICACION },
       { nombre: 'Notas de observación',    ancho: 350, tipo: 'texto'  },
-      { nombre: 'Barreras activas',        ancho: 130, tipo: 'texto'  },
-      { nombre: 'Desmotivación',           ancho: 130, tipo: 'texto'  }
+      { nombre: 'Barreras activas',        ancho: 120, tipo: 'texto'  },
+      { nombre: 'Desmotivación',           ancho: 120, tipo: 'texto'  }
     ]
   },
 
@@ -1326,12 +1326,12 @@ function procesarClasificacionPerfiles(datos) {
 
     var fila = [
       creamosId,                  // 1  Creamos ID
-      datosGrad.nombre   || '',   // 2  Nombre completo
-      datosGrad.telefono || '',   // 3  Número de teléfono
-      datosGrad.genero   || '',   // 4  Género
-      datosGrad.edad     || '',   // 5  Edad
-      datosGrad.nivelEdu || '',   // 6  Nivel educativo
-      fechaEval,                  // 7  Fecha de evaluación
+      fechaEval,                  // 2  Fecha de evaluación  ← al frente para acceso rápido
+      datosGrad.nombre   || '',   // 3  Nombre completo
+      datosGrad.telefono || '',   // 4  Número de teléfono
+      datosGrad.genero   || '',   // 5  Género
+      datosGrad.edad     || '',   // 6  Edad
+      datosGrad.nivelEdu || '',   // 7  Nivel educativo
       d1, c1,                     // 8-9  D1
       d2, c2,                     // 10-11 D2
       d3, c3,                     // 12-13 D3
@@ -1341,7 +1341,7 @@ function procesarClasificacionPerfiles(datos) {
       d7, c7,                     // 20-21 D7
       puntajeTotal + ' / 28',     // 22 Puntaje Total
       perfil,                     // 23 Perfil Asignado
-      notas,                      // 24 Notas
+      notas,                      // 24 Notas de observación
       tieneBarreras,              // 25 Barreras activas
       tieneDesmot                 // 26 Desmotivación
     ];
