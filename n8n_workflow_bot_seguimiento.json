@@ -1,0 +1,337 @@
+{
+  "name": "Bot Seguimiento Equipito Empleabilidad",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b5f2a1c3-0000-4000-8000-000000000001",
+      "name": "Prueba Manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 400],
+      "notes": "Usa este nodo para probar sin esperar al horario"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "b5f2a1c3-0000-4000-8000-000000000002",
+      "name": "Cron 9AM Guatemala",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 580],
+      "notes": "Se ejecuta automaticamente cada dia a las 9 AM"
+    },
+    {
+      "parameters": {
+        "operation": "getRows",
+        "documentId": {
+          "__rl": true,
+          "value": "TU_SPREADSHEET_ID_AQUI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Seguimiento Bot",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "b5f2a1c3-0000-4000-8000-000000000003",
+      "name": "Leer Seguimiento Bot",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [480, 400],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURAR_EN_N8N",
+          "name": "Google Sheets OAuth2"
+        }
+      },
+      "notes": "IMPORTANTE: Reemplaza TU_SPREADSHEET_ID_AQUI con el ID de tu Google Sheet"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filtrar filas donde Fecha Seg1 o Fecha Seg2 es HOY y Estado = Pendiente\nconst hoy = new Date();\nconst pad = n => n.toString().padStart(2, '0');\nconst hoyStr = pad(hoy.getDate()) + '/' + pad(hoy.getMonth() + 1) + '/' + hoy.getFullYear();\n\nconst resultado = [];\n\nfor (const item of $input.all()) {\n  const fila = item.json;\n  const estado = (fila['Estado'] || '').trim();\n  const seg1   = (fila['Fecha Seg1'] || '').toString().trim();\n  const seg2   = (fila['Fecha Seg2'] || '').toString().trim();\n  const tel    = (fila['Telefono'] || '').toString().trim();\n\n  const esHoy     = seg1 === hoyStr || seg2 === hoyStr;\n  const pendiente = estado === 'Pendiente' || estado === '';\n\n  if (esHoy && pendiente && tel) {\n    resultado.push({\n      json: {\n        ...fila,\n        _hoy: hoyStr,\n        _esSeg2: seg2 === hoyStr\n      }\n    });\n  }\n}\n\nconsole.log('Filas para enviar hoy:', resultado.length);\nreturn resultado;"
+      },
+      "id": "b5f2a1c3-0000-4000-8000-000000000004",
+      "name": "Filtrar fecha de hoy",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json['Tipo Seguimiento'] }}",
+                    "rightValue": "Post-empleo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Post-empleo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json['Tipo Seguimiento'] }}",
+                    "rightValue": "Busqueda activa",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Busqueda activa"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b5f2a1c3-0000-4000-8000-000000000005",
+      "name": "Que tipo de seguimiento",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [920, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mensaje para seguimiento POST-EMPLEO\nconst resultados = [];\n\nfor (const item of $input.all()) {\n  const d       = item.json;\n  const esSeg2  = d._esSeg2;\n  const nombre  = d['Nombre'] || 'amigo/a';\n  const empresa = d['Empresa'] || 'tu nuevo trabajo';\n\n  let mensaje;\n  if (!esSeg2) {\n    // Mensaje 1 — Primer seguimiento\n    mensaje =\n      'Hola ' + nombre + '! Esperamos que vayas bien en ' + empresa + '. ' +\n      'Queremos saber como te va.\\n\\n' +\n      '1. Como va tu adaptacion?\\n   A) Excelente  B) Bien  C) Regular  D) Dificil\\n\\n' +\n      '2. Te sientes apoyado por tu equipo?\\n   A) Si  B) Parcialmente  C) No\\n\\n' +\n      '3. En que podemos ayudarte? (escribe libremente)\\n\\n' +\n      'Equipito Empleabilidad';\n  } else {\n    // Mensaje 2 — Segundo seguimiento (dia 14)\n    mensaje =\n      'Hola ' + nombre + '! Han pasado 2 semanas en ' + empresa + '. ' +\n      'Queremos saber como sigues.\\n\\n' +\n      '1. Que es lo mejor de tu trabajo hasta ahora? (escribe libremente)\\n\\n' +\n      '2. Te sientes mas comodo que la primera semana?\\n   A) Mucho mas  B) Igual  C) Aun dificil\\n\\n' +\n      '3. Hay algo en lo que podamos apoyarte? (escribe libremente)\\n\\n' +\n      'Equipito Empleabilidad';\n  }\n\n  resultados.push({\n    json: { ...d, _mensaje: mensaje, _tipoMensaje: esSeg2 ? 'Seg2' : 'Seg1' }\n  });\n}\n\nreturn resultados;"
+      },
+      "id": "b5f2a1c3-0000-4000-8000-000000000006",
+      "name": "Construir mensaje Post-empleo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 260]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mensaje para seguimiento BUSQUEDA ACTIVA\nconst resultados = [];\n\nfor (const item of $input.all()) {\n  const d      = item.json;\n  const esSeg2 = d._esSeg2;\n  const nombre = d['Nombre'] || 'amigo/a';\n\n  let mensaje;\n  if (!esSeg2) {\n    // Mensaje 1 — Primer contacto (dia 7)\n    mensaje =\n      'Hola ' + nombre + '! Somos del Equipito Empleabilidad. ' +\n      'Sabemos que estas buscando trabajo y queremos apoyarte.\\n\\n' +\n      '1. Cuantas empresas has contactado esta semana? (escribe el numero)\\n\\n' +\n      '2. Has tenido alguna entrevista?\\n   A) Si  B) No\\n\\n' +\n      '3. En que podemos ayudarte mas?\\n   A) CV  B) Preparacion entrevista  C) Buscar vacantes  D) Otro\\n\\n' +\n      'Equipito Empleabilidad';\n  } else {\n    // Mensaje 2 — Segunda semana (dia 14)\n    mensaje =\n      'Hola ' + nombre + '! Como va tu busqueda de trabajo esta semana?\\n\\n' +\n      '1. Has recibido alguna oferta?\\n   A) Si  B) Pendiente  C) No todavia\\n\\n' +\n      '2. Que tipo de trabajo buscas ahora? (escribe libremente)\\n\\n' +\n      '3. Como te sientes con el proceso?\\n   A) Optimista  B) Neutral  C) Necesito apoyo\\n\\n' +\n      'Equipito Empleabilidad';\n  }\n\n  resultados.push({\n    json: { ...d, _mensaje: mensaje, _tipoMensaje: esSeg2 ? 'Seg2' : 'Seg1' }\n  });\n}\n\nreturn resultados;"
+      },
+      "id": "b5f2a1c3-0000-4000-8000-000000000007",
+      "name": "Construir mensaje Busqueda Activa",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 540]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "b5f2a1c3-0000-4000-8000-000000000008",
+      "name": "Unir ambos mensajes",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1360, 400]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "from": "whatsapp:+14155238886",
+        "to": "={{ 'whatsapp:' + $json['Telefono'] }}",
+        "body": "={{ $json['_mensaje'] }}"
+      },
+      "id": "b5f2a1c3-0000-4000-8000-000000000009",
+      "name": "Enviar WhatsApp Twilio",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1580, 400],
+      "credentials": {
+        "twilioApi": {
+          "id": "CONFIGURAR_EN_N8N",
+          "name": "Twilio Account"
+        }
+      },
+      "notes": "IMPORTANTE: El numero +14155238886 es el sandbox de Twilio. Cambialo por tu numero real cuando salgas de pruebas."
+    },
+    {
+      "parameters": {
+        "operation": "updateRows",
+        "documentId": {
+          "__rl": true,
+          "value": "TU_SPREADSHEET_ID_AQUI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Seguimiento Bot",
+          "mode": "name"
+        },
+        "lookupColumn": "Creamos ID",
+        "lookupValue": "={{ $json['Creamos ID'] }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "Estado",
+              "fieldValue": "Mensaje Enviado"
+            },
+            {
+              "fieldId": "Etapa Actual",
+              "fieldValue": "={{ $json['_tipoMensaje'] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b5f2a1c3-0000-4000-8000-000000000010",
+      "name": "Actualizar Estado en Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1800, 400],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURAR_EN_N8N",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Prueba Manual": {
+      "main": [
+        [
+          {
+            "node": "Leer Seguimiento Bot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron 9AM Guatemala": {
+      "main": [
+        [
+          {
+            "node": "Leer Seguimiento Bot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Seguimiento Bot": {
+      "main": [
+        [
+          {
+            "node": "Filtrar fecha de hoy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar fecha de hoy": {
+      "main": [
+        [
+          {
+            "node": "Que tipo de seguimiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Que tipo de seguimiento": {
+      "main": [
+        [
+          {
+            "node": "Construir mensaje Post-empleo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Construir mensaje Busqueda Activa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construir mensaje Post-empleo": {
+      "main": [
+        [
+          {
+            "node": "Unir ambos mensajes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construir mensaje Busqueda Activa": {
+      "main": [
+        [
+          {
+            "node": "Unir ambos mensajes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Unir ambos mensajes": {
+      "main": [
+        [
+          {
+            "node": "Enviar WhatsApp Twilio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar WhatsApp Twilio": {
+      "main": [
+        [
+          {
+            "node": "Actualizar Estado en Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Guatemala"
+  },
+  "meta": {
+    "instanceId": "equipito-empleabilidad-bot"
+  }
+}
