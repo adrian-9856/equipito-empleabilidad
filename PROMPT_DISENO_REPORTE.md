@@ -1,218 +1,232 @@
-# PROMPT DE DISEÑO — REPORTE EQUIPITO EMPLEABILIDAD
+# PROMPT DE DISEÑO VISUAL — REPORTES EQUIPITO EMPLEABILIDAD
 
-> Copia y pega este prompt en Canva AI, ChatGPT, Figma AI, o cualquier herramienta de diseño.
-> Ajusta los datos con los números reales antes de presentar.
+> Prompts genéricos para diseñar reportes visualmente atractivos.
+> Funcionan para cualquier DP o programa. Solo cambia el nombre del programa y los datos.
 
 ---
 
-## PROMPT PARA CANVA AI / DISEÑO VISUAL
+## 1. PROMPT PARA CANVA AI
 
 ```
-Diseña un reporte visual de empleabilidad con las siguientes características:
+Diseña un reporte visual profesional para un programa social con estas especificaciones:
 
-ORGANIZACIÓN: Equipito Empleabilidad — programa de inserción laboral para jóvenes.
-ESTILO: Moderno, profesional, minimalista. Colores corporativos: azul #1a73e8 y verde #0f9d58.
-FORMATO: Presentación tipo informe ejecutivo (A4 horizontal o slides 16:9).
+ESTILO GENERAL:
+- Diseño moderno, limpio y minimalista
+- Mucho espacio en blanco entre secciones
+- Tipografía: una fuente sans-serif para títulos (bold) y una ligera para cuerpo
+- Colores: un color primario fuerte + blanco + gris claro (#f5f5f5) como fondo de cards
+- Sin tablas con bordes recargados — usar cards con sombra suave
+- Iconos lineales (outline), no rellenos
+- Formato: A4 vertical u horizontal según el contenido
 
-SECCIONES QUE DEBE INCLUIR:
+ESTRUCTURA DE PÁGINAS:
 
-1. PORTADA
-   - Logo/nombre: Equipito Empleabilidad
-   - Título: "Reporte de Seguimiento de Graduados"
-   - Período: [MES AÑO]
-   - Subtítulo: "Programa de Inserción Laboral"
+PÁGINA 1 — PORTADA
+- Nombre del programa (título grande, color primario)
+- Subtítulo: tipo de reporte (mensual / trimestral / anual)
+- Período que cubre
+- Logo o ícono representativo centrado
+- Franja de color en la parte inferior o lateral
 
-2. INDICADORES CLAVE (KPIs) — tarjetas grandes con número y etiqueta
-   - Total Graduados registrados: [NÚMERO]
-   - Empleados activos: [NÚMERO]
-   - Tasa de empleo: [%]
-   - Seguimientos completados: [NÚMERO]
+PÁGINA 2 — INDICADORES CLAVE (KPIs)
+- 4 tarjetas grandes en fila: número grande arriba, etiqueta abajo
+- Fondo de cada tarjeta: blanco con borde izquierdo del color del indicador
+- Espacio para un párrafo breve de contexto debajo
 
-3. DISTRIBUCIÓN POR ETAPA — gráfico de dona o barras horizontales
-   Etapas: Aliados / Plataforma / Derivaciones / Activamente busca trabajo /
-           Paso a paso / Conexiones Laborales
-   Mostrar: número y % por etapa
+PÁGINA 3 — DISTRIBUCIÓN / AVANCE
+- Gráfico de barras horizontal o dona
+- Leyenda clara a la derecha o abajo
+- Porcentaje visible en cada segmento
+- Título de sección con ícono a la izquierda
 
-4. CLASIFICACIÓN DE PERFILES — gráfico de semáforo o barras apiladas
-   - Perfil Verde (bajas barreras): [NÚMERO]
-   - Perfil Amarillo (barreras medias): [NÚMERO]
-   - Perfil Rojo (altas barreras): [NÚMERO]
+PÁGINA 4 — TABLA DE RESULTADOS
+- Máximo 10 filas
+- Columnas: 3-4 datos clave, no más
+- Filas alternadas (una blanca, una gris muy claro)
+- Sin bordes excepto línea inferior de cada fila
 
-5. SEGUIMIENTOS BOT — tabla o timeline
-   - Total activos en seguimiento: [NÚMERO]
-   - Post-empleo: [NÚMERO] | Búsqueda activa: [NÚMERO]
-   - Mensajes enviados este mes: [NÚMERO]
-   - Llamadas pendientes: [NÚMERO]
+PÁGINA 5 — NOTAS Y PRÓXIMOS PASOS
+- Dos columnas: Logros | Desafíos
+- Lista de viñetas con íconos de check y alerta
+- Espacio para 3 acciones del próximo período
 
-6. CONEXIONES LABORALES — tabla de empleos conseguidos
-   Columnas: Nombre | Empresa | Cargo | Salario | Fecha inicio
-   (máximo 10 registros recientes)
-
-7. SATISFACCIÓN LABORAL — gauge o estrellas
-   - Puntaje promedio AAPI: [X.X / 5]
-   - Respuestas recibidas: [NÚMERO]
-
-8. NOTAS Y PRÓXIMOS PASOS
-   - Espacio para texto libre del equipo
-
-DISEÑO:
-- Cada sección en su propia tarjeta/card con sombra suave
-- Tipografía: Google Fonts (Poppins o Inter)
-- Paleta: Azul #1a73e8, Verde #0f9d58, Gris claro #f5f5f5, Blanco
-- Usar iconos lineales (no rellenos)
-- Sin tablas recargadas — preferir visualizaciones
+REGLAS DE DISEÑO:
+- Máximo 30 palabras de texto por sección (los datos hablan solos)
+- Cada número importante debe ser visualmente grande (mínimo 36pt)
+- Paleta de máximo 3 colores + blanco + gris
+- Consistencia total entre páginas (mismo header, mismo footer con número de página)
 ```
 
 ---
 
-## PROMPT PARA CHATGPT / CLAUDE (generar texto del reporte)
+## 2. PROMPT PARA FIGMA / DISEÑADOR
 
 ```
-Actúa como analista de datos de un programa de empleabilidad juvenil.
-Genera el texto narrativo de un reporte mensual con los siguientes datos:
+Necesito un sistema de diseño para reportes internos de un programa social.
+Debe ser reutilizable para diferentes programas y períodos.
 
-DATOS DEL MES DE [MES/AÑO]:
-- Total graduados: [NÚMERO]
-- Nuevos este mes: [NÚMERO]
-- Empleados activos: [NÚMERO]
-- Tasa de empleo: [%]
-- Perfil Verde: [NÚMERO] | Amarillo: [NÚMERO] | Rojo: [NÚMERO]
-- Seguimientos enviados: [NÚMERO]
-- Respuestas recibidas: [NÚMERO]
-- Llamadas completadas: [NÚMERO]
+COMPONENTES QUE NECESITO:
 
-INCLUYE:
-1. Resumen ejecutivo (3 oraciones, tono optimista y profesional)
-2. Logros del mes (3-5 puntos en viñetas)
-3. Desafíos identificados (2-3 puntos)
-4. Recomendaciones para el próximo mes (2-3 acciones concretas)
-5. Nota motivacional para el equipo (1 párrafo breve)
+1. CARD DE KPI
+   - Variantes: pequeña (2x2 cm) / mediana / grande
+   - Elementos: número principal, etiqueta, ícono opcional, línea de color lateral
+   - Estado: neutro / positivo (verde) / atención (naranja) / crítico (rojo)
 
-TONO: Profesional pero cercano, orientado a impacto social.
-IDIOMA: Español.
-LONGITUD: Máximo 1 página.
-```
+2. GRÁFICO DE PROGRESO
+   - Barra horizontal con porcentaje al final
+   - Variante: dona con número central
+   - Etiquetas: nombre de categoría a la izquierda, valor a la derecha
 
----
+3. TABLA LIMPIA
+   - Header con fondo color primario y texto blanco
+   - Filas alternas blanco / gris muy claro
+   - Sin bordes exteriores (solo separadores internos ligeros)
 
-## PROMPT PARA PRESENTACIÓN ANTE DONANTES / DP
+4. BADGE DE ESTADO
+   - Colores: Verde (completado) / Amarillo (en progreso) / Rojo (pendiente)
+   - Forma: pill redondeado, texto en 10pt
 
-```
-Crea una presentación ejecutiva de 5 slides para presentar ante donantes
-o directores de programa (DP) sobre el avance del programa de empleabilidad.
+5. SECCIÓN HEADER
+   - Título de sección + ícono + línea separadora
 
-DATOS A INCLUIR: [PEGAR DATOS DEL MES]
+6. LAYOUT DE PÁGINA
+   - Margen: 24px en todos los lados
+   - Grid: 12 columnas
+   - Espaciado entre secciones: 32px
 
-ESTRUCTURA DE SLIDES:
-
-SLIDE 1 — IMPACTO EN NÚMEROS
-Tres datos grandes: total graduados / empleados / tasa de éxito
-Frase de impacto: "[X] jóvenes con nueva oportunidad laboral este mes"
-
-SLIDE 2 — ¿QUIÉNES SON?
-Distribución de perfiles (Verde/Amarillo/Rojo)
-Breve descripción de qué significa cada perfil
-
-SLIDE 3 — EL PROCESO
-Diagrama de flujo simple:
-Graduado → Clasificación → Seguimiento Bot → Empleo → Seguimiento post-empleo
-
-SLIDE 4 — RESULTADOS ESTE MES
-Tabla concisa: Empleos conseguidos con empresa/cargo/salario
-Estadística de satisfacción laboral (AAPI)
-
-SLIDE 5 — PRÓXIMOS PASOS
-3 acciones prioritarias del próximo mes
-Necesidades del programa (recursos, aliados, etc.)
-
-ESTILO: Limpio, mucho espacio en blanco, sin texto corrido.
-Cada slide: máximo 30 palabras de texto + visualización.
+TOKENS DE DISEÑO:
+   - Color primario: a definir por programa
+   - Texto principal: #212121
+   - Texto secundario: #757575
+   - Fondo de página: #ffffff
+   - Fondo de cards: #f9f9f9
+   - Sombra de cards: 0 2px 8px rgba(0,0,0,0.08)
+   - Border radius: 8px
 ```
 
 ---
 
-## ESTRUCTURA JSON PARA GOOGLE SHEETS → REPORTE AUTOMÁTICO
+## 3. PROMPT PARA CHATGPT / CLAUDE (texto del reporte)
 
-Esta estructura es lo que el script de Apps Script ya genera en la hoja "Reporte".
-Puedes usarla también para exportar a otras herramientas:
+```
+Actúa como redactor de impacto social. Escribe el texto de un reporte mensual
+para un programa de [NOMBRE DEL PROGRAMA].
 
-```json
-{
-  "reporte": {
-    "periodo": "Abril 2026",
-    "generado": "2026-04-27T09:00:00",
-    "resumen": {
-      "total_graduados": 0,
-      "empleados_activos": 0,
-      "tasa_empleo_pct": 0,
-      "nuevos_este_mes": 0
-    },
-    "por_etapa": {
-      "Aliados": 0,
-      "Plataforma": 0,
-      "Derivaciones": 0,
-      "Activamente busca trabajo": 0,
-      "Paso a paso": 0,
-      "Conexiones Laborales": 0
-    },
-    "clasificacion_perfiles": {
-      "Verde": 0,
-      "Amarillo": 0,
-      "Rojo": 0
-    },
-    "seguimiento_bot": {
-      "total_activos": 0,
-      "post_empleo": 0,
-      "busqueda_activa": 0,
-      "mensajes_enviados_mes": 0,
-      "llamadas_pendientes": 0,
-      "respuestas_recibidas": 0
-    },
-    "satisfaccion_laboral": {
-      "puntaje_promedio_aapi": 0,
-      "respuestas_totales": 0
-    },
-    "conexiones_laborales_recientes": [
-      {
-        "nombre": "",
-        "empresa": "",
-        "cargo": "",
-        "salario": "",
-        "fecha_inicio": ""
-      }
-    ]
-  }
-}
+DATOS DEL PERÍODO [MES/AÑO]:
+[PEGAR AQUÍ LOS NÚMEROS DEL MES]
+
+ESCRIBE ESTAS SECCIONES:
+
+1. TITULAR DE IMPACTO (1 oración)
+   Formato: "[X] personas [logro] gracias a [programa]"
+
+2. RESUMEN EJECUTIVO (3 oraciones)
+   - Qué se hizo
+   - Cuál fue el resultado más importante
+   - Qué sigue
+
+3. LOGROS DEL MES (máximo 5 viñetas)
+   Cada viñeta: verbo en pasado + dato concreto + impacto
+   Ejemplo: "Acompañamos a 12 personas en búsqueda activa, logrando 4 nuevos empleos"
+
+4. DESAFÍOS (máximo 3 viñetas)
+   Tono honesto pero constructivo, no alarmista
+
+5. PRÓXIMAS ACCIONES (3 puntos)
+   Específicas, con responsable implícito y fecha si aplica
+
+TONO: Profesional, cercano, orientado a personas (no a procesos).
+No usar palabras como "sinergia", "robusto", "implementar" — usar lenguaje simple.
+Máximo 200 palabras en total.
 ```
 
 ---
 
-## COLORES DE REFERENCIA POR HOJA
+## 4. PROMPT PARA PRESENTACIÓN A DONANTES / DP (5 slides)
 
-Úsalos para mantener consistencia visual en el reporte:
+```
+Crea una presentación ejecutiva de 5 slides para mostrar avance de un programa social
+ante [donantes / directores de programa / aliados].
 
-| Hoja | Color | Hex |
-|------|-------|-----|
-| Graduados | Azul | `#1a73e8` |
-| Aliados | Índigo | `#3f51b5` |
-| Plataforma | Cian | `#00bcd4` |
-| Derivaciones | Naranja | `#ff9800` |
-| Activamente busca trabajo | Verde | `#0f9d58` |
-| Conexiones Laborales | Naranja oscuro | `#e65100` |
-| Seguimiento Bot | Verde azulado | `#00897b` |
-| Clasificación de Perfiles | Azul índigo | `#5c6bc0` |
-| Satisfacción Empleo | Verde | `#00897b` |
-| Sesiones Acompañamiento | Púrpura | `#5e35b1` |
-| Reporte | Rosa/Magenta | `#e91e63` |
+PÚBLICO: personas que toman decisiones, tienen poco tiempo, quieren ver impacto.
+
+SLIDE 1 — EL IMPACTO EN NÚMEROS
+Diseño: 3 números grandes centrados, cada uno con su etiqueta
+Datos: las 3 métricas más importantes del período
+Abajo: 1 frase de impacto humano
+
+SLIDE 2 — ¿A QUIÉN ATENDEMOS?
+Diseño: gráfico de dona o barras con categorías de personas
+No más de 5 categorías
+Cada categoría con color distinto y porcentaje visible
+
+SLIDE 3 — EL PROCESO (cómo funciona)
+Diseño: diagrama de flujo horizontal, máximo 5 pasos
+Íconos simples en cada paso
+Sin texto extenso — solo etiquetas de 2-3 palabras
+
+SLIDE 4 — RESULTADOS CONCRETOS
+Diseño: tabla simple con los 5-8 logros más importantes
+Columnas: qué / cuánto / cuándo
+Una fila destacada (el mayor logro) con fondo de color
+
+SLIDE 5 — QUÉ NECESITAMOS / QUÉ SIGUE
+Diseño: dos columnas
+Izquierda: próximas 3 acciones (con fecha)
+Derecha: recursos o apoyo necesario
+
+REGLAS:
+- Máximo 15 palabras por slide (excluyendo tabla/gráfico)
+- Fondo blanco o muy claro
+- Un solo color de acento por slide
+- Sin animaciones complejas
+- Fuente grande: mínimo 24pt para texto visible en sala
+```
 
 ---
 
-## INSTRUCCIONES DE USO
+## 5. GUÍA DE COLORES POR PROGRAMA
 
-1. **Para presentar al equipo:** Usa el primer prompt (Canva) y reemplaza los `[NÚMERO]` con datos reales del mes
-2. **Para presentar a donantes:** Usa el tercer prompt (5 slides)
-3. **Para generar texto narrativo:** Usa el segundo prompt (ChatGPT/Claude)
-4. **Para exportar datos a otro sistema:** Usa la estructura JSON
+Asigna un color primario diferente a cada programa para diferenciarlos visualmente:
 
-> El reporte automático se genera desde Google Sheets:
-> Menú → 📊 Seguimiento Graduados → 📊 Generar Reporte
+| Programa | Color sugerido | Hex | Por qué |
+|----------|---------------|-----|---------|
+| Empleabilidad general | Azul confianza | `#1a73e8` | Profesional, estable |
+| Empleo juvenil | Verde esperanza | `#0f9d58` | Crecimiento, futuro |
+| Inserción mujeres | Violeta | `#7b1fa2` | Fuerza, dignidad |
+| Emprendimiento | Naranja energía | `#e65100` | Acción, dinamismo |
+| Acompañamiento social | Teal | `#00897b` | Calma, apoyo |
+| Formación técnica | Azul índigo | `#3f51b5` | Conocimiento |
+
+**Regla:** Un programa = un color primario.
+Úsalo en: header de la portada, borde de KPIs, header de tabla, títulos de sección.
+
+---
+
+## 6. CHECKLIST DE CALIDAD VISUAL
+
+Antes de enviar cualquier reporte, verifica:
+
+- [ ] ¿El número más importante es el más grande visualmente?
+- [ ] ¿Puedo entender el reporte en 30 segundos sin leer el texto?
+- [ ] ¿Hay consistencia de fuentes? (máximo 2 tipografías)
+- [ ] ¿Los colores tienen suficiente contraste? (texto sobre fondo)
+- [ ] ¿Las gráficas tienen etiquetas legibles sin necesitar leyenda?
+- [ ] ¿El logo / nombre del programa está visible en cada página?
+- [ ] ¿El período del reporte está claro desde la portada?
+- [ ] ¿Hay número de página o indicador de sección?
+- [ ] ¿El archivo pesa menos de 5MB para poder enviarse por correo?
+
+---
+
+## HERRAMIENTAS RECOMENDADAS
+
+| Herramienta | Para qué | Costo |
+|-------------|---------|-------|
+| **Canva** | Diseño rápido sin diseñador | Gratis / Pro $13/mes |
+| **Google Slides** | Colaboración en equipo | Gratis |
+| **Figma** | Sistema de diseño reutilizable | Gratis (hasta 3 proyectos) |
+| **Looker Studio** | Reportes conectados a Sheets en tiempo real | Gratis |
+| **PowerPoint** | Si ya lo tiene el equipo | Licencia Office |
+
+**Recomendación para Equipito:** Canva para reportes mensuales rápidos + Looker Studio para dashboards conectados a Google Sheets en tiempo real (sin copiar datos manualmente).

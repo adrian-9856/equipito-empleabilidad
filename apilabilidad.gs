@@ -41,7 +41,6 @@ function onOpen(e) {
       .addSeparator()
       .addItem('📊 Generar Reporte',                'generarReporte')
       .addItem('📝 Clasificar Graduados',           'mostrarFormularioClasificacion')
-      .addItem('📞 Ver Seguimientos Pendientes',    'mostrarSeguimientosPendientes')
       .addSeparator()
       .addSubMenu(submenuImport)
       .addSeparator()
@@ -573,26 +572,7 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // -- SEGUIMIENTOS -----------------------------------------------------------
-  'Seguimientos': {
-    color: '#673ab7',
-    columnas: [
-      { nombre: 'No.',                ancho: 60,  tipo: 'texto' },
-      { nombre: 'Creamos ID',         ancho: 130, tipo: 'texto' },
-      { nombre: 'Nombre completo',    ancho: 200, tipo: 'texto' },
-      { nombre: 'Número de teléfono', ancho: 150, tipo: 'texto' },
-      { nombre: 'Género',             ancho: 120, tipo: 'dropdown', opciones: GENEROS },
-      { nombre: 'Edad',               ancho: 80,  tipo: 'texto' },
-      { nombre: 'Nivel educativo',    ancho: 160, tipo: 'texto' },
-      { nombre: 'Tipo seguimiento', ancho: 180, tipo: 'texto' },
-      { nombre: 'Fecha programada', ancho: 150, tipo: 'fecha' },
-      { nombre: 'Fecha realizada',  ancho: 150, tipo: 'fecha' },
-      { nombre: 'Estado',           ancho: 120, tipo: 'texto' },
-      { nombre: 'Resultado',        ancho: 220, tipo: 'texto' },
-      { nombre: 'Notas',            ancho: 300, tipo: 'texto' },
-      { nombre: 'Próximo paso',     ancho: 220, tipo: 'texto' }
-    ]
-  },
+  // Hoja "Seguimientos" eliminada — reemplazada por "Seguimiento Bot"
 
   // -- SEGUIMIENTO BOT (para n8n + WhatsApp) --------------------------------
   // Hoja unificada para dos flujos:
@@ -732,7 +712,7 @@ function _ejecutarInstalacion(borrarExistentes) {
         'Por su cuenta',
         'Paso a paso',
         'Activamente busca trabajo',
-        'Seguimientos',
+        'Seguimientos',        // legacy — se elimina si existe
         'Seguimiento Bot',
         'Clasificación de Perfiles',
         'Satisfacción Empleo',
@@ -773,7 +753,6 @@ function _ejecutarInstalacion(borrarExistentes) {
       'Paso a paso',
       'Activamente busca trabajo',
       'Conexiones Laborales',
-      'Seguimientos',
       'Seguimiento Bot',
       'Clasificación de Perfiles',
       'Satisfacción Empleo',
