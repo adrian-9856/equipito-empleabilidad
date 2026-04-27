@@ -33,7 +33,7 @@
         "operation": "getRows",
         "documentId": {
           "__rl": true,
-          "value": "TU_SPREADSHEET_ID_AQUI",
+          "value": "1_596FX6yr8tX93UyIks4emSeE2_vxLJMDyw9Zncsnzs",
           "mode": "id"
         },
         "sheetName": {
@@ -54,7 +54,7 @@
           "name": "Google Sheets OAuth2"
         }
       },
-      "notes": "IMPORTANTE: Reemplaza TU_SPREADSHEET_ID_AQUI con el ID de tu Google Sheet"
+      "notes": "Spreadsheet de Equipito Empleabilidad — pestaña Seguimiento Bot"
     },
     {
       "parameters": {
@@ -181,7 +181,7 @@
         "operation": "updateRows",
         "documentId": {
           "__rl": true,
-          "value": "TU_SPREADSHEET_ID_AQUI",
+          "value": "1_596FX6yr8tX93UyIks4emSeE2_vxLJMDyw9Zncsnzs",
           "mode": "id"
         },
         "sheetName": {
