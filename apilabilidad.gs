@@ -90,7 +90,11 @@ function onEdit(e) {
 
     if (nuevaEtapa === 'Activamente busca trabajo') {
       hoja.getRange(fila, 12).setValue('Si');
-      programarSeguimientos(graduadoId, nombre);
+      crearSeguimientoBusquedaActiva(
+        datosGrad[2],  // Creamos ID (col C)
+        datosGrad[3],  // Nombre completo (col D)
+        datosGrad[7]   // Número de teléfono (col H)
+      );
     }
 
     SpreadsheetApp.getActiveSpreadsheet().toast(
@@ -591,6 +595,9 @@ const ESTRUCTURA_HOJAS = {
   },
 
   // -- SEGUIMIENTO BOT (para n8n + WhatsApp) --------------------------------
+  // Hoja unificada para dos flujos:
+  //   "Post-empleo"     → viene de Conexiones Laborales
+  //   "Búsqueda activa" → viene de Activamente busca trabajo
   'Seguimiento Bot': {
     color: '#00897b',
     columnas: [
@@ -603,7 +610,7 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Fecha Seg1',         ancho: 140, tipo: 'fecha' },
       { nombre: 'Fecha Seg2',         ancho: 140, tipo: 'fecha' },
       { nombre: 'Fecha Recordatorio', ancho: 160, tipo: 'fecha' },
-      { nombre: 'Estado',             ancho: 160, tipo: 'texto' },
+      { nombre: 'Estado',             ancho: 180, tipo: 'dropdown', opciones: ['Pendiente', 'Mensaje Enviado', 'Respuesta Recibida', 'Llamada Programada', 'Completado'] },
       { nombre: 'Etapa Actual',       ancho: 130, tipo: 'texto' },
       { nombre: 'Resp S1 P1',         ancho: 300, tipo: 'texto' },
       { nombre: 'Resp S1 P2',         ancho: 300, tipo: 'texto' },
@@ -611,7 +618,9 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Resp S2 P1',         ancho: 300, tipo: 'texto' },
       { nombre: 'Resp S2 P2',         ancho: 300, tipo: 'texto' },
       { nombre: 'Resp S2 P3',         ancho: 300, tipo: 'texto' },
-      { nombre: 'Email Enviado',      ancho: 130, tipo: 'siNo'  }
+      { nombre: 'Email Enviado',      ancho: 130, tipo: 'siNo'  },
+      { nombre: 'Tipo Seguimiento',   ancho: 180, tipo: 'dropdown', opciones: ['Post-empleo', 'Búsqueda activa'] },
+      { nombre: 'Origen',             ancho: 220, tipo: 'texto' }
     ]
   },
 
@@ -2854,35 +2863,89 @@ function crearFilaSeguimientoBot(datos, fechaEmpleo) {
              d.getFullYear();
     }
 
-    // Asegurar formato +502XXXXXXXX
     var telefono = (datos.telefono || '').toString().trim();
     if (telefono && !telefono.startsWith('+')) {
       telefono = '+' + telefono;
     }
 
     const fila = [
-      datos.creamosId      || '',   // Creamos ID
-      datos.nombreCompleto || '',   // Nombre
-      telefono,                     // Telefono
-      datos.empresa        || '',   // Empresa
-      datos.cargo          || '',   // Cargo
-      fechaEmpleo,                  // Fecha Empleo
-      fmt(fechaSeg1),               // Fecha Seg1 (hoy)
-      fmt(fechaSeg2),               // Fecha Seg2 (+14 días)
-      fmt(fechaRecord),             // Fecha Recordatorio (+90 días)
-      'Nuevo',                      // Estado (n8n detecta esto)
-      '',                           // Etapa Actual
-      '', '', '',                   // Resp S1 P1, P2, P3
-      '', '', '',                   // Resp S2 P1, P2, P3
-      'No'                          // Email Enviado
+      datos.creamosId      || '',   // 1  Creamos ID
+      datos.nombreCompleto || '',   // 2  Nombre
+      telefono,                     // 3  Telefono
+      datos.empresa        || '',   // 4  Empresa
+      datos.cargo          || '',   // 5  Cargo
+      fechaEmpleo,                  // 6  Fecha Empleo
+      fmt(fechaSeg1),               // 7  Fecha Seg1 (hoy)
+      fmt(fechaSeg2),               // 8  Fecha Seg2 (+14 días)
+      fmt(fechaRecord),             // 9  Fecha Recordatorio (+90 días)
+      'Pendiente',                  // 10 Estado
+      '',                           // 11 Etapa Actual
+      '', '', '',                   // 12-14 Resp S1 P1, P2, P3
+      '', '', '',                   // 15-17 Resp S2 P1, P2, P3
+      'No',                         // 18 Email Enviado
+      'Post-empleo',                // 19 Tipo Seguimiento
+      'Conexiones Laborales'        // 20 Origen
     ];
 
     hoja.appendRow(fila);
-    Logger.log('Seguimiento Bot creado para: ' + datos.nombreCompleto);
+    Logger.log('Seguimiento Bot (post-empleo) creado para: ' + datos.nombreCompleto);
 
   } catch (error) {
     Logger.log('Error al crear fila en Seguimiento Bot: ' + error);
     // No lanzar el error para no interrumpir el guardado de Conexiones Laborales
+  }
+}
+
+/**
+ * Crea una fila en "Seguimiento Bot" cuando alguien entra a "Activamente busca trabajo".
+ * Flujo: onEdit detecta Etapa → llama esta función.
+ *
+ * Día 7  → WhatsApp Mensaje 1 (bot n8n)
+ * Día 14 → WhatsApp Mensaje 2 (bot n8n)
+ * Día 21 → Llamada por colaborador (marcado como "Llamada Programada")
+ */
+function crearSeguimientoBusquedaActiva(creamosId, nombre, telefono) {
+  try {
+    const hoja = obtenerHoja('Seguimiento Bot');
+
+    const hoy = new Date();
+    const seg1 = new Date(hoy); seg1.setDate(hoy.getDate() + 7);   // Día 7
+    const seg2 = new Date(hoy); seg2.setDate(hoy.getDate() + 14);  // Día 14
+    const rec  = new Date(hoy); rec.setDate(hoy.getDate() + 21);   // Día 21 (llamada)
+
+    function fmt(d) {
+      return ('0' + d.getDate()).slice(-2) + '/' +
+             ('0' + (d.getMonth() + 1)).slice(-2) + '/' +
+             d.getFullYear();
+    }
+
+    var tel = (telefono || '').toString().trim();
+    if (tel && !tel.startsWith('+')) tel = '+' + tel;
+
+    const fila = [
+      creamosId || '',              // 1  Creamos ID
+      nombre    || '',              // 2  Nombre
+      tel,                          // 3  Telefono
+      '',                           // 4  Empresa (vacío: aún no tiene)
+      '',                           // 5  Cargo   (vacío)
+      fmt(hoy),                     // 6  Fecha inicio búsqueda
+      fmt(seg1),                    // 7  Fecha Seg1 (+7 días → WhatsApp 1)
+      fmt(seg2),                    // 8  Fecha Seg2 (+14 días → WhatsApp 2)
+      fmt(rec),                     // 9  Fecha Recordatorio (+21 días → Llamada)
+      'Pendiente',                  // 10 Estado
+      'Búsqueda Activa',            // 11 Etapa Actual
+      '', '', '',                   // 12-14 Resp S1 P1, P2, P3
+      '', '', '',                   // 15-17 Resp S2 P1, P2, P3
+      'No',                         // 18 Email Enviado
+      'Búsqueda activa',            // 19 Tipo Seguimiento
+      'Activamente busca trabajo'   // 20 Origen
+    ];
+
+    hoja.appendRow(fila);
+    Logger.log('Seguimiento Bot (búsqueda activa) creado para: ' + nombre);
+
+  } catch (error) {
+    Logger.log('Error en crearSeguimientoBusquedaActiva: ' + error);
   }
 }
 
