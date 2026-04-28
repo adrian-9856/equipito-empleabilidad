@@ -37,27 +37,29 @@ function onOpen(e) {
       .addItem('⏹ Desactivar sincronización horaria',    'desactivarSincronizacionAutomatica');
 
     ui.createMenu('📊 Seguimiento Graduados')
-      .addItem('📥 Importar todos los datos',       'importarTodosLosDatos')
-      .addSeparator()
-      .addItem('📊 Generar Reporte',                'generarReporte')
-      .addItem('📝 Clasificar Graduados',           'mostrarFormularioClasificacion')
-      .addSeparator()
+      // ── Importar ──────────────────────────────────────
+      .addItem('📥 Importar todos los datos',          'importarTodosLosDatos')
+      .addItem('📥 Importar Graduados (externo)',       'importarGraduadosDesdeExterno')
       .addSubMenu(submenuImport)
       .addSeparator()
-      .addItem('⏱ Activar auto-import (cada X min)', 'activarAutoImport')
-      .addItem('⏹ Desactivar auto-import',           'desactivarAutoImport')
+      // ── Ver y clasificar ──────────────────────────────
+      .addItem('📊 Generar Reporte',                   'generarReporte')
+      .addItem('📝 Clasificar Graduados',              'mostrarFormularioClasificacion')
       .addSeparator()
-      .addItem('📥 Importar Graduados',              'importarGraduadosDesdeExterno')
-      .addItem('⏰ Instalar Trigger Graduados',      'instalarTriggerGraduados')
+      // ── Creamos ID / Salesforce ───────────────────────
+      .addItem('🔄 Autocompletar con Creamos ID',      'autocompletarConCreamos')
+      .addItem('🔍 Verificar Creamos ID ahora',        'verificarYCompletarCreamos')
+      .addItem('🔒 Proteger base datos Salesforce',    'protegerBaseDatosSalesforce')
       .addSeparator()
+      // ── Automatizaciones ─────────────────────────────
+      .addItem('⏱ Activar auto-import (cada X min)',   'activarAutoImport')
+      .addItem('⏹ Desactivar auto-import',             'desactivarAutoImport')
+      .addItem('⏰ Instalar Trigger Graduados',         'instalarTriggerGraduados')
+      .addItem('⏰ Activar verificación Creamos ID',   'instalarTriggerVerificacionCreamos')
       .addSeparator()
-      .addItem('🔄 Autocompletar con Creamos ID',       'autocompletarConCreamos')
-      .addItem('🔍 Verificar Creamos ID ahora',         'verificarYCompletarCreamos')
-      .addItem('⏰ Activar verificación automática',    'instalarTriggerVerificacionCreamos')
-      .addItem('🔒 Proteger base datos Salesforce',     'protegerBaseDatosSalesforce')
-      .addSeparator()
-      .addItem('🚀 Instalar Sistema (primera vez)',  'instalarSistema')
-      .addItem('🔁 Reinstalar Sistema (borra todo)', 'reinstalarSistema')
+      // ── Sistema ───────────────────────────────────────
+      .addItem('🚀 Instalar Sistema (primera vez)',    'instalarSistema')
+      .addItem('🔁 Reinstalar Sistema (borra todo)',   'reinstalarSistema')
       .addToUi();
   } catch (error) {
     Logger.log('onOpen: no se pudo crear el menú — ' + error.message);
