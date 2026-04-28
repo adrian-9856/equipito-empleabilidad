@@ -609,7 +609,7 @@ const ESTRUCTURA_HOJAS = {
   'Clasificación de Perfiles': {
     color: '#5c6bc0',
     columnas: [
-      { nombre: 'Creamos ID',          ancho: 130, tipo: 'texto' },
+      ...COLUMNAS_COMUNES,
       { nombre: 'Fecha evaluación',    ancho: 130, tipo: 'fecha' },
       { nombre: 'D1: Cuidado',         ancho: 280, tipo: 'texto' },
       { nombre: 'D1 Comentario',       ancho: 300, tipo: 'texto' },
