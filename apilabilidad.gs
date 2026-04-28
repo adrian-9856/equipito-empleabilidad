@@ -50,6 +50,10 @@ function onOpen(e) {
       .addItem('📥 Importar Graduados',              'importarGraduadosDesdeExterno')
       .addItem('⏰ Instalar Trigger Graduados',      'instalarTriggerGraduados')
       .addSeparator()
+      .addSeparator()
+      .addItem('🔄 Autocompletar con Creamos ID',   'autocompletarConCreamos')
+      .addItem('🔒 Proteger base datos Salesforce',  'protegerBaseDatosSalesforce')
+      .addSeparator()
       .addItem('🚀 Instalar Sistema (primera vez)',  'instalarSistema')
       .addItem('🔁 Reinstalar Sistema (borra todo)', 'reinstalarSistema')
       .addToUi();
@@ -2043,21 +2047,8 @@ function procesarClasificacionPerfiles(datos) {
   var todasColumnas     = Object.keys(datos[0]);
   var columnasFiltradas = todasColumnas.filter(function(c) { return !_excluir(c); });
 
-  // ── Cargar datos de Graduados para enriquecer con Nombre, Teléfono, Género, Edad ──
-  var mapaGrads = {};
-  var hojaGrads = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Graduados');
-  if (hojaGrads && hojaGrads.getLastRow() > 1) {
-    var grads = hojaGrads.getRange(2, 1, hojaGrads.getLastRow() - 1, 16).getValues();
-    grads.forEach(function(g) {
-      var cid = (g[2] || '').toString().trim(); // Creamos ID = col C (índice 2)
-      if (cid) mapaGrads[cid] = {
-        nombre:   g[3] || '',  // Nombre completo (col D)
-        telefono: g[7] || '',  // Teléfono (col H)
-        genero:   g[4] || '',  // Género (col E)
-        edad:     g[5] || ''   // Edad (col F)
-      };
-    });
-  }
+  // ── Cargar nombres desde base de datos Salesforce (fuente de verdad) ──
+  var mapaGrads = _cargarMapaCreamos_();
 
   var colId    = 'Creamos ID del participante:';
   var colFecha = '_submission_time';
@@ -3814,6 +3805,135 @@ function testSistema() {
 // ===========================================================================
 // SECCIÓN 8: IMPORTACIÓN DESDE HOJA EXTERNA DE GRADUADOS (pull horario)
 // ===========================================================================
+
+// ==========================================================================
+// SECCIÓN: BASE DE DATOS SALESFORCE (CREAMOS ID)
+// Hoja oculta y protegida que sirve como fuente de verdad para autocompletar
+// ==========================================================================
+
+const HOJA_BD_CREAMOS = 'Copy of CREAMOS ID nuevo';
+
+/**
+ * Carga el mapa Creamos ID → datos personales desde la hoja Salesforce.
+ * Columnas de la hoja: A=Nombre | B=Creamos ID | C=Año ingreso | D=Edad | E=DPI
+ * @return {Object} mapa { creamosId: { nombre, anio, edad, dpi } }
+ */
+function _cargarMapaCreamos_() {
+  var ss   = SpreadsheetApp.getActiveSpreadsheet();
+  var hoja = ss.getSheetByName(HOJA_BD_CREAMOS);
+  if (!hoja || hoja.getLastRow() < 2) return {};
+  var datos = hoja.getRange(2, 1, hoja.getLastRow() - 1, 5).getValues();
+  var mapa  = {};
+  datos.forEach(function(fila) {
+    var cid = (fila[1] || '').toString().trim(); // col B = Creamos ID
+    if (!cid) return;
+    mapa[cid] = {
+      nombre: (fila[0] || '').toString().trim(),  // col A = Nombre completo
+      anio:   fila[2] || '',                       // col C = Año que entró
+      edad:   fila[3] || '',                       // col D = Age
+      dpi:    (fila[4] || '').toString().trim()    // col E = Número de DPI
+    };
+  });
+  return mapa;
+}
+
+/**
+ * Autocompleta campos faltantes en las hojas del sistema
+ * usando la base de datos de Salesforce como fuente de verdad.
+ * Solo rellena celdas que estén vacías — nunca sobreescribe datos existentes.
+ */
+function autocompletarConCreamos() {
+  var ui   = SpreadsheetApp.getUi();
+  var mapa = _cargarMapaCreamos_();
+  if (Object.keys(mapa).length === 0) {
+    ui.alert('❌ Error', 'No se encontró la hoja "' + HOJA_BD_CREAMOS + '" o está vacía.', ui.ButtonSet.OK);
+    return;
+  }
+
+  var ss      = SpreadsheetApp.getActiveSpreadsheet();
+  var cambios = 0;
+
+  // ── Graduados: Creamos ID = col C (idx 2), Nombre = col D (idx 3), Edad = col F (idx 5) ──
+  var hojaGrad = ss.getSheetByName('Graduados');
+  if (hojaGrad && hojaGrad.getLastRow() > 1) {
+    var filas = hojaGrad.getRange(2, 1, hojaGrad.getLastRow() - 1, 10).getValues();
+    for (var i = 0; i < filas.length; i++) {
+      var cid  = (filas[i][2] || '').toString().trim();
+      var dato = mapa[cid];
+      if (!cid || !dato) continue;
+      var row = i + 2;
+      if (!filas[i][3] && dato.nombre) { hojaGrad.getRange(row, 4).setValue(dato.nombre); cambios++; }
+      if (!filas[i][5] && dato.edad)   { hojaGrad.getRange(row, 6).setValue(dato.edad);   cambios++; }
+    }
+  }
+
+  // ── Hojas de clasificación con COLUMNAS_COMUNES ──
+  // Creamos ID = col B (idx 1), Nombre = col C (idx 2), Edad = col F (idx 5)
+  ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'].forEach(function(nombre) {
+    var h = ss.getSheetByName(nombre);
+    if (!h || h.getLastRow() < 2) return;
+    var filas = h.getRange(2, 1, h.getLastRow() - 1, 7).getValues();
+    for (var i = 0; i < filas.length; i++) {
+      var cid  = (filas[i][1] || '').toString().trim();
+      var dato = mapa[cid];
+      if (!cid || !dato) continue;
+      var row = i + 2;
+      if (!filas[i][2] && dato.nombre) { h.getRange(row, 3).setValue(dato.nombre); cambios++; }
+      if (!filas[i][5] && dato.edad)   { h.getRange(row, 6).setValue(dato.edad);   cambios++; }
+    }
+  });
+
+  // ── Clasificación de Perfiles: Creamos ID = col B (idx 1), Nombre = col C (idx 2) ──
+  var hojaClasif = ss.getSheetByName('Clasificación de Perfiles');
+  if (hojaClasif && hojaClasif.getLastRow() > 1) {
+    var filas = hojaClasif.getRange(2, 1, hojaClasif.getLastRow() - 1, 3).getValues();
+    for (var i = 0; i < filas.length; i++) {
+      var cid  = (filas[i][1] || '').toString().trim();
+      var dato = mapa[cid];
+      if (!cid || !dato) continue;
+      if (!filas[i][2] && dato.nombre) { hojaClasif.getRange(i + 2, 3).setValue(dato.nombre); cambios++; }
+    }
+  }
+
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    'Se completaron ' + cambios + ' campos faltantes con datos de Salesforce.',
+    '✅ Autocompletado listo', 5
+  );
+}
+
+/**
+ * Oculta y protege la hoja base de datos Salesforce.
+ * Solo el usuario que ejecuta esta función puede editarla.
+ */
+function protegerBaseDatosSalesforce() {
+  var ui   = SpreadsheetApp.getUi();
+  var ss   = SpreadsheetApp.getActiveSpreadsheet();
+  var hoja = ss.getSheetByName(HOJA_BD_CREAMOS);
+  if (!hoja) {
+    ui.alert('❌ Error', 'No se encontró la hoja "' + HOJA_BD_CREAMOS + '".\nVerifica que el nombre sea exactamente ese.', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Ocultar la hoja
+  hoja.hideSheet();
+
+  // Proteger: eliminar todos los editores excepto el usuario actual
+  var proteccion = hoja.protect().setDescription('Base de datos Salesforce — solo administrador');
+  proteccion.setDomainEdit(false);
+  var yo = Session.getEffectiveUser();
+  var editores = proteccion.getEditors();
+  if (editores.length > 0) proteccion.removeEditors(editores);
+  proteccion.addEditor(yo);
+
+  ui.alert(
+    '🔒 Hoja protegida',
+    '"' + HOJA_BD_CREAMOS + '" está ahora:\n\n' +
+    '✅ Oculta (no visible en las pestañas)\n' +
+    '✅ Protegida (solo tú puedes editarla)\n\n' +
+    'Para verla: clic derecho en cualquier pestaña → "Mostrar hojas".',
+    ui.ButtonSet.OK
+  );
+}
 
 const CONFIG_GRADUADOS_EXTERNO = {
   FILE_ID:    '1_596FX6yr8tX93UyIks4emSeE2_vxLJMDyw9Zncsnzs',
