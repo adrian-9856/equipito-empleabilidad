@@ -51,8 +51,10 @@ function onOpen(e) {
       .addItem('⏰ Instalar Trigger Graduados',      'instalarTriggerGraduados')
       .addSeparator()
       .addSeparator()
-      .addItem('🔄 Autocompletar con Creamos ID',   'autocompletarConCreamos')
-      .addItem('🔒 Proteger base datos Salesforce',  'protegerBaseDatosSalesforce')
+      .addItem('🔄 Autocompletar con Creamos ID',       'autocompletarConCreamos')
+      .addItem('🔍 Verificar Creamos ID ahora',         'verificarYCompletarCreamos')
+      .addItem('⏰ Activar verificación automática',    'instalarTriggerVerificacionCreamos')
+      .addItem('🔒 Proteger base datos Salesforce',     'protegerBaseDatosSalesforce')
       .addSeparator()
       .addItem('🚀 Instalar Sistema (primera vez)',  'instalarSistema')
       .addItem('🔁 Reinstalar Sistema (borra todo)', 'reinstalarSistema')
@@ -3932,6 +3934,99 @@ function protegerBaseDatosSalesforce() {
     '✅ Protegida (solo tú puedes editarla)\n\n' +
     'Para verla: clic derecho en cualquier pestaña → "Mostrar hojas".',
     ui.ButtonSet.OK
+  );
+}
+
+/**
+ * Recorre todas las hojas buscando filas sin Creamos ID.
+ * - Sin Creamos ID → marca celda en naranja + nota para crear perfil en Salesforce
+ * - Con Creamos ID → borra el color de alerta y autocompleta datos faltantes
+ * Se ejecuta desde el menú o automáticamente por trigger cada 4 horas.
+ */
+function verificarYCompletarCreamos() {
+  var mapa  = _cargarMapaCreamos_();
+  var COLOR = '#FFE0B2'; // naranja claro = falta Creamos ID en Salesforce
+  var NOTA  = '⚠️ Pendiente: crear perfil en Salesforce con este registro';
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sinId = 0;
+  var completados = 0;
+
+  // ── Graduados: Creamos ID = col C (idx 2), Nombre = col D, Edad = col F ──
+  var hojaGrad = ss.getSheetByName('Graduados');
+  if (hojaGrad && hojaGrad.getLastRow() > 1) {
+    var nf   = hojaGrad.getLastRow() - 1;
+    var data = hojaGrad.getRange(2, 1, nf, 10).getValues();
+    for (var i = 0; i < data.length; i++) {
+      var cid = (data[i][2] || '').toString().trim();
+      var row = i + 2;
+      if (!cid) {
+        hojaGrad.getRange(row, 3).setBackground(COLOR).setNote(NOTA);
+        sinId++;
+      } else {
+        hojaGrad.getRange(row, 3).setBackground(null).clearNote();
+        var dato = mapa[cid];
+        if (dato) {
+          if (!data[i][3] && dato.nombre) { hojaGrad.getRange(row, 4).setValue(dato.nombre); completados++; }
+          if (!data[i][5] && dato.edad)   { hojaGrad.getRange(row, 6).setValue(dato.edad);   completados++; }
+        }
+      }
+    }
+  }
+
+  // ── Hojas de clasificación: Creamos ID = col B (idx 1) ──
+  ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'].forEach(function(nombre) {
+    var h = ss.getSheetByName(nombre);
+    if (!h || h.getLastRow() < 2) return;
+    var data = h.getRange(2, 1, h.getLastRow() - 1, 7).getValues();
+    for (var i = 0; i < data.length; i++) {
+      var cid = (data[i][1] || '').toString().trim();
+      var row = i + 2;
+      if (!cid) {
+        h.getRange(row, 2).setBackground(COLOR).setNote(NOTA);
+        sinId++;
+      } else {
+        h.getRange(row, 2).setBackground(null).clearNote();
+        var dato = mapa[cid];
+        if (dato) {
+          if (!data[i][2] && dato.nombre) { h.getRange(row, 3).setValue(dato.nombre); completados++; }
+          if (!data[i][5] && dato.edad)   { h.getRange(row, 6).setValue(dato.edad);   completados++; }
+        }
+      }
+    }
+  });
+
+  Logger.log('Verificación Creamos: ' + sinId + ' sin ID, ' + completados + ' campos completados.');
+  if (sinId > 0) {
+    ss.toast(
+      sinId + ' registros en naranja necesitan perfil en Salesforce.',
+      '⚠️ Acción requerida', 10
+    );
+  } else if (completados > 0) {
+    ss.toast(completados + ' campos completados automáticamente.', '✅ Actualizado', 5);
+  }
+}
+
+/**
+ * Instala un trigger que ejecuta verificarYCompletarCreamos() cada 4 horas.
+ * Elimina triggers anteriores del mismo nombre para evitar duplicados.
+ */
+function instalarTriggerVerificacionCreamos() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'verificarYCompletarCreamos') ScriptApp.deleteTrigger(t);
+  });
+
+  ScriptApp.newTrigger('verificarYCompletarCreamos')
+    .timeBased()
+    .everyHours(4)
+    .create();
+
+  SpreadsheetApp.getUi().alert(
+    '⏰ Verificación automática activada',
+    'Cada 4 horas el sistema:\n\n' +
+    '🟠 Marcará en naranja registros sin Creamos ID\n' +
+    '✅ Completará datos faltantes desde Salesforce\n\n' +
+    'También puedes ejecutarlo manualmente desde el menú.',
+    SpreadsheetApp.getUi().ButtonSet.OK
   );
 }
 
