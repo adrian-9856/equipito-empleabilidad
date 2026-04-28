@@ -2062,14 +2062,11 @@ function procesarClasificacionPerfiles(datos) {
   // Columnas de evaluación: todo excepto ID y fecha (ya van en las 6 base)
   var evalCols = columnasFiltradas.filter(function(c) { return c !== colId && c !== colFecha; });
 
-  // Headers: 6 columnas base (con nombre y datos personales) + columnas de evaluación
+  // Headers: 3 columnas base + columnas de evaluación
   var headersLimpios = [
     'Fecha de ingreso',
     'Creamos ID',
-    'Nombre completo',
-    'Número de teléfono',
-    'Género',
-    'Edad'
+    'Nombre completo'
   ].concat(evalCols.map(function(col) { return NOMBRES[col] || col; }));
 
   // ── Limpiar hoja y escribir headers con el mismo estilo ──
@@ -2094,10 +2091,7 @@ function procesarClasificacionPerfiles(datos) {
     var fila = [
       dato[colFecha] || '',   // Fecha de ingreso (= fecha evaluación KoboToolbox)
       cid,                    // Creamos ID
-      grad.nombre   || '',    // Nombre completo (desde Graduados)
-      grad.telefono || '',    // Número de teléfono (desde Graduados)
-      grad.genero   || '',    // Género (desde Graduados)
-      grad.edad     || ''     // Edad (desde Graduados)
+      grad.nombre   || ''     // Nombre completo (desde Graduados)
     ].concat(evalCols.map(function(col) { return dato[col] || ''; }));
     hoja.appendRow(fila);
     nuevos++;
