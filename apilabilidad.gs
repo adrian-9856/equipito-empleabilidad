@@ -606,11 +606,13 @@ const ESTRUCTURA_HOJAS = {
 
   // -- CLASIFICACIÓN DE PERFILES -----------------------------------------------
   // Importada desde KoboToolbox: IL_09_Módulo de Clasificación de Perfiles
+  // Estructura dinámica — se reconstruye en procesarClasificacionPerfiles()
   'Clasificación de Perfiles': {
     color: '#5c6bc0',
     columnas: [
-      ...COLUMNAS_COMUNES,
-      { nombre: 'Fecha evaluación',    ancho: 130, tipo: 'fecha' },
+      { nombre: 'Fecha de ingreso',    ancho: 140, tipo: 'texto' },
+      { nombre: 'Creamos ID',          ancho: 130, tipo: 'texto' },
+      { nombre: 'Nombre completo',     ancho: 200, tipo: 'texto' },
       { nombre: 'D1: Cuidado',         ancho: 280, tipo: 'texto' },
       { nombre: 'D1 Comentario',       ancho: 300, tipo: 'texto' },
       { nombre: 'D2: Violencia',       ancho: 280, tipo: 'texto' },
@@ -2072,6 +2074,8 @@ function procesarClasificacionPerfiles(datos) {
   // ── Limpiar hoja y escribir headers con el mismo estilo ──
   hoja.clearContents();
   hoja.clearFormats();
+  hoja.clearConditionalFormatRules();
+  hoja.getDataRange().clearDataValidations();
   var headerRange = hoja.getRange(1, 1, 1, headersLimpios.length);
   headerRange.setValues([headersLimpios]);
   headerRange.setBackground('#5c6bc0')
