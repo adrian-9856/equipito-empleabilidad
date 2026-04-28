@@ -2041,19 +2041,41 @@ function procesarClasificacionPerfiles(datos) {
   var todasColumnas     = Object.keys(datos[0]);
   var columnasFiltradas = todasColumnas.filter(function(c) { return !_excluir(c); });
 
-  // Poner Creamos ID primero y _submission_time segundo
+  // ── Cargar datos de Graduados para enriquecer con Nombre, Teléfono, Género, Edad ──
+  var mapaGrads = {};
+  var hojaGrads = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Graduados');
+  if (hojaGrads && hojaGrads.getLastRow() > 1) {
+    var grads = hojaGrads.getRange(2, 1, hojaGrads.getLastRow() - 1, 16).getValues();
+    grads.forEach(function(g) {
+      var cid = (g[2] || '').toString().trim(); // Creamos ID = col C (índice 2)
+      if (cid) mapaGrads[cid] = {
+        nombre:   g[3] || '',  // Nombre completo (col D)
+        telefono: g[7] || '',  // Teléfono (col H)
+        genero:   g[4] || '',  // Género (col E)
+        edad:     g[5] || ''   // Edad (col F)
+      };
+    });
+  }
+
   var colId    = 'Creamos ID del participante:';
   var colFecha = '_submission_time';
-  var resto    = columnasFiltradas.filter(function(c) { return c !== colId && c !== colFecha; });
-  var orden    = [colId, colFecha].filter(function(c) { return columnasFiltradas.indexOf(c) !== -1; }).concat(resto);
+  // Columnas de evaluación: todo excepto ID y fecha (ya van en las 6 base)
+  var evalCols = columnasFiltradas.filter(function(c) { return c !== colId && c !== colFecha; });
 
-  // Nombres para los headers (cortos si existe mapeo, original si no)
-  var headersLimpios = orden.map(function(col) { return NOMBRES[col] || col; });
+  // Headers: 6 columnas base (con nombre y datos personales) + columnas de evaluación
+  var headersLimpios = [
+    'Fecha de ingreso',
+    'Creamos ID',
+    'Nombre completo',
+    'Número de teléfono',
+    'Género',
+    'Edad'
+  ].concat(evalCols.map(function(col) { return NOMBRES[col] || col; }));
 
   // ── Limpiar hoja y escribir headers con el mismo estilo ──
   hoja.clearContents();
   hoja.clearFormats();
-  var headerRange = hoja.getRange(1, 1, 1, orden.length);
+  var headerRange = hoja.getRange(1, 1, 1, headersLimpios.length);
   headerRange.setValues([headersLimpios]);
   headerRange.setBackground('#5c6bc0')
              .setFontColor('#ffffff')
@@ -2063,12 +2085,20 @@ function procesarClasificacionPerfiles(datos) {
   hoja.setRowHeight(1, 36);
   hoja.setFrozenRows(1);
 
-  // ── Escribir filas de datos ──
+  // ── Escribir filas: 6 columnas base + datos de evaluación ──
   var nuevos = 0;
   datos.forEach(function(dato) {
-    var creamosId = (dato[colId] || '').toString().trim();
-    if (!creamosId) return;
-    var fila = orden.map(function(col) { return dato[col] || ''; });
+    var cid = (dato[colId] || '').toString().trim();
+    if (!cid) return;
+    var grad = mapaGrads[cid] || {};
+    var fila = [
+      dato[colFecha] || '',   // Fecha de ingreso (= fecha evaluación KoboToolbox)
+      cid,                    // Creamos ID
+      grad.nombre   || '',    // Nombre completo (desde Graduados)
+      grad.telefono || '',    // Número de teléfono (desde Graduados)
+      grad.genero   || '',    // Género (desde Graduados)
+      grad.edad     || ''     // Edad (desde Graduados)
+    ].concat(evalCols.map(function(col) { return dato[col] || ''; }));
     hoja.appendRow(fila);
     nuevos++;
   });
