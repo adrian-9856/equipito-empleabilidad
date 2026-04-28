@@ -58,7 +58,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// ============================================================\n// MODO PRUEBA\n// Cambia MODO_PRUEBA a true para probar sin importar la fecha\n// Cambia TELEFONO_PRUEBA a TU numero para recibir los mensajes\n// ============================================================\nconst MODO_PRUEBA = false;\nconst TELEFONO_PRUEBA = '+502XXXXXXXX'; // <-- pon tu numero aqui\n// ============================================================\n\nconst hoy = new Date();\nconst pad = n => n.toString().padStart(2, '0');\nconst hoyStr = pad(hoy.getDate()) + '/' + pad(hoy.getMonth() + 1) + '/' + hoy.getFullYear();\n\nconst resultado = [];\n\nfor (const item of $input.all()) {\n  const fila = item.json;\n  const estado = (fila['Estado'] || '').trim();\n  const seg1   = (fila['Fecha Seg1'] || '').toString().trim();\n  const seg2   = (fila['Fecha Seg2'] || '').toString().trim();\n  let   tel    = (fila['Telefono'] || '').toString().trim();\n\n  const esHoy     = MODO_PRUEBA ? (seg1 !== '' || seg2 !== '') : (seg1 === hoyStr || seg2 === hoyStr);\n  const pendiente = estado === 'Pendiente' || estado === '';\n\n  if (esHoy && pendiente && tel) {\n    // En modo prueba, redirigir todos los mensajes al numero de prueba\n    if (MODO_PRUEBA) tel = TELEFONO_PRUEBA;\n\n    resultado.push({\n      json: {\n        ...fila,\n        Telefono: tel,\n        _hoy: hoyStr,\n        _esSeg2: MODO_PRUEBA ? false : (seg2 === hoyStr)\n      }\n    });\n  }\n}\n\nconsole.log('MODO_PRUEBA:', MODO_PRUEBA);\nconsole.log('Filas para enviar hoy:', resultado.length);\nreturn resultado;"
+        "jsCode": "// ============================================================\n// MODO PRUEBA\n// Cambia MODO_PRUEBA a true para probar sin importar la fecha\n// Cambia TELEFONO_PRUEBA a TU numero (con +502) para recibir todo\n// ============================================================\nconst MODO_PRUEBA = false;\nconst TELEFONO_PRUEBA = '+50212345678'; // <-- pon TU numero aqui\n// ============================================================\n\nconst hoy = new Date();\nconst pad = n => n.toString().padStart(2, '0');\nconst hoyStr = pad(hoy.getDate()) + '/' + pad(hoy.getMonth() + 1) + '/' + hoy.getFullYear();\n\nconst resultado = [];\n\nfor (const item of $input.all()) {\n  const fila = item.json;\n  const estado = (fila['Estado'] || '').toString().trim();\n  const seg1   = (fila['Fecha Seg1'] || '').toString().trim();\n  const seg2   = (fila['Fecha Seg2'] || '').toString().trim();\n  let   tel    = (fila['Telefono'] || '').toString().trim();\n\n  // Asegurar que el telefono empieza con +\n  if (tel && !tel.startsWith('+')) {\n    // Si parece numero de Guatemala (8 digitos), agregar +502\n    if (/^\\d{8}$/.test(tel)) {\n      tel = '+502' + tel;\n    } else if (/^\\d+$/.test(tel)) {\n      tel = '+' + tel;\n    }\n  }\n\n  const esHoy     = MODO_PRUEBA ? (seg1 !== '' || seg2 !== '') : (seg1 === hoyStr || seg2 === hoyStr);\n  const pendiente = estado === 'Pendiente' || estado === '';\n\n  if (esHoy && pendiente && tel) {\n    if (MODO_PRUEBA) tel = TELEFONO_PRUEBA;\n\n    resultado.push({\n      json: {\n        ...fila,\n        Telefono: tel,\n        _hoy: hoyStr,\n        _esSeg2: MODO_PRUEBA ? false : (seg2 === hoyStr)\n      }\n    });\n  }\n}\n\nconsole.log('MODO_PRUEBA:', MODO_PRUEBA);\nconsole.log('Filas para enviar hoy:', resultado.length);\nreturn resultado;"
       },
       "id": "b5f2a1c3-0000-4000-8000-000000000004",
       "name": "Filtrar fecha de hoy",
@@ -158,10 +158,11 @@
     },
     {
       "parameters": {
-        "operation": "send",
-        "from": "whatsapp:+14155238886",
-        "to": "={{ 'whatsapp:' + $json['Telefono'] }}",
-        "body": "={{ $json['_mensaje'] }}"
+        "from": "+14155238886",
+        "to": "={{ $json['Telefono'] }}",
+        "toWhatsapp": true,
+        "message": "={{ $json['_mensaje'] }}",
+        "options": {}
       },
       "id": "b5f2a1c3-0000-4000-8000-000000000009",
       "name": "Enviar WhatsApp Twilio",
@@ -174,7 +175,7 @@
           "name": "Twilio Account"
         }
       },
-      "notes": "Numero sandbox Twilio: +14155238886. Cambialo cuando salgas de pruebas."
+      "notes": "Numero sandbox Twilio: +14155238886. toWhatsapp=true agrega prefijo whatsapp: automaticamente"
     },
     {
       "parameters": {
@@ -192,11 +193,42 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
+            "Creamos ID": "={{ $json['Creamos ID'] }}",
             "Estado": "Mensaje Enviado",
             "Etapa Actual": "={{ $json['_tipoMensaje'] }}"
           },
           "matchingColumns": ["Creamos ID"],
-          "schema": []
+          "schema": [
+            {
+              "id": "Creamos ID",
+              "displayName": "Creamos ID",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Estado",
+              "displayName": "Estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Etapa Actual",
+              "displayName": "Etapa Actual",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
         },
         "options": {}
       },
