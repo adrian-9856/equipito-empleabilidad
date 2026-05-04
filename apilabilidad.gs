@@ -487,7 +487,6 @@ const ESTRUCTURA_HOJAS = {
     columnas: [
       ...COLUMNAS_COMUNES,
       { nombre: 'DPI',                ancho: 140, tipo: 'texto' },
-      { nombre: 'Número de teléfono', ancho: 160, tipo: 'texto' },
       { nombre: 'Formación',          ancho: 180, tipo: 'texto' },
       { nombre: 'Cohorte',            ancho: 110, tipo: 'texto' },
       { nombre: 'Nota',               ancho: 300, tipo: 'texto' },
@@ -2276,6 +2275,12 @@ function clasificarGraduado(graduadoId, clasificacion, datosAdicionales = {}) {
 function copiarAHojaClasificacion(datosGraduado, clasificacion, datosAdicionales) {
   const nombreHoja = obtenerNombreHojaClasificacion(clasificacion);
   const hoja       = obtenerHoja(nombreHoja);
+
+  // Asegurar que la hoja tiene headers si está vacía
+  if (hoja.getLastRow() < 1) {
+    _construirHoja(hoja, nombreHoja);
+  }
+
   const fila       = prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionales);
   hoja.appendRow(fila);
 }
@@ -2339,8 +2344,8 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
 
     case 'Aliados':
       return filaBase.concat([
-        datosAdicionales.pendiente             || 'No',
-        datosAdicionales.tramites              || '',
+        datosAdicionales.compartioCv           || 'No',
+        datosAdicionales.area                  || '',
         datosAdicionales.entrevista            || '',
         datosAdicionales.diaDePrueba           || '',
         datosAdicionales.confirmacionRecepcion || '',
@@ -2390,7 +2395,6 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
     case 'Fito':
       return filaBase.concat([
         datosAdicionales.dpi       || '',
-        datosAdicionales.telefono  || datosGraduado[7] || '',  // índice 7 = Número de teléfono
         datosAdicionales.formacion || datosGraduado[8] || '',  // índice 8 = Formación
         datosAdicionales.cohorte   || datosGraduado[9] || '',  // índice 9 = Cohorte
         datosAdicionales.nota      || '',
