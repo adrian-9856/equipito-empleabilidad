@@ -2276,9 +2276,31 @@ function copiarAHojaClasificacion(datosGraduado, clasificacion, datosAdicionales
   const nombreHoja = obtenerNombreHojaClasificacion(clasificacion);
   const hoja       = obtenerHoja(nombreHoja);
 
-  // Asegurar que la hoja tiene headers si está vacía
-  if (hoja.getLastRow() < 1) {
-    _construirHoja(hoja, nombreHoja);
+  // Asegurar que la hoja tiene headers correctos antes de agregar datos.
+  // Esto previene el bug donde una hoja sin headers recibe datos en fila 1
+  // (haciéndola parecer "vacía" o "corrupta").
+  const estructura = ESTRUCTURA_HOJAS[nombreHoja];
+  if (estructura && estructura.columnas && estructura.columnas.length > 0) {
+    const headersEsperados = estructura.columnas.map(c => c.nombre);
+    const lastRow = hoja.getLastRow();
+    const lastCol = hoja.getLastColumn();
+
+    let necesitaReconstruir = false;
+    if (lastRow < 1 || lastCol < 1) {
+      // Hoja completamente vacía
+      necesitaReconstruir = true;
+    } else {
+      // Verificar que el primer header coincide
+      const primerHeader = hoja.getRange(1, 1).getValue();
+      if (!primerHeader || primerHeader.toString().trim() === '') {
+        necesitaReconstruir = true;
+      }
+    }
+
+    if (necesitaReconstruir) {
+      Logger.log('Reconstruyendo hoja sin headers: ' + nombreHoja);
+      _construirHoja(hoja, nombreHoja);
+    }
   }
 
   const fila       = prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionales);
