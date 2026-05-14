@@ -46,6 +46,9 @@ function onOpen(e) {
       .addItem('📊 Generar Reporte',                   'generarReporte')
       .addItem('📝 Clasificar Graduados',              'mostrarFormularioClasificacion')
       .addSeparator()
+      .addItem('📤 Enviar a Conexiones Laborales',     'enviarAConexionesLaborales')
+      .addItem('🔔 Enviar a Seguimiento Bot',          'enviarSesionASeguimientoBot')
+      .addSeparator()
       // ── Creamos ID / Salesforce ───────────────────────
       .addItem('🔄 Autocompletar con Creamos ID',      'autocompletarConCreamos')
       .addItem('🔍 Verificar Creamos ID ahora',        'verificarYCompletarCreamos')
@@ -3811,9 +3814,9 @@ function generarReporte() {
       if (e === 'Paso a paso')               return 'P.Paso';
       return e;
     });
-    // Solo caben 5 columnas de etapa + 1 de mes si W=6; usamos todas las etapas y dejamos Total abajo
-    var numEtapas  = ETAPAS_FLUJO.length; // 6
-    var numColsMes = 1 + numEtapas + 1;   // Mes + etapas + Total
+    // Mes + etapas + Sesiones + Total
+    var numEtapas  = ETAPAS_FLUJO.length;
+    var numColsMes = 1 + numEtapas + 1 + 1; // Mes + etapas + Sesiones + Total
 
     // Si necesitamos más columnas, ampliar
     for (var cx = W + 1; cx <= numColsMes; cx++) hoja.setColumnWidth(cx, 85);
@@ -3824,6 +3827,7 @@ function generarReporte() {
     hoja.setRowHeight(f, 28);
     var headerMes = [['Mes']];
     etapasCortas.forEach(function(e) { headerMes[0].push(e); });
+    headerMes[0].push('Sesiones');
     headerMes[0].push('Total');
     hoja.getRange(f, 1, 1, numColsMes).setValues(headerMes)
         .setBackground(C.headerBg).setFontColor(C.headerFg)
@@ -3832,6 +3836,7 @@ function generarReporte() {
 
     var totEtapa = {};
     ETAPAS_FLUJO.forEach(function(e) { totEtapa[e] = 0; });
+    var totSesiones = 0;
     var granTotal = 0;
     var filaInicioMeses = f;
 
@@ -3846,6 +3851,9 @@ function generarReporte() {
         totEtapa[e] += v;
         totalMes    += v;
       });
+      var vSes = ipm[mes]['Sesiones'] || 0;
+      row.push(vSes);
+      totSesiones += vSes;
       row.push(totalMes);
       granTotal += totalMes;
       hoja.getRange(f, 1, 1, numColsMes).setValues([row])
@@ -3858,6 +3866,7 @@ function generarReporte() {
     hoja.setRowHeight(f, 26);
     var rowTot = ['TOTAL'];
     ETAPAS_FLUJO.forEach(function(e) { rowTot.push(totEtapa[e]); });
+    rowTot.push(totSesiones);
     rowTot.push(granTotal);
     hoja.getRange(f, 1, 1, numColsMes).setValues([rowTot])
         .setBackground(C.total).setFontColor(C.totalFg)
@@ -3865,6 +3874,78 @@ function generarReporte() {
     hoja.getRange(f, 1).setHorizontalAlignment('left');
     borde(filaInicioMeses - 1, 1, meses.length + 2, numColsMes);
     f += 2;
+
+    // ╔══════════════════════════════════════════╗
+    // ║  BLOQUE 5 — RESUMEN ANUAL               ║
+    // ╚══════════════════════════════════════════╝
+    // Group months by year and show yearly totals
+    var porAnio = {};
+    meses.forEach(function(mes) {
+      // mes is like "Enero 2024"
+      var partes = mes.split(' ');
+      var anio = partes[partes.length - 1];
+      if (!porAnio[anio]) porAnio[anio] = { _orden: parseInt(anio), etapas: {}, sesiones: 0, total: 0 };
+      ETAPAS_FLUJO.forEach(function(e) {
+        if (!porAnio[anio].etapas[e]) porAnio[anio].etapas[e] = 0;
+        porAnio[anio].etapas[e] += ipm[mes][e] || 0;
+        porAnio[anio].total     += ipm[mes][e] || 0;
+      });
+      porAnio[anio].sesiones += ipm[mes]['Sesiones'] || 0;
+    });
+    var anios = Object.keys(porAnio).sort(function(a, b) { return porAnio[a]._orden - porAnio[b]._orden; });
+
+    if (anios.length > 0) {
+      f = titulo(f, '📆  RESUMEN ANUAL', C.secBg, C.secFg);
+
+      // Header anual
+      hoja.setRowHeight(f, 28);
+      var headerAnio = [['Año']];
+      etapasCortas.forEach(function(e) { headerAnio[0].push(e); });
+      headerAnio[0].push('Sesiones');
+      headerAnio[0].push('Total');
+      hoja.getRange(f, 1, 1, numColsMes).setValues(headerAnio)
+          .setBackground(C.headerBg).setFontColor(C.headerFg)
+          .setFontWeight('bold').setHorizontalAlignment('center').setFontSize(10);
+      f++;
+
+      var filaInicioAnios = f;
+      var granTotalAnio = 0;
+      var totEtapaAnio = {};
+      ETAPAS_FLUJO.forEach(function(e) { totEtapaAnio[e] = 0; });
+      var totSesionesAnio = 0;
+
+      anios.forEach(function(anio, idx) {
+        var bg = idx % 2 === 0 ? C.par : C.impar;
+        hoja.setRowHeight(f, 26);
+        var row = [anio];
+        ETAPAS_FLUJO.forEach(function(e) {
+          var v = porAnio[anio].etapas[e] || 0;
+          row.push(v);
+          totEtapaAnio[e] += v;
+        });
+        row.push(porAnio[anio].sesiones);
+        totSesionesAnio += porAnio[anio].sesiones;
+        row.push(porAnio[anio].total);
+        granTotalAnio += porAnio[anio].total;
+        hoja.getRange(f, 1, 1, numColsMes).setValues([row])
+            .setBackground(bg).setHorizontalAlignment('center').setFontSize(11);
+        hoja.getRange(f, 1).setHorizontalAlignment('left').setFontWeight('bold');
+        f++;
+      });
+
+      // Fila total anual
+      hoja.setRowHeight(f, 28);
+      var rowTotAnio = ['TOTAL'];
+      ETAPAS_FLUJO.forEach(function(e) { rowTotAnio.push(totEtapaAnio[e]); });
+      rowTotAnio.push(totSesionesAnio);
+      rowTotAnio.push(granTotalAnio);
+      hoja.getRange(f, 1, 1, numColsMes).setValues([rowTotAnio])
+          .setBackground(C.total).setFontColor(C.totalFg)
+          .setFontWeight('bold').setHorizontalAlignment('center').setFontSize(12);
+      hoja.getRange(f, 1).setHorizontalAlignment('left');
+      borde(filaInicioAnios - 1, 1, anios.length + 2, numColsMes);
+      f += 2;
+    }
   }
 
   // ── Footer ────────────────────────────────────────────────────────────────
