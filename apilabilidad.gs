@@ -34,6 +34,7 @@ function onOpen(e) {
       .addItem('🤝 Sesiones Acompañamiento (IL-08)',         'importarSesionesAcompanamiento')
       .addSeparator()
       .addItem('♻️ Reimportar Sesiones desde cero',          'reimportarSesionesDesdeCero')
+      .addItem('♻️ Reimportar Satisfacción desde cero',      'reimportarSatisfaccionDesdeCero')
       .addItem('🧹 Limpiar duplicados (Clasificación)',      'limpiarDuplicadosClasificacion');
 
     // ── Submenú: Herramientas avanzadas ───────────────────────────────────
@@ -604,24 +605,24 @@ const ESTRUCTURA_HOJAS = {
   },
 
   // -- IL_06: SATISFACCIÓN EMPLEO --------------------------------------------
+  // Nueva estructura del formulario (5 preguntas escala 1-5 + texto):
+  //   satisfaccion_empleo, cumple_expectativas, ambiente_laboral,
+  //   salario_beneficios, permanencia (1-5)
+  //   aspecto_mejorar, otro_aspecto, Nota (texto libre)
   'Satisfacción Empleo': {
     color: '#00897b',
     columnas: [
-      { nombre: 'Creamos ID',         ancho: 130, tipo: 'texto' },
-      { nombre: 'Fecha envío',        ancho: 160, tipo: 'texto' },
-      { nombre: 'Nombre',             ancho: 140, tipo: 'texto' },
-      { nombre: 'Apellido',           ancho: 140, tipo: 'texto' },
-      { nombre: 'Primera vez',        ancho: 100, tipo: 'texto' },
-      { nombre: 'Formación recibida', ancho: 200, tipo: 'texto' },
-      { nombre: 'P1',                 ancho: 60,  tipo: 'texto' },
-      { nombre: 'P2',                 ancho: 60,  tipo: 'texto' },
-      { nombre: 'P3',                 ancho: 60,  tipo: 'texto' },
-      { nombre: 'P4',                 ancho: 60,  tipo: 'texto' },
-      { nombre: 'P5',                 ancho: 60,  tipo: 'texto' },
-      { nombre: 'P6',                 ancho: 60,  tipo: 'texto' },
-      { nombre: 'Comentarios',        ancho: 280, tipo: 'texto' },
-      { nombre: 'Puntaje AAPI',       ancho: 110, tipo: 'texto' },
-      { nombre: 'Satisfacción',       ancho: 120, tipo: 'texto' }
+      { nombre: 'Creamos ID',           ancho: 130, tipo: 'texto' },
+      { nombre: 'Fecha envío',          ancho: 160, tipo: 'texto' },
+      { nombre: 'Satisfacción empleo',  ancho: 110, tipo: 'texto' },
+      { nombre: 'Cumple expectativas',  ancho: 110, tipo: 'texto' },
+      { nombre: 'Ambiente laboral',     ancho: 110, tipo: 'texto' },
+      { nombre: 'Salario y beneficios', ancho: 130, tipo: 'texto' },
+      { nombre: 'Permanencia',          ancho: 100, tipo: 'texto' },
+      { nombre: 'Aspecto a mejorar',    ancho: 220, tipo: 'texto' },
+      { nombre: 'Otro aspecto',         ancho: 200, tipo: 'texto' },
+      { nombre: 'Nota',                 ancho: 280, tipo: 'texto' },
+      { nombre: 'Promedio (1-5)',       ancho: 110, tipo: 'texto' }
     ]
   },
 
@@ -1550,36 +1551,52 @@ function _syncSatisfaccionSoloNuevos() {
     var datos = parsearCSV(body);
     if (!datos || datos.length === 0) return { nuevos: 0, actualizados: 0, total: 0 };
 
+    // Mapeo nuevo formulario → columnas de la hoja
     var NOMBRES = {
-      'Creamos_ID':              'Creamos ID',
-      '_submission_time':        'Fecha envío',
-      'primer_nombre':           'Nombre',
-      'apellido':                'Apellido',
-      'primera_vez':             'Primera vez',
-      '_Qu_formaci_n_recibiste': 'Formación recibida',
-      'group_aapi/P1':           'P1',
-      'group_aapi/P2':           'P2',
-      'group_aapi/P3':           'P3',
-      'group_aapi/P4':           'P4',
-      'group_aapi/P5':           'P5',
-      'group_aapi/P6':           'P6',
-      'Comentarios_adicionales': 'Comentarios',
-      'aapi_puntaje':            'Puntaje AAPI',
-      'grado_satisfaccion':      'Satisfacción'
+      'intro/Creamos_ID':     'Creamos ID',
+      '_submission_time':     'Fecha envío',
+      'satisfaccion_empleo':  'Satisfacción empleo',
+      'cumple_expectativas':  'Cumple expectativas',
+      'ambiente_laboral':     'Ambiente laboral',
+      'salario_beneficios':   'Salario y beneficios',
+      'permanencia':          'Permanencia',
+      'aspecto_mejorar':      'Aspecto a mejorar',
+      'otro_aspecto':         'Otro aspecto',
+      'Nota':                 'Nota'
     };
-    // Lista blanca: SOLO las columnas de NOMBRES, en ese orden exacto.
-    // Cualquier columna extra de KoboToolbox (P7, P8, P9...) se ignora.
+    // Las 5 preguntas con escala 1-5 (para calcular promedio)
+    var CAMPOS_NUMERICOS = [
+      'satisfaccion_empleo', 'cumple_expectativas', 'ambiente_laboral',
+      'salario_beneficios',  'permanencia'
+    ];
     var ORDEN       = Object.keys(NOMBRES);
-    var CAMPO_ID    = 'Creamos_ID';
+    var CAMPO_ID    = 'intro/Creamos_ID';
     var CAMPO_FECHA = '_submission_time';
 
-    var hoja = obtenerHoja('Satisfacción Empleo');
+    // Helper: calcular promedio de las 5 preguntas (ignorando vacíos)
+    function calcularPromedio(d) {
+      var suma = 0, n = 0;
+      CAMPOS_NUMERICOS.forEach(function(c) {
+        var v = parseFloat((d[c] || '').toString().trim());
+        if (!isNaN(v)) { suma += v; n++; }
+      });
+      return n > 0 ? (suma / n).toFixed(2) : '';
+    }
 
+    // Helper: arma la fila completa (NOMBRES + Promedio)
+    function armarFila(d) {
+      var row = ORDEN.map(function(k) { return d[k] || ''; });
+      row.push(calcularPromedio(d));
+      return row;
+    }
+
+    var hoja = obtenerHoja('Satisfacción Empleo');
     var ultimaFechaSatisf = _leerUltimaFecha(PROP_LAST_SATISF);
 
     // --- Primera importación (hoja vacía) ----------------------------------
     if (hoja.getLastRow() <= 1) {
       var headers = ORDEN.map(function(k) { return NOMBRES[k]; });
+      headers.push('Promedio (1-5)');
       hoja.clearContents();
       var hr = hoja.getRange(1, 1, 1, headers.length);
       hr.setValues([headers]);
@@ -1588,9 +1605,8 @@ function _syncSatisfaccionSoloNuevos() {
       var nuevos = 0;
       var maxF = '';
       datos.forEach(function(d) {
-        var id = (d[CAMPO_ID] || '').toString().trim();
-        if (!id) return;
-        hoja.appendRow(ORDEN.map(function(k) { return d[k] || ''; }));
+        // No filtrar por Creamos ID — importar TODOS los registros (histórico)
+        hoja.appendRow(armarFila(d));
         nuevos++;
         var f = (d[CAMPO_FECHA] || '').toString().trim();
         if (f > maxF) maxF = f;
@@ -1607,7 +1623,8 @@ function _syncSatisfaccionSoloNuevos() {
         hoja.getRange(2, 1, uf - 1, 2).getValues().forEach(function(r) {
           var id = (r[0] || '').toString().trim();
           var f  = (r[1] || '').toString().trim();
-          if (id) existentes[id + '||' + f] = true;
+          var k  = id ? (id + '||' + f) : ('noId||' + f);
+          existentes[k] = true;
         });
       }
     }
@@ -1615,12 +1632,11 @@ function _syncSatisfaccionSoloNuevos() {
     var maxFecha = ultimaFechaSatisf;
     datos.forEach(function(d) {
       var id    = (d[CAMPO_ID] || '').toString().trim();
-      if (!id) return;
       var fecha = (d[CAMPO_FECHA] || '').toString().trim();
       if (ultimaFechaSatisf && fecha <= ultimaFechaSatisf) return;
-      var key   = id + '||' + fecha;
+      var key   = id ? (id + '||' + fecha) : ('noId||' + fecha);
       if (existentes[key]) return;
-      hoja.appendRow(ORDEN.map(function(k) { return d[k] || ''; }));
+      hoja.appendRow(armarFila(d));
       existentes[key] = true;
       nuevos++;
       if (fecha > maxFecha) maxFecha = fecha;
@@ -1644,6 +1660,37 @@ function importarSatisfaccionEmpleo() {
     ss.toast('', '', 1);
     ui.alert('✅ Satisfacción Empleo importada',
       'Nuevos: ' + res.nuevos + '\nTotal en hoja: ' + res.total, ui.ButtonSet.OK);
+  } catch (e) {
+    ss.toast('', '', 1);
+    ui.alert('❌ Error', e.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Limpia la hoja "Satisfacción Empleo" y la reimporta desde cero
+ * (histórico completo) con las columnas del nuevo formulario.
+ */
+function reimportarSatisfaccionDesdeCero() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  var confirmar = ui.alert(
+    '🔄 Reimportar Satisfacción Empleo',
+    'Esto borrará toda la hoja "Satisfacción Empleo" y la reimportará\n' +
+    'desde KoboToolbox con la nueva estructura del formulario.\n\n' +
+    'Se traerán TODOS los registros históricos.\n\n¿Continuar?',
+    ui.ButtonSet.YES_NO
+  );
+  if (confirmar !== ui.Button.YES) return;
+  var hoja = ss.getSheetByName('Satisfacción Empleo');
+  if (hoja) { hoja.clearContents(); hoja.clearFormats(); }
+  _resetearUltimaFecha(PROP_LAST_SATISF);
+  ss.toast('Reimportando Satisfacción Empleo...', '🔄', -1);
+  try {
+    var res = _syncSatisfaccionSoloNuevos();
+    ss.toast('', '', 1);
+    ui.alert('✅ Reimportación completada',
+      'Registros importados: ' + res.nuevos + '\nTotal en hoja: ' + res.total,
+      ui.ButtonSet.OK);
   } catch (e) {
     ss.toast('', '', 1);
     ui.alert('❌ Error', e.message, ui.ButtonSet.OK);
