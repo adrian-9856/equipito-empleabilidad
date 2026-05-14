@@ -2982,12 +2982,20 @@ function crearSeguimientoBusquedaActiva(creamosId, nombre, telefono) {
 // ===========================================================================
 
 /**
- * Programa los seguimientos automáticos para un graduado empleado/activo
+ * Programa los seguimientos automáticos para un graduado empleado/activo.
+ * NOTA: Función legacy. El reemplazo es crearSeguimientoBusquedaActiva()
+ * que escribe a la hoja "Seguimiento Bot". Esta función solo escribe si
+ * la hoja "Seguimientos" ya existe (no la crea automáticamente).
  * @param {string} graduadoId
  * @param {string} nombreGraduado
  */
 function programarSeguimientos(graduadoId, nombreGraduado) {
-  const hojaSeguimientos = obtenerHoja('Seguimientos');
+  // Usar getSheetByName (NO obtenerHoja) para evitar crear la hoja legacy.
+  const hojaSeguimientos = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Seguimientos');
+  if (!hojaSeguimientos) {
+    Logger.log('Hoja "Seguimientos" no existe; se omite programarSeguimientos (legacy)');
+    return;
+  }
 
   const fechaBase   = new Date();
   const seguimientos = [
@@ -3028,7 +3036,10 @@ function programarSeguimientos(graduadoId, nombreGraduado) {
  * @return {Array}
  */
 function obtenerSeguimientosPendientes() {
-  const hojaSeguimientos = obtenerHoja('Seguimientos');
+  // Usar getSheetByName (NO obtenerHoja) para evitar crear la hoja legacy "Seguimientos"
+  // si no existe. Si no existe, no hay pendientes que reportar.
+  const hojaSeguimientos = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Seguimientos');
+  if (!hojaSeguimientos) return [];
   const datos            = hojaSeguimientos.getDataRange().getValues();
   if (datos.length <= 1) return [];
 
@@ -3070,7 +3081,11 @@ function marcarSeguimientoRealizado(fila, resultado, notas, proximoPaso) {
   // Seguimientos: col 1=No. | 2=Creamos ID | 3=Nombre | 4=Género | 5=Edad |
   //   6=Nivel edu | 7=Tipo | 8=Fecha prog. | 9=Fecha real. | 10=Estado |
   //   11=Resultado | 12=Notas | 13=Próximo paso
-  const hoja = obtenerHoja('Seguimientos');
+  const hoja = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Seguimientos');
+  if (!hoja) {
+    Logger.log('Hoja "Seguimientos" no existe; se omite marcarSeguimientoRealizado');
+    return;
+  }
   hoja.getRange(fila, 9).setValue(new Date().toLocaleDateString('es-ES'));  // Fecha realizada
   hoja.getRange(fila, 10).setValue('Realizado');                            // Estado
   hoja.getRange(fila, 11).setValue(resultado);                              // Resultado
