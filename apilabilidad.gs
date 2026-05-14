@@ -23,46 +23,48 @@ function onOpen(e) {
   try {
     const ui = SpreadsheetApp.getUi();
 
-    const submenuImport = ui.createMenu('📂 Importar por separado')
-      .addItem('🔄 Graduados',                           'importarDatosKobo')
-      .addItem('📋 Clasificación de Perfiles',           'importarClasificacionPerfiles')
-      .addItem('😊 Satisfacción Empleo (IL-06)',         'importarSatisfaccionEmpleo')
-      .addItem('🤝 Sesiones Acompañamiento (IL-08)',     'importarSesionesAcompanamiento')
+    // ── Submenú: Importar datos ────────────────────────────────────────────
+    const submenuImport = ui.createMenu('📂 Importar datos')
+      .addItem('📥 Importar todos (Kobo + externo)',         'importarTodosLosDatos')
+      .addItem('📥 Graduados (externo)',                     'importarGraduadosDesdeExterno')
       .addSeparator()
-      .addItem('♻️ Reimportar Sesiones desde cero',      'reimportarSesionesDesdeCero')
-      .addItem('🧹 Limpiar duplicados (Clasificación)',  'limpiarDuplicadosClasificacion')
-      .addItem('🔍 Diagnosticar Clasificación de Perfiles', 'diagnosticarClasificacionPerfiles')
+      .addItem('🔄 Solo Graduados (Kobo)',                   'importarDatosKobo')
+      .addItem('📋 Clasificación de Perfiles',               'importarClasificacionPerfiles')
+      .addItem('😊 Satisfacción Empleo (IL-06)',             'importarSatisfaccionEmpleo')
+      .addItem('🤝 Sesiones Acompañamiento (IL-08)',         'importarSesionesAcompanamiento')
       .addSeparator()
-      .addItem('🔧 Limpiar triggers duplicados',          'limpiarTriggersDuplicados')
-      .addItem('⏹ Desactivar sincronización horaria',    'desactivarSincronizacionAutomatica');
+      .addItem('♻️ Reimportar Sesiones desde cero',          'reimportarSesionesDesdeCero')
+      .addItem('🧹 Limpiar duplicados (Clasificación)',      'limpiarDuplicadosClasificacion');
 
-    ui.createMenu('📊 Seguimiento Graduados')
-      // ── Importar ──────────────────────────────────────
-      .addItem('📥 Importar todos los datos',          'importarTodosLosDatos')
-      .addItem('📥 Importar Graduados (externo)',       'importarGraduadosDesdeExterno')
+    // ── Submenú: Herramientas avanzadas ───────────────────────────────────
+    const submenuAvanzado = ui.createMenu('⚙️ Herramientas avanzadas')
+      .addItem('🔍 Diagnosticar Clasificación de Perfiles',  'diagnosticarClasificacionPerfiles')
+      .addItem('🔧 Limpiar triggers duplicados',             'limpiarTriggersDuplicados')
+      .addItem('⏱ Activar auto-import (cada hora)',          'activarAutoImport')
+      .addItem('⏹ Desactivar auto-import',                   'desactivarAutoImport')
+      .addItem('⏹ Desactivar sincronización horaria',        'desactivarSincronizacionAutomatica')
+      .addSeparator()
+      .addItem('⏰ Instalar trigger Graduados',               'instalarTriggerGraduados')
+      .addItem('⏰ Activar verificación Creamos ID',          'instalarTriggerVerificacionCreamos')
+      .addSeparator()
+      .addItem('🚀 Instalar Sistema (primera vez)',           'instalarSistema')
+      .addItem('🔁 Reinstalar Sistema (borra todo)',          'reinstalarSistema');
+
+    ui.createMenu('📊 Equipito Empleabilidad')
+      // ── 1. Importar ──────────────────────────────────
       .addSubMenu(submenuImport)
       .addSeparator()
-      // ── Ver y clasificar ──────────────────────────────
-      .addItem('📊 Generar Reporte',                   'generarReporte')
-      .addItem('📝 Clasificar Graduados',              'mostrarFormularioClasificacion')
+      // ── 2. Ver y clasificar ──────────────────────────
+      .addItem('📊 Generar Reporte',                         'generarReporte')
+      .addItem('📝 Clasificar Graduados',                    'mostrarFormularioClasificacion')
       .addSeparator()
-      .addItem('📤 Enviar a Conexiones Laborales',     'enviarAConexionesLaborales')
-      .addItem('🔔 Enviar a Seguimiento Bot',          'enviarSesionASeguimientoBot')
+      // ── 3. Creamos ID / Salesforce ───────────────────
+      .addItem('🔄 Autocompletar con Creamos ID',            'autocompletarConCreamos')
+      .addItem('🔍 Verificar Creamos ID ahora',              'verificarYCompletarCreamos')
+      .addItem('🔒 Proteger base datos Salesforce',          'protegerBaseDatosSalesforce')
       .addSeparator()
-      // ── Creamos ID / Salesforce ───────────────────────
-      .addItem('🔄 Autocompletar con Creamos ID',      'autocompletarConCreamos')
-      .addItem('🔍 Verificar Creamos ID ahora',        'verificarYCompletarCreamos')
-      .addItem('🔒 Proteger base datos Salesforce',    'protegerBaseDatosSalesforce')
-      .addSeparator()
-      // ── Automatizaciones ─────────────────────────────
-      .addItem('⏱ Activar auto-import (cada X min)',   'activarAutoImport')
-      .addItem('⏹ Desactivar auto-import',             'desactivarAutoImport')
-      .addItem('⏰ Instalar Trigger Graduados',         'instalarTriggerGraduados')
-      .addItem('⏰ Activar verificación Creamos ID',   'instalarTriggerVerificacionCreamos')
-      .addSeparator()
-      // ── Sistema ───────────────────────────────────────
-      .addItem('🚀 Instalar Sistema (primera vez)',    'instalarSistema')
-      .addItem('🔁 Reinstalar Sistema (borra todo)',   'reinstalarSistema')
+      // ── 4. Avanzado ───────────────────────────────────
+      .addSubMenu(submenuAvanzado)
       .addToUi();
   } catch (error) {
     Logger.log('onOpen: no se pudo crear el menú — ' + error.message);
@@ -82,34 +84,71 @@ function onOpen(e) {
 function onEdit(e) {
   try {
     if (!e || !e.range) return;
-    const hoja = e.range.getSheet();
-    if (hoja.getName() !== 'Graduados') return;
-    if (e.range.getColumn() !== 15) return;
-    if (e.range.getRow() <= 1) return;
-
-    const nuevaEtapa = e.value;
-    if (!nuevaEtapa || nuevaEtapa === 'Conexiones Laborales') return;
-
+    const hoja       = e.range.getSheet();
+    const nombreHoja = hoja.getName();
+    const col        = e.range.getColumn();
     const fila       = e.range.getRow();
-    const datosGrad  = hoja.getRange(fila, 1, 1, 15).getValues()[0];
-    const graduadoId = datosGrad[0];
-    const nombre     = datosGrad[3];
+    if (fila <= 1) return;
 
-    copiarAHojaClasificacion(datosGrad, nuevaEtapa, {});
-    generarReporte();
+    // ── Hoja Graduados: columna Etapa (col 15) ─────────────────────────────
+    if (nombreHoja === 'Graduados' && col === 15) {
+      const nuevaEtapa = e.value;
+      if (!nuevaEtapa || nuevaEtapa === 'Conexiones Laborales') return;
 
-    if (nuevaEtapa === 'Activamente busca trabajo') {
-      hoja.getRange(fila, 12).setValue('Si');
-      crearSeguimientoBusquedaActiva(
-        datosGrad[2],  // Creamos ID (col C)
-        datosGrad[3],  // Nombre completo (col D)
-        datosGrad[7]   // Número de teléfono (col H)
+      const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
+      const nombre    = datosGrad[3];
+
+      copiarAHojaClasificacion(datosGrad, nuevaEtapa, {});
+      generarReporte();
+
+      if (nuevaEtapa === 'Activamente busca trabajo') {
+        hoja.getRange(fila, 12).setValue('Si');
+        crearSeguimientoBusquedaActiva(
+          datosGrad[2],  // Creamos ID
+          datosGrad[3],  // Nombre completo
+          datosGrad[7]   // Teléfono
+        );
+      }
+
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        nombre + ' enviado a: ' + nuevaEtapa, '✅ Clasificado', 3
       );
+      return;
     }
 
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      nombre + ' enviado a: ' + nuevaEtapa, '✅ Clasificado', 3
-    );
+    // ── Hoja Sesiones Acompañamiento: columna Acción (col 16) ─────────────
+    // Solo maneja "→ Seguimiento Bot" porque no abre diálogos.
+    // "→ Conexiones Laborales" lo maneja onEditInstalable (requiere diálogo).
+    if (nombreHoja === 'Sesiones Acompañamiento' && col === 16) {
+      const accion = (e.value || '').toString().trim();
+      if (!accion) return;
+
+      // Siempre limpiar la celda de acción
+      e.range.setValue('');
+
+      if (accion === '→ Seguimiento Bot') {
+        const datos        = hoja.getRange(fila, 1, 1, 15).getValues()[0];
+        const creamosId    = (datos[0] || '').toString().trim();
+        const nombre       = (datos[4] || '').toString().trim();
+        const apellidos    = (datos[5] || '').toString().trim();
+        const telefono     = (datos[6] || '').toString().trim();
+        const nombreComp   = (nombre + ' ' + apellidos).trim();
+
+        if (!nombreComp) {
+          SpreadsheetApp.getActiveSpreadsheet().toast(
+            'La fila no tiene nombre.', '⚠️ Sin datos', 3
+          );
+          return;
+        }
+
+        crearSeguimientoBusquedaActiva(creamosId, nombreComp, telefono);
+        SpreadsheetApp.getActiveSpreadsheet().toast(
+          nombreComp + ' agregado a Seguimiento Bot', '✅ Seguimiento creado', 4
+        );
+      }
+      // "→ Conexiones Laborales" se maneja en onEditInstalable
+    }
+
   } catch (error) {
     Logger.log('onEdit: ' + error);
   }
@@ -126,45 +165,72 @@ function onEdit(e) {
 function onEditInstalable(e) {
   try {
     if (!e || !e.range) return;
-    const hoja = e.range.getSheet();
-    if (hoja.getName() !== 'Graduados') return;
-    if (e.range.getColumn() !== 15) return;
-    if (e.range.getRow() <= 1) return;
+    const hoja       = e.range.getSheet();
+    const nombreHoja = hoja.getName();
+    const col        = e.range.getColumn();
+    const fila       = e.range.getRow();
+    if (fila <= 1) return;
 
-    const nuevaEtapa = e.value;
-    if (nuevaEtapa !== 'Conexiones Laborales') return;
+    // ── Graduados: Etapa = "Conexiones Laborales" ─────────────────────────
+    if (nombreHoja === 'Graduados' && col === 15) {
+      if (e.value !== 'Conexiones Laborales') return;
 
-    const fila      = e.range.getRow();
-    const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
-    const creamosId = datosGrad[2] || '';
-    const nombre    = datosGrad[3] || '';
+      const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
+      const creamosId = datosGrad[2] || '';
+      const nombre    = datosGrad[3] || '';
 
-    // Limpiar el dropdown
-    e.range.setValue('');
+      e.range.setValue('');
 
-    if (!nombre) {
-      SpreadsheetApp.getActiveSpreadsheet().toast(
-        'La fila no tiene nombre.', '⚠️ Sin datos', 3
-      );
+      if (!nombre) {
+        SpreadsheetApp.getActiveSpreadsheet().toast('La fila no tiene nombre.', '⚠️ Sin datos', 3);
+        return;
+      }
+
+      const datosExtra = {
+        genero:         datosGrad[4] || '',
+        edad:           datosGrad[5] || '',
+        nivelEducativo: datosGrad[6] || '',
+        telefono:       datosGrad[7] || ''
+      };
+
+      const html = HtmlService.createHtmlOutput(
+        _generarHTMLFormConexionLaboral(fila, creamosId, nombre, 'Graduados', datosExtra)
+      ).setWidth(560).setHeight(720).setTitle('Conexión Laboral');
+      SpreadsheetApp.getUi().showModalDialog(html, '💼 Conexión Laboral — ' + nombre);
       return;
     }
 
-    // Datos personales del graduado (Graduados: 4=Género, 5=Edad, 6=Nivel edu, 7=Teléfono)
-    const datosExtra = {
-      genero:         datosGrad[4] || '',
-      edad:           datosGrad[5] || '',
-      nivelEducativo: datosGrad[6] || '',
-      telefono:       datosGrad[7] || ''
-    };
+    // ── Sesiones Acompañamiento: columna Acción (col 16) = "→ Conexiones Laborales" ──
+    if (nombreHoja === 'Sesiones Acompañamiento' && col === 16) {
+      if ((e.value || '').toString().trim() !== '→ Conexiones Laborales') return;
 
-    // Abrir formulario de Conexiones Laborales
-    const html = HtmlService.createHtmlOutput(
-      _generarHTMLFormConexionLaboral(fila, creamosId, nombre, 'Graduados', datosExtra)
-    )
-      .setWidth(560)
-      .setHeight(720)
-      .setTitle('Conexión Laboral');
-    SpreadsheetApp.getUi().showModalDialog(html, '💼 Conexión Laboral — ' + nombre);
+      e.range.setValue('');
+
+      // Columnas Sesiones: 1=Creamos ID, 5=Nombre, 6=Apellidos, 7=Teléfono, 9=Edad, 10=Género
+      const datos      = hoja.getRange(fila, 1, 1, 15).getValues()[0];
+      const creamosId  = (datos[0] || '').toString().trim();
+      const nombre     = (datos[4] || '').toString().trim();
+      const apellidos  = (datos[5] || '').toString().trim();
+      const nombreComp = (nombre + ' ' + apellidos).trim();
+
+      if (!nombreComp) {
+        SpreadsheetApp.getActiveSpreadsheet().toast('La fila no tiene nombre.', '⚠️ Sin datos', 3);
+        return;
+      }
+
+      const datosExtra = {
+        telefono:       (datos[6] || '').toString().trim(),
+        edad:           (datos[8] || '').toString().trim(),
+        genero:         (datos[9] || '').toString().trim(),
+        nivelEducativo: ''
+      };
+
+      const html = HtmlService.createHtmlOutput(
+        _generarHTMLFormConexionLaboral(fila, creamosId, nombreComp, 'Sesiones Acompañamiento', datosExtra)
+      ).setWidth(560).setHeight(720).setTitle('Conexión Laboral');
+      SpreadsheetApp.getUi().showModalDialog(html, '💼 Conexión Laboral — ' + nombreComp);
+    }
+
   } catch (error) {
     Logger.log('onEditInstalable: ' + error);
   }
@@ -561,6 +627,7 @@ const ESTRUCTURA_HOJAS = {
 
   // -- IL_08: SESIONES ACOMPAÑAMIENTO PROFESIONAL ----------------------------
   // Columnas exactas del NOMBRES whitelist (excluye columnas redundantes de KoboToolbox)
+  // Col 16 = "Acción": dropdown para enviar directamente desde la hoja
   'Sesiones Acompañamiento': {
     color: '#5e35b1',
     columnas: [
@@ -578,7 +645,9 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'En qué año',          ancho: 100, tipo: 'texto' },
       { nombre: 'Grado académico',     ancho: 150, tipo: 'texto' },
       { nombre: 'Tipo servicio',       ancho: 200, tipo: 'texto' },
-      { nombre: 'Comentario',          ancho: 280, tipo: 'texto' }
+      { nombre: 'Comentario',          ancho: 280, tipo: 'texto' },
+      { nombre: 'Acción',              ancho: 220, tipo: 'dropdown',
+        opciones: ['→ Conexiones Laborales', '→ Seguimiento Bot'] }
     ]
   },
 
