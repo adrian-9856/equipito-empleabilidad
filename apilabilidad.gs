@@ -1644,8 +1644,6 @@ function _syncSesionesSoloNuevos() {
       var nuevos = 0;
       var maxF = '';
       datos.forEach(function(d) {
-        var id = (d[CAMPO_ID] || '').toString().trim();
-        if (!id) return;
         hoja.appendRow(ORDEN.map(function(k) { return d[k] || ''; }));
         nuevos++;
         var f = (d[CAMPO_FECHA] || '').toString().trim();
@@ -1671,10 +1669,10 @@ function _syncSesionesSoloNuevos() {
     var maxFecha = ultimaFechaSesiones;
     datos.forEach(function(d) {
       var id    = (d[CAMPO_ID] || '').toString().trim();
-      if (!id) return;
       var fecha = (d[CAMPO_FECHA] || '').toString().trim();
       if (ultimaFechaSesiones && fecha <= ultimaFechaSesiones) return;
-      var key   = id + '||' + fecha;
+      // Use Creamos ID if available; otherwise fall back to date-only for deduplication
+      var key   = (id ? id + '||' : 'noId||') + fecha;
       if (existentes[key]) return;
       hoja.appendRow(ORDEN.map(function(k) { return d[k] || ''; }));
       existentes[key] = true;
@@ -2488,7 +2486,7 @@ function enviarAConexionesLaborales() {
   // Hojas válidas para enviar a Conexiones Laborales
   const hojasValidas = [
     'Graduados', 'Aliados', 'Plataforma', 'Derivaciones',
-    'Paso a paso', 'Activamente busca trabajo'
+    'Paso a paso', 'Activamente busca trabajo', 'Sesiones Acompañamiento'
   ];
 
   if (hojasValidas.indexOf(nombreHoja) === -1) {
@@ -2509,6 +2507,7 @@ function enviarAConexionesLaborales() {
   // Leer datos según la hoja activa
   // Graduados: 2=Creamos ID, 3=Nombre, 4=Género, 5=Edad, 6=Nivel edu, 7=Teléfono
   // Hojas clasificación (COLUMNAS_COMUNES): 1=Creamos ID, 2=Nombre, 3=Teléfono, 4=Género, 5=Edad, 6=Nivel edu
+  // Sesiones Acompañamiento: 1=Creamos ID, 2=Fecha envío, 3=Inicio sesión, 4=Proyecto, 5=Nombre, 6=Apellidos, 7=Teléfono, 8=Fecha nacimiento, 9=Edad, 10=Género
   var creamosId, nombreCompleto, datosExtra;
   if (nombreHoja === 'Graduados') {
     const datos = hoja.getRange(filaActiva, 1, 1, 15).getValues()[0];
@@ -2519,6 +2518,16 @@ function enviarAConexionesLaborales() {
       edad:           datos[5] || '',
       nivelEducativo: datos[6] || '',
       telefono:       datos[7] || ''
+    };
+  } else if (nombreHoja === 'Sesiones Acompañamiento') {
+    const datos = hoja.getRange(filaActiva, 1, 1, 10).getValues()[0];
+    creamosId      = datos[0] || '';  // Col 1 = Creamos ID
+    nombreCompleto = ((datos[4] || '') + ' ' + (datos[5] || '')).trim();  // Col 5 = Nombre, Col 6 = Apellidos
+    datosExtra = {
+      telefono:       datos[6] || '',  // Col 7 = Teléfono
+      edad:           datos[8] || '',  // Col 9 = Edad
+      genero:         datos[9] || '',  // Col 10 = Género
+      nivelEducativo: ''
     };
   } else {
     const datos = hoja.getRange(filaActiva, 1, 1, 7).getValues()[0];
@@ -2545,6 +2554,49 @@ function enviarAConexionesLaborales() {
     .setHeight(720)
     .setTitle('Conexión Laboral');
   ui.showModalDialog(html, '💼 Conexión Laboral — ' + nombreCompleto);
+}
+
+/**
+ * Envía a la persona de la sesión seleccionada al bot de seguimiento de búsqueda activa.
+ * El usuario debe tener seleccionada una fila en la hoja "Sesiones Acompañamiento".
+ */
+function enviarSesionASeguimientoBot() {
+  const ui   = SpreadsheetApp.getUi();
+  const hoja = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+
+  if (hoja.getName() !== 'Sesiones Acompañamiento') {
+    ui.alert('⚠️ Hoja incorrecta',
+             'Debes estar en la hoja "Sesiones Acompañamiento" y seleccionar una fila.',
+             ui.ButtonSet.OK);
+    return;
+  }
+
+  const filaActiva = hoja.getActiveRange().getRow();
+  if (filaActiva <= 1) {
+    ui.alert('⚠️ Selección inválida',
+             'Selecciona la fila de un participante (no la fila de encabezados).',
+             ui.ButtonSet.OK);
+    return;
+  }
+
+  // Sesiones Acompañamiento: Col1=Creamos ID, Col5=Nombre, Col6=Apellidos, Col7=Teléfono
+  const datos        = hoja.getRange(filaActiva, 1, 1, 7).getValues()[0];
+  const creamosId    = (datos[0] || '').toString().trim();
+  const nombre       = (datos[4] || '').toString().trim();
+  const apellidos    = (datos[5] || '').toString().trim();
+  const telefono     = (datos[6] || '').toString().trim();
+  const nombreCompleto = (nombre + ' ' + apellidos).trim();
+
+  if (!nombreCompleto) {
+    ui.alert('⚠️ Sin datos', 'La fila seleccionada no tiene nombre.', ui.ButtonSet.OK);
+    return;
+  }
+
+  crearSeguimientoBusquedaActiva(creamosId, nombreCompleto, telefono);
+
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    nombreCompleto + ' enviado al bot de seguimiento.', '🔔 Seguimiento activado', 4
+  );
 }
 
 /**
@@ -3567,9 +3619,40 @@ function generarReporte() {
       if (!ipm[clave]) {
         ipm[clave] = { _t: fch.getTime() };
         ETAPAS_FLUJO.forEach(function(e) { ipm[clave][e] = 0; });
+        ipm[clave]['Sesiones'] = 0;
       }
       ipm[clave][nombreHoja]++;
     }
+  });
+  // Add Sesiones Acompañamiento data (col1=Creamos ID, col2=Fecha envío ISO "2024-01-15T10:30:00")
+  (function() {
+    var hSes = ss.getSheetByName('Sesiones Acompañamiento');
+    if (!hSes || hSes.getLastRow() <= 1) return;
+    var datosSes = hSes.getDataRange().getValues();
+    for (var i = 1; i < datosSes.length; i++) {
+      var raw = datosSes[i][1]; // col 2 = Fecha envío
+      var fch;
+      if (raw instanceof Date) {
+        fch = raw;
+      } else if (typeof raw === 'string' && raw.length >= 10) {
+        var isoDate = raw.substring(0, 10); // "2024-01-15"
+        var parts = isoDate.split('-');
+        if (parts.length === 3) fch = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      }
+      if (!fch || isNaN(fch.getTime())) continue;
+      var clave = MESES[fch.getMonth()] + ' ' + fch.getFullYear();
+      if (!ipm[clave]) {
+        ipm[clave] = { _t: fch.getTime() };
+        ETAPAS_FLUJO.forEach(function(e) { ipm[clave][e] = 0; });
+        ipm[clave]['Sesiones'] = 0;
+      }
+      if (!ipm[clave].hasOwnProperty('Sesiones')) ipm[clave]['Sesiones'] = 0;
+      ipm[clave]['Sesiones']++;
+    }
+  })();
+  // Ensure all existing ipm entries have the Sesiones key
+  Object.keys(ipm).forEach(function(clave) {
+    if (!ipm[clave].hasOwnProperty('Sesiones')) ipm[clave]['Sesiones'] = 0;
   });
   var meses = Object.keys(ipm).sort(function(a, b) { return ipm[a]._t - ipm[b]._t; });
 
