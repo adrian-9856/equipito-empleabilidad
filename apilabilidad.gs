@@ -59,6 +59,7 @@ function onOpen(e) {
       .addItem('📊 Generar Reporte (todo)',                   'generarReporte')
       .addItem('📅 Generar Reporte 2025',                    'generarReporte2025')
       .addItem('📅 Corregir fechas de ingreso (2025)',       'corregirFechasIngreso')
+      .addItem('🔢 Numerar filas de Graduados',              'numerarGraduados')
       .addItem('📝 Clasificar Graduados',                    'mostrarFormularioClasificacion')
       .addItem('🎨 Aplicar colores y desplegables (Graduados)','aplicarColoresGraduados')
       .addSeparator()
@@ -1348,15 +1349,18 @@ function validarDatosGraduado(dato) {
 }
 
 /**
- * Verifica si un graduado ya existe en el sistema
- * @param {string} id
+ * Verifica si un graduado ya existe en el sistema.
+ * Busca por nombre completo (col D, índice 3) ya que col A ahora es número secuencial.
+ * @param {string} nombre
  * @return {boolean}
  */
-function graduadoExiste(id) {
+function graduadoExiste(nombre) {
+  if (!nombre) return false;
+  const normNombre = _normalizarTexto_(nombre);
   const hoja  = obtenerHoja('Graduados');
   const datos = hoja.getDataRange().getValues();
   for (let i = 1; i < datos.length; i++) {
-    if (datos[i][0] === id) return true;
+    if (_normalizarTexto_(datos[i][3]) === normNombre) return true;
   }
   return false;
 }
@@ -2453,7 +2457,7 @@ function procesarDatosGraduados(datos) {
 
   datos.forEach(dato => {
     const graduadoValidado = validarDatosGraduado(dato);
-    if (!graduadoExiste(graduadoValidado.id)) {
+    if (!graduadoExiste(graduadoValidado.nombre)) {
       agregarGraduado(graduadoValidado);
       nuevos++;
     } else {
@@ -2478,7 +2482,7 @@ function procesarDatosGraduados(datos) {
 function agregarGraduado(graduado) {
   const hoja = obtenerHoja('Graduados');
   const fila = [
-    graduado.id,                            // 1  No.
+    hoja.getLastRow(),                      // 1  No. (número secuencial automático)
     new Date().toLocaleDateString('es-ES'), // 2  Fecha de envío
     '',                                     // 3  Creamos ID (manual)
     graduado.nombre,                        // 4  Nombre completo
@@ -2504,10 +2508,11 @@ function agregarGraduado(graduado) {
  * @param {Object} graduado
  */
 function actualizarGraduado(graduado) {
-  const hoja  = obtenerHoja('Graduados');
-  const datos = hoja.getDataRange().getValues();
+  const hoja      = obtenerHoja('Graduados');
+  const datos     = hoja.getDataRange().getValues();
+  const normNombre = _normalizarTexto_(graduado.nombre);
   for (let i = 1; i < datos.length; i++) {
-    if (datos[i][0] === graduado.id) {
+    if (_normalizarTexto_(datos[i][3]) === normNombre) { // col D (índice 3) = Nombre completo
       // col 1-3 (No., Fecha envío, Creamos ID) → no tocar
       hoja.getRange(i + 1, 4).setValue(graduado.nombre);
       hoja.getRange(i + 1, 5).setValue(graduado.genero          || datos[i][4]);
@@ -3800,6 +3805,24 @@ function registrarMovimientoEtapa(creamosId, nombreCompleto, etapa, nota) {
 function generarReporte2025() { generarReporte(2025); }
 
 /**
+ * Numera todas las filas de Graduados en la columna A (1, 2, 3...).
+ * Útil para corregir filas existentes que no tienen número o tienen el ID de Kobo.
+ */
+function numerarGraduados() {
+  var ss   = SpreadsheetApp.getActiveSpreadsheet();
+  var hoja = ss.getSheetByName('Graduados');
+  if (!hoja || hoja.getLastRow() < 2) {
+    SpreadsheetApp.getUi().alert('La hoja Graduados está vacía.'); return;
+  }
+  var total = hoja.getLastRow() - 1;
+  var nums  = [];
+  for (var i = 1; i <= total; i++) nums.push([i]);
+  hoja.getRange(2, 1, total, 1).setValues(nums);
+  SpreadsheetApp.getActiveSpreadsheet()
+    .toast(total + ' filas numeradas (1 → ' + total + ')', '✅ Numeración lista', 4);
+}
+
+/**
  * Corrige la columna "Fecha de ingreso" en todas las hojas de clasificación.
  * Para cada fila busca la "Fecha de envío" real en Graduados usando el Creamos ID,
  * y reemplaza la fecha incorrecta (ej: 18/5/2026 = hoy) con la fecha correcta de Graduados.
@@ -5021,6 +5044,10 @@ function importarGraduadosDesdeExterno() {
     }
 
     const filaInicio = Math.max(hojaDestino.getLastRow() + 1, 2);
+    // Asignar número secuencial en col A antes de escribir
+    for (let j = 0; j < nuevas.length; j++) {
+      nuevas[j][0] = (filaInicio - 1) + j; // 1, 2, 3... continúa desde el último
+    }
     hojaDestino.getRange(filaInicio, 1, nuevas.length, CONFIG_GRADUADOS_EXTERNO.NUM_COLS).setValues(nuevas);
 
     ss.toast('Se importaron ' + nuevas.length + ' registro(s) nuevo(s)',
