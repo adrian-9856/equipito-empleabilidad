@@ -1272,6 +1272,14 @@ function sincronizacionAutomatica() {
       Logger.log('Sync Sesiones omitido: ' + e.message);
     }
 
+    // 5. Importar Graduados desde archivo externo de Google Sheets
+    try {
+      importarGraduadosDesdeExterno();
+      Logger.log('Import Graduados externo ejecutado');
+    } catch (e) {
+      Logger.log('Import Graduados externo omitido: ' + e.message);
+    }
+
   } catch (error) {
     Logger.log('Error en sincronización automática: ' + error);
   }
