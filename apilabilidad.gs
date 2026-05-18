@@ -4398,6 +4398,36 @@ function _buscarEnMapaFuzzy_(valorBruto, mapaExt) {
 }
 
 /**
+ * Busca en el mapa Creamos por nombre completo.
+ * Primero intenta coincidencia normalizada exacta (resuelve casos de acentos:
+ * "Mendez" == "Méndez" tras normalizar). Luego fuzzy con Levenshtein ≤ 2.
+ * Devuelve el mismo formato que _buscarEnMapaFuzzy_.
+ */
+function _buscarPorNombre_(nombre, mapaExt) {
+  var normNombre = _normalizarTexto_(nombre);
+  if (!normNombre) return null;
+
+  // 1. Coincidencia normalizada exacta — captura diferencias solo de acentos/mayúsculas
+  for (var i = 0; i < mapaExt.todos.length; i++) {
+    var t = mapaExt.todos[i];
+    if (t.normNombre === normNombre)
+      return { rec: t, metodo: 'nombre-exacto', idSugerido: t.cid };
+  }
+
+  // 2. Fuzzy sobre nombre normalizado (ej: apellido con 1 letra diferente)
+  var mejorDist = 999, mejorRec = null;
+  for (var i = 0; i < mapaExt.todos.length; i++) {
+    var t = mapaExt.todos[i];
+    if (!t.normNombre) continue;
+    var d = _levenshtein_(normNombre, t.normNombre);
+    if (d < mejorDist) { mejorDist = d; mejorRec = t; }
+  }
+  if (mejorDist <= 2) return { rec: mejorRec, metodo: 'nombre-dist' + mejorDist, idSugerido: mejorRec.cid };
+
+  return null;
+}
+
+/**
  * Autocompleta campos faltantes en las hojas del sistema
  * usando la base de datos de Salesforce como fuente de verdad.
  * Solo rellena celdas vacías — nunca sobreescribe datos existentes.
@@ -4411,80 +4441,94 @@ function autocompletarConCreamos() {
     return;
   }
 
-  var ss       = SpreadsheetApp.getActiveSpreadsheet();
-  var cambios  = 0;
+  var ss         = SpreadsheetApp.getActiveSpreadsheet();
+  var cambios    = 0;
   var corregidos = 0;
+  var porNombre  = 0;
 
-  function _llenar_(hoja, row, idx, val, campo) {
-    if (hoja.getRange(row, idx + 1).getValue()) return;
-    hoja.getRange(row, idx + 1).setValue(val);
+  function _llenar_(hoja, row, colIdx1based, val) {
+    if (hoja.getRange(row, colIdx1based).getValue()) return;
+    hoja.getRange(row, colIdx1based).setValue(val);
     cambios++;
   }
 
-  // ── Graduados: Creamos ID = col C (idx 2), Nombre = col D (idx 3), Edad = col F (idx 5) ──
+  // Resuelve match por ID (con fuzzy) o, si no hay ID, por nombre normalizado.
+  function _resolver_(cid, nombreEnHoja) {
+    if (cid) return _buscarEnMapaFuzzy_(cid, mapaExt);
+    return _buscarPorNombre_(nombreEnHoja, mapaExt);
+  }
+
+  // ── Graduados: Creamos ID = col C (idx 3), Nombre = col D (idx 4), Edad = col F (idx 6) ──
   var hojaGrad = ss.getSheetByName('Graduados');
   if (hojaGrad && hojaGrad.getLastRow() > 1) {
     var filas = hojaGrad.getRange(2, 1, hojaGrad.getLastRow() - 1, 10).getValues();
     for (var i = 0; i < filas.length; i++) {
-      var cid   = (filas[i][2] || '').toString().trim();
-      if (!cid) continue;
-      var match = _buscarEnMapaFuzzy_(cid, mapaExt);
+      var cid    = (filas[i][2] || '').toString().trim();
+      var nombre = (filas[i][3] || '').toString().trim();
+      var match  = _resolver_(cid, nombre);
       if (!match) continue;
       var rec = match.rec;
       var row = i + 2;
-      if (match.metodo === 'dist1' || match.metodo === 'normalizado') {
-        // Corregir el Creamos ID en la hoja y marcar amarillo con nota
-        hojaGrad.getRange(row, 3)
-          .setValue(rec.cid)
-          .setBackground('#FFF9C4')
+      if (!cid && match.metodo.indexOf('nombre') === 0) {
+        // Rellenar Creamos ID encontrado por nombre (acento u ortografía)
+        hojaGrad.getRange(row, 3).setValue(rec.cid).setBackground('#FFF9C4')
+          .setNote('ID encontrado por nombre: "' + nombre + '" → ' + rec.cid);
+        porNombre++;
+      } else if (match.metodo === 'dist1' || match.metodo === 'normalizado') {
+        hojaGrad.getRange(row, 3).setValue(rec.cid).setBackground('#FFF9C4')
           .setNote('ID corregido: "' + cid + '" → "' + rec.cid + '"');
         corregidos++;
       }
-      if (!filas[i][3] && rec.nombre) _llenar_(hojaGrad, row, 3, rec.nombre);
-      if (!filas[i][5] && rec.edad)   _llenar_(hojaGrad, row, 5, rec.edad);
+      if (!filas[i][3] && rec.nombre) _llenar_(hojaGrad, row, 4, rec.nombre);
+      if (!filas[i][5] && rec.edad)   _llenar_(hojaGrad, row, 6, rec.edad);
     }
   }
 
-  // ── Hojas de clasificación: Creamos ID = col B (idx 1), Nombre = col C (idx 2), Edad = col F (idx 5) ──
-  ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'].forEach(function(nombre) {
-    var h = ss.getSheetByName(nombre);
+  // ── Hojas de clasificación: Creamos ID = col B (idx 2), Nombre = col C (idx 3), Edad = col F (idx 6) ──
+  ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'].forEach(function(nomHoja) {
+    var h = ss.getSheetByName(nomHoja);
     if (!h || h.getLastRow() < 2) return;
     var filas = h.getRange(2, 1, h.getLastRow() - 1, 7).getValues();
     for (var i = 0; i < filas.length; i++) {
-      var cid   = (filas[i][1] || '').toString().trim();
-      if (!cid) continue;
-      var match = _buscarEnMapaFuzzy_(cid, mapaExt);
+      var cid    = (filas[i][1] || '').toString().trim();
+      var nombre = (filas[i][2] || '').toString().trim();
+      var match  = _resolver_(cid, nombre);
       if (!match) continue;
       var rec = match.rec;
       var row = i + 2;
-      if (match.metodo === 'dist1' || match.metodo === 'normalizado') {
-        h.getRange(row, 2)
-          .setValue(rec.cid)
-          .setBackground('#FFF9C4')
+      if (!cid && match.metodo.indexOf('nombre') === 0) {
+        h.getRange(row, 2).setValue(rec.cid).setBackground('#FFF9C4')
+          .setNote('ID encontrado por nombre: "' + nombre + '" → ' + rec.cid);
+        porNombre++;
+      } else if (match.metodo === 'dist1' || match.metodo === 'normalizado') {
+        h.getRange(row, 2).setValue(rec.cid).setBackground('#FFF9C4')
           .setNote('ID corregido: "' + cid + '" → "' + rec.cid + '"');
         corregidos++;
       }
-      if (!filas[i][2] && rec.nombre) _llenar_(h, row, 2, rec.nombre);
-      if (!filas[i][5] && rec.edad)   _llenar_(h, row, 5, rec.edad);
+      if (!filas[i][2] && rec.nombre) _llenar_(h, row, 3, rec.nombre);
+      if (!filas[i][5] && rec.edad)   _llenar_(h, row, 6, rec.edad);
     }
   });
 
-  // ── Clasificación de Perfiles: Creamos ID = col B (idx 1), Nombre = col C (idx 2) ──
+  // ── Clasificación de Perfiles: Creamos ID = col B (idx 2), Nombre = col C (idx 3) ──
   var hojaClasif = ss.getSheetByName('Clasificación de Perfiles');
   if (hojaClasif && hojaClasif.getLastRow() > 1) {
     var filas = hojaClasif.getRange(2, 1, hojaClasif.getLastRow() - 1, 3).getValues();
     for (var i = 0; i < filas.length; i++) {
-      var cid   = (filas[i][1] || '').toString().trim();
-      if (!cid) continue;
-      var match = _buscarEnMapaFuzzy_(cid, mapaExt);
+      var cid    = (filas[i][1] || '').toString().trim();
+      var nombre = (filas[i][2] || '').toString().trim();
+      var match  = _resolver_(cid, nombre);
       if (!match) continue;
       var rec = match.rec;
-      if (!filas[i][2] && rec.nombre) _llenar_(hojaClasif, i + 2, 2, rec.nombre);
+      if (!filas[i][2] && rec.nombre) _llenar_(hojaClasif, i + 2, 3, rec.nombre);
     }
   }
 
-  var msg = 'Se completaron ' + cambios + ' campos faltantes.';
-  if (corregidos > 0) msg += '\n⚠️ ' + corregidos + ' Creamos ID corregidos (celdas en amarillo).';
+  var partes = [];
+  if (cambios > 0)     partes.push(cambios     + ' campos completados');
+  if (corregidos > 0)  partes.push(corregidos  + ' IDs corregidos (amarillo)');
+  if (porNombre > 0)   partes.push(porNombre   + ' IDs encontrados por nombre (amarillo)');
+  var msg = partes.length ? partes.join('\n') : 'No había campos pendientes.';
   SpreadsheetApp.getActiveSpreadsheet().toast(msg, '✅ Autocompletado listo', 7);
 }
 
@@ -4540,14 +4584,35 @@ function verificarYCompletarCreamos() {
   var ss          = SpreadsheetApp.getActiveSpreadsheet();
   var sinId       = 0, noBD = 0, corregidos = 0, sugerencias = 0, completados = 0;
 
+  var porNombreFnd = 0;
+
   function _procesarFila_(hoja, fila, row, colCid, colNombre, colEdad) {
-    var cid   = (fila[colCid] || '').toString().trim();
-    var celId = hoja.getRange(row, colCid + 1);
+    var cid    = (fila[colCid]    || '').toString().trim();
+    var nombre = colNombre !== null ? (fila[colNombre] || '').toString().trim() : '';
+    var celId  = hoja.getRange(row, colCid + 1);
+
     if (!cid) {
-      celId.setBackground(C_SIN_ID).setNote('⚠️ Pendiente: crear perfil en Salesforce con este registro');
-      sinId++;
+      // Intentar encontrar el Creamos ID por nombre (maneja acentos y typos)
+      var matchNom = _buscarPorNombre_(nombre, mapaExt);
+      if (matchNom) {
+        var rec = matchNom.rec;
+        celId.setValue(rec.cid).setBackground(C_TYPO)
+          .setNote('🔎 ID encontrado por nombre: "' + nombre + '" → ' + rec.cid +
+                   (matchNom.metodo !== 'nombre-exacto' ? ' (similitud)' : ''));
+        porNombreFnd++;
+        if (colNombre !== null && !fila[colNombre] && rec.nombre) {
+          hoja.getRange(row, colNombre + 1).setValue(rec.nombre); completados++;
+        }
+        if (colEdad !== null && !fila[colEdad] && rec.edad) {
+          hoja.getRange(row, colEdad + 1).setValue(rec.edad); completados++;
+        }
+      } else {
+        celId.setBackground(C_SIN_ID).setNote('⚠️ Pendiente: crear perfil en Salesforce con este registro');
+        sinId++;
+      }
       return;
     }
+
     var match = _buscarEnMapaFuzzy_(cid, mapaExt);
     if (!match) {
       celId.setBackground(C_NO_BD).setNote('❌ Creamos ID "' + cid + '" no existe en Salesforce. Verificar.');
@@ -4557,7 +4622,7 @@ function verificarYCompletarCreamos() {
     var rec = match.rec;
     if (match.metodo === 'dist1' || match.metodo === 'normalizado') {
       celId.setValue(rec.cid).setBackground(C_TYPO)
-        .setNote('✏️ ID corregido automáticamente: "' + cid + '" → "' + rec.cid + '"');
+        .setNote('✏️ ID corregido: "' + cid + '" → "' + rec.cid + '"');
       corregidos++;
     } else if (match.metodo === 'dist2') {
       celId.setBackground(C_SUGER)
@@ -4590,11 +4655,12 @@ function verificarYCompletarCreamos() {
   });
 
   var partes = [];
-  if (completados > 0)  partes.push(completados  + ' campos completados');
-  if (corregidos > 0)   partes.push(corregidos   + ' IDs corregidos (amarillo)');
-  if (sugerencias > 0)  partes.push(sugerencias  + ' posibles typos (ámbar) — revisar');
-  if (sinId > 0)        partes.push(sinId        + ' sin Creamos ID (naranja)');
-  if (noBD > 0)         partes.push(noBD         + ' IDs no encontrados en Salesforce (rojo)');
+  if (completados > 0)   partes.push(completados   + ' campos completados');
+  if (corregidos > 0)    partes.push(corregidos    + ' IDs corregidos por typo (amarillo)');
+  if (porNombreFnd > 0)  partes.push(porNombreFnd  + ' IDs encontrados por nombre (amarillo)');
+  if (sugerencias > 0)   partes.push(sugerencias   + ' posibles typos (ámbar) — revisar');
+  if (sinId > 0)         partes.push(sinId         + ' sin Creamos ID (naranja)');
+  if (noBD > 0)          partes.push(noBD          + ' IDs no encontrados en Salesforce (rojo)');
   var msg = partes.length ? partes.join('\n') : 'Todo está correcto.';
   Logger.log('Verificación Creamos: ' + msg);
   ss.toast(msg, '🔍 Verificación completada', 10);
@@ -4740,18 +4806,18 @@ function importarGraduadosDesdeExterno() {
       const datosLocal = hojaDestino.getRange(2, 1, ultFilaLocal - 1, CONFIG_GRADUADOS_EXTERNO.NUM_COLS).getValues();
       for (let i = 0; i < datosLocal.length; i++) {
         const creamosId = String(datosLocal[i][2] || '').trim();
-        const nombre    = String(datosLocal[i][3] || '').trim().toLowerCase();
+        const nombre    = _normalizarTexto_(datosLocal[i][3]); // normaliza acentos, mayúsculas y espacios
         if (creamosId) existentesId[creamosId] = true;
         if (nombre)    existentesNombre[nombre] = true;
       }
     }
 
-    // 5. Filtrar filas nuevas (dedup por Creamos ID; fallback por Nombre)
+    // 5. Filtrar filas nuevas (dedup por Creamos ID; fallback por Nombre normalizado)
     const nuevas = [];
     for (let i = 0; i < datosExt.length; i++) {
       const fila = datosExt[i];
       const creamosId = String(fila[2] || '').trim();
-      const nombre    = String(fila[3] || '').trim().toLowerCase();
+      const nombre    = _normalizarTexto_(fila[3]); // "Méndez" == "Mendez" tras normalizar
 
       if (!creamosId && !nombre) continue; // fila vacía
 
