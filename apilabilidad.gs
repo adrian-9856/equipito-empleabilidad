@@ -63,6 +63,7 @@ function onOpen(e) {
       // ── 3. Creamos ID / Salesforce ───────────────────
       .addItem('🔄 Autocompletar con Creamos ID',            'autocompletarConCreamos')
       .addItem('🔍 Verificar Creamos ID ahora',              'verificarYCompletarCreamos')
+      .addItem('🩺 Diagnosticar errores Creamos ID',         'diagnosticarErroresCreamos')
       .addItem('🔒 Proteger base datos Salesforce',          'protegerBaseDatosSalesforce')
       .addSeparator()
       // ── 4. Avanzado ───────────────────────────────────
@@ -2364,7 +2365,8 @@ function procesarClasificacionPerfiles(datos) {
   datos.forEach(function(dato) {
     var cid = (dato[colId] || '').toString().trim();
     if (!cid) return;
-    var grad = mapaGrads[cid] || {};
+    var matchGrad = _buscarEnMapaFuzzy_(cid, mapaGrads);
+    var grad = matchGrad ? matchGrad.rec : {};
     var fila = [
       dato[colFecha] || '',   // Fecha de ingreso (= fecha evaluación KoboToolbox)
       cid,                    // Creamos ID
@@ -4308,65 +4310,162 @@ const HOJA_BD_CREAMOS = 'Copy of CREAMOS ID nuevo';
 function _cargarMapaCreamos_() {
   var ss   = SpreadsheetApp.getActiveSpreadsheet();
   var hoja = ss.getSheetByName(HOJA_BD_CREAMOS);
-  if (!hoja || hoja.getLastRow() < 2) return {};
-  var datos = hoja.getRange(2, 1, hoja.getLastRow() - 1, 5).getValues();
-  var mapa  = {};
+  if (!hoja || hoja.getLastRow() < 2) {
+    return { porId: {}, porNorm: {}, porDpi: {}, todos: [] };
+  }
+  var datos   = hoja.getRange(2, 1, hoja.getLastRow() - 1, 5).getValues();
+  var porId   = {};
+  var porNorm = {};
+  var porDpi  = {};
+  var todos   = [];
   datos.forEach(function(fila) {
-    var cid = (fila[1] || '').toString().trim(); // col B = Creamos ID
-    if (!cid) return;
-    mapa[cid] = {
-      nombre: (fila[0] || '').toString().trim(),  // col A = Nombre completo
-      anio:   fila[2] || '',                       // col C = Año que entró
-      edad:   fila[3] || '',                       // col D = Age
-      dpi:    (fila[4] || '').toString().trim()    // col E = Número de DPI
+    var cid    = (fila[1] || '').toString().trim(); // col B = Creamos ID
+    var nombre = (fila[0] || '').toString().trim(); // col A = Nombre completo
+    var dpi    = (fila[4] || '').toString().trim(); // col E = DPI
+    if (!cid && !nombre) return;
+    var rec = {
+      cid:        cid,
+      nombre:     nombre,
+      normCid:    _normalizarTexto_(cid),
+      normNombre: _normalizarTexto_(nombre),
+      anio:       fila[2] || '',                    // col C = Año que entró
+      edad:       fila[3] || '',                    // col D = Age
+      dpi:        dpi
     };
+    if (cid) { porId[cid] = rec; porNorm[rec.normCid] = rec; }
+    if (dpi) porDpi[dpi] = rec;
+    todos.push(rec);
   });
-  return mapa;
+  return { porId: porId, porNorm: porNorm, porDpi: porDpi, todos: todos };
+}
+
+/** Elimina acentos, pasa a minúsculas y colapsa espacios para comparar textos. */
+function _normalizarTexto_(s) {
+  if (!s) return '';
+  return s.toString().trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+/** Distancia Levenshtein entre dos strings. */
+function _levenshtein_(a, b) {
+  if (a === b) return 0;
+  if (!a) return b.length;
+  if (!b) return a.length;
+  var al = a.length, bl = b.length;
+  var dp = [];
+  for (var i = 0; i <= al; i++) { dp[i] = [i]; }
+  for (var j = 1; j <= bl; j++) { dp[0][j] = j; }
+  for (var i = 1; i <= al; i++) {
+    for (var j = 1; j <= bl; j++) {
+      dp[i][j] = a[i-1] === b[j-1]
+        ? dp[i-1][j-1]
+        : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[al][bl];
+}
+
+/**
+ * Busca un Creamos ID (o nombre) en el mapa con fallback fuzzy.
+ * @return {null | { rec, metodo: 'exacto'|'normalizado'|'dist1'|'dist2', idSugerido }}
+ */
+function _buscarEnMapaFuzzy_(valorBruto, mapaExt) {
+  var v = (valorBruto || '').toString().trim();
+  if (!v) return null;
+
+  // 1. Coincidencia exacta
+  if (mapaExt.porId[v])
+    return { rec: mapaExt.porId[v], metodo: 'exacto', idSugerido: null };
+
+  // 2. Coincidencia normalizada (maneja acentos, mayúsculas, espacios)
+  var vn = _normalizarTexto_(v);
+  if (mapaExt.porNorm[vn])
+    return { rec: mapaExt.porNorm[vn], metodo: 'normalizado', idSugerido: mapaExt.porNorm[vn].cid };
+
+  // 3. Fuzzy por Levenshtein sobre el Creamos ID normalizado
+  var mejorDist = 999, mejorRec = null;
+  for (var i = 0; i < mapaExt.todos.length; i++) {
+    var t = mapaExt.todos[i];
+    if (!t.normCid) continue;
+    var d = _levenshtein_(vn, t.normCid);
+    if (d < mejorDist) { mejorDist = d; mejorRec = t; }
+  }
+  if (mejorDist <= 1) return { rec: mejorRec, metodo: 'dist1', idSugerido: mejorRec.cid };
+  if (mejorDist <= 2) return { rec: mejorRec, metodo: 'dist2', idSugerido: mejorRec.cid };
+
+  return null;
 }
 
 /**
  * Autocompleta campos faltantes en las hojas del sistema
  * usando la base de datos de Salesforce como fuente de verdad.
- * Solo rellena celdas que estén vacías — nunca sobreescribe datos existentes.
+ * Solo rellena celdas vacías — nunca sobreescribe datos existentes.
+ * Usa fuzzy matching para detectar y corregir errores ortográficos.
  */
 function autocompletarConCreamos() {
-  var ui   = SpreadsheetApp.getUi();
-  var mapa = _cargarMapaCreamos_();
-  if (Object.keys(mapa).length === 0) {
+  var ui      = SpreadsheetApp.getUi();
+  var mapaExt = _cargarMapaCreamos_();
+  if (mapaExt.todos.length === 0) {
     ui.alert('❌ Error', 'No se encontró la hoja "' + HOJA_BD_CREAMOS + '" o está vacía.', ui.ButtonSet.OK);
     return;
   }
 
-  var ss      = SpreadsheetApp.getActiveSpreadsheet();
-  var cambios = 0;
+  var ss       = SpreadsheetApp.getActiveSpreadsheet();
+  var cambios  = 0;
+  var corregidos = 0;
+
+  function _llenar_(hoja, row, idx, val, campo) {
+    if (hoja.getRange(row, idx + 1).getValue()) return;
+    hoja.getRange(row, idx + 1).setValue(val);
+    cambios++;
+  }
 
   // ── Graduados: Creamos ID = col C (idx 2), Nombre = col D (idx 3), Edad = col F (idx 5) ──
   var hojaGrad = ss.getSheetByName('Graduados');
   if (hojaGrad && hojaGrad.getLastRow() > 1) {
     var filas = hojaGrad.getRange(2, 1, hojaGrad.getLastRow() - 1, 10).getValues();
     for (var i = 0; i < filas.length; i++) {
-      var cid  = (filas[i][2] || '').toString().trim();
-      var dato = mapa[cid];
-      if (!cid || !dato) continue;
+      var cid   = (filas[i][2] || '').toString().trim();
+      if (!cid) continue;
+      var match = _buscarEnMapaFuzzy_(cid, mapaExt);
+      if (!match) continue;
+      var rec = match.rec;
       var row = i + 2;
-      if (!filas[i][3] && dato.nombre) { hojaGrad.getRange(row, 4).setValue(dato.nombre); cambios++; }
-      if (!filas[i][5] && dato.edad)   { hojaGrad.getRange(row, 6).setValue(dato.edad);   cambios++; }
+      if (match.metodo === 'dist1' || match.metodo === 'normalizado') {
+        // Corregir el Creamos ID en la hoja y marcar amarillo con nota
+        hojaGrad.getRange(row, 3)
+          .setValue(rec.cid)
+          .setBackground('#FFF9C4')
+          .setNote('ID corregido: "' + cid + '" → "' + rec.cid + '"');
+        corregidos++;
+      }
+      if (!filas[i][3] && rec.nombre) _llenar_(hojaGrad, row, 3, rec.nombre);
+      if (!filas[i][5] && rec.edad)   _llenar_(hojaGrad, row, 5, rec.edad);
     }
   }
 
-  // ── Hojas de clasificación con COLUMNAS_COMUNES ──
-  // Creamos ID = col B (idx 1), Nombre = col C (idx 2), Edad = col F (idx 5)
+  // ── Hojas de clasificación: Creamos ID = col B (idx 1), Nombre = col C (idx 2), Edad = col F (idx 5) ──
   ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'].forEach(function(nombre) {
     var h = ss.getSheetByName(nombre);
     if (!h || h.getLastRow() < 2) return;
     var filas = h.getRange(2, 1, h.getLastRow() - 1, 7).getValues();
     for (var i = 0; i < filas.length; i++) {
-      var cid  = (filas[i][1] || '').toString().trim();
-      var dato = mapa[cid];
-      if (!cid || !dato) continue;
+      var cid   = (filas[i][1] || '').toString().trim();
+      if (!cid) continue;
+      var match = _buscarEnMapaFuzzy_(cid, mapaExt);
+      if (!match) continue;
+      var rec = match.rec;
       var row = i + 2;
-      if (!filas[i][2] && dato.nombre) { h.getRange(row, 3).setValue(dato.nombre); cambios++; }
-      if (!filas[i][5] && dato.edad)   { h.getRange(row, 6).setValue(dato.edad);   cambios++; }
+      if (match.metodo === 'dist1' || match.metodo === 'normalizado') {
+        h.getRange(row, 2)
+          .setValue(rec.cid)
+          .setBackground('#FFF9C4')
+          .setNote('ID corregido: "' + cid + '" → "' + rec.cid + '"');
+        corregidos++;
+      }
+      if (!filas[i][2] && rec.nombre) _llenar_(h, row, 2, rec.nombre);
+      if (!filas[i][5] && rec.edad)   _llenar_(h, row, 5, rec.edad);
     }
   });
 
@@ -4375,17 +4474,18 @@ function autocompletarConCreamos() {
   if (hojaClasif && hojaClasif.getLastRow() > 1) {
     var filas = hojaClasif.getRange(2, 1, hojaClasif.getLastRow() - 1, 3).getValues();
     for (var i = 0; i < filas.length; i++) {
-      var cid  = (filas[i][1] || '').toString().trim();
-      var dato = mapa[cid];
-      if (!cid || !dato) continue;
-      if (!filas[i][2] && dato.nombre) { hojaClasif.getRange(i + 2, 3).setValue(dato.nombre); cambios++; }
+      var cid   = (filas[i][1] || '').toString().trim();
+      if (!cid) continue;
+      var match = _buscarEnMapaFuzzy_(cid, mapaExt);
+      if (!match) continue;
+      var rec = match.rec;
+      if (!filas[i][2] && rec.nombre) _llenar_(hojaClasif, i + 2, 2, rec.nombre);
     }
   }
 
-  SpreadsheetApp.getActiveSpreadsheet().toast(
-    'Se completaron ' + cambios + ' campos faltantes con datos de Salesforce.',
-    '✅ Autocompletado listo', 5
-  );
+  var msg = 'Se completaron ' + cambios + ' campos faltantes.';
+  if (corregidos > 0) msg += '\n⚠️ ' + corregidos + ' Creamos ID corregidos (celdas en amarillo).';
+  SpreadsheetApp.getActiveSpreadsheet().toast(msg, '✅ Autocompletado listo', 7);
 }
 
 /**
@@ -4429,65 +4529,124 @@ function protegerBaseDatosSalesforce() {
  * Se ejecuta desde el menú o automáticamente por trigger cada 4 horas.
  */
 function verificarYCompletarCreamos() {
-  var mapa  = _cargarMapaCreamos_();
-  var COLOR = '#FFE0B2'; // naranja claro = falta Creamos ID en Salesforce
-  var NOTA  = '⚠️ Pendiente: crear perfil en Salesforce con este registro';
-  var ss    = SpreadsheetApp.getActiveSpreadsheet();
-  var sinId = 0;
-  var completados = 0;
+  var mapaExt = _cargarMapaCreamos_();
+  // Colores de estado en la celda del Creamos ID:
+  var C_SIN_ID  = '#FFE0B2'; // naranja    = celda vacía, falta Creamos ID
+  var C_NO_BD   = '#FFCDD2'; // rojo claro = tiene ID pero no existe en Salesforce
+  var C_TYPO    = '#FFF9C4'; // amarillo   = typo detectado, ID corregido
+  var C_SUGER   = '#FFF3E0'; // ámbar claro = posible typo (distancia 2), sin corregir
+  var C_OK      = null;      // sin color  = todo correcto
 
-  // ── Graduados: Creamos ID = col C (idx 2), Nombre = col D, Edad = col F ──
-  var hojaGrad = ss.getSheetByName('Graduados');
-  if (hojaGrad && hojaGrad.getLastRow() > 1) {
-    var nf   = hojaGrad.getLastRow() - 1;
-    var data = hojaGrad.getRange(2, 1, nf, 10).getValues();
-    for (var i = 0; i < data.length; i++) {
-      var cid = (data[i][2] || '').toString().trim();
-      var row = i + 2;
-      if (!cid) {
-        hojaGrad.getRange(row, 3).setBackground(COLOR).setNote(NOTA);
-        sinId++;
-      } else {
-        hojaGrad.getRange(row, 3).setBackground(null).clearNote();
-        var dato = mapa[cid];
-        if (dato) {
-          if (!data[i][3] && dato.nombre) { hojaGrad.getRange(row, 4).setValue(dato.nombre); completados++; }
-          if (!data[i][5] && dato.edad)   { hojaGrad.getRange(row, 6).setValue(dato.edad);   completados++; }
-        }
-      }
+  var ss          = SpreadsheetApp.getActiveSpreadsheet();
+  var sinId       = 0, noBD = 0, corregidos = 0, sugerencias = 0, completados = 0;
+
+  function _procesarFila_(hoja, fila, row, colCid, colNombre, colEdad) {
+    var cid   = (fila[colCid] || '').toString().trim();
+    var celId = hoja.getRange(row, colCid + 1);
+    if (!cid) {
+      celId.setBackground(C_SIN_ID).setNote('⚠️ Pendiente: crear perfil en Salesforce con este registro');
+      sinId++;
+      return;
+    }
+    var match = _buscarEnMapaFuzzy_(cid, mapaExt);
+    if (!match) {
+      celId.setBackground(C_NO_BD).setNote('❌ Creamos ID "' + cid + '" no existe en Salesforce. Verificar.');
+      noBD++;
+      return;
+    }
+    var rec = match.rec;
+    if (match.metodo === 'dist1' || match.metodo === 'normalizado') {
+      celId.setValue(rec.cid).setBackground(C_TYPO)
+        .setNote('✏️ ID corregido automáticamente: "' + cid + '" → "' + rec.cid + '"');
+      corregidos++;
+    } else if (match.metodo === 'dist2') {
+      celId.setBackground(C_SUGER)
+        .setNote('❓ Posible typo: ¿quisiste decir "' + rec.cid + '"? Revisar manualmente.');
+      sugerencias++;
+    } else {
+      celId.setBackground(C_OK).clearNote();
+    }
+    if (colNombre !== null && !fila[colNombre] && rec.nombre) {
+      hoja.getRange(row, colNombre + 1).setValue(rec.nombre); completados++;
+    }
+    if (colEdad !== null && !fila[colEdad] && rec.edad) {
+      hoja.getRange(row, colEdad + 1).setValue(rec.edad); completados++;
     }
   }
 
-  // ── Hojas de clasificación: Creamos ID = col B (idx 1) ──
+  // ── Graduados: Creamos ID = col C (idx 2), Nombre = col D (idx 3), Edad = col F (idx 5) ──
+  var hojaGrad = ss.getSheetByName('Graduados');
+  if (hojaGrad && hojaGrad.getLastRow() > 1) {
+    var data = hojaGrad.getRange(2, 1, hojaGrad.getLastRow() - 1, 10).getValues();
+    for (var i = 0; i < data.length; i++) _procesarFila_(hojaGrad, data[i], i + 2, 2, 3, 5);
+  }
+
+  // ── Hojas de clasificación: Creamos ID = col B (idx 1), Nombre = col C (idx 2), Edad = col F (idx 5) ──
   ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'].forEach(function(nombre) {
     var h = ss.getSheetByName(nombre);
     if (!h || h.getLastRow() < 2) return;
     var data = h.getRange(2, 1, h.getLastRow() - 1, 7).getValues();
-    for (var i = 0; i < data.length; i++) {
-      var cid = (data[i][1] || '').toString().trim();
-      var row = i + 2;
-      if (!cid) {
-        h.getRange(row, 2).setBackground(COLOR).setNote(NOTA);
-        sinId++;
-      } else {
-        h.getRange(row, 2).setBackground(null).clearNote();
-        var dato = mapa[cid];
-        if (dato) {
-          if (!data[i][2] && dato.nombre) { h.getRange(row, 3).setValue(dato.nombre); completados++; }
-          if (!data[i][5] && dato.edad)   { h.getRange(row, 6).setValue(dato.edad);   completados++; }
-        }
-      }
-    }
+    for (var i = 0; i < data.length; i++) _procesarFila_(h, data[i], i + 2, 1, 2, 5);
   });
 
-  Logger.log('Verificación Creamos: ' + sinId + ' sin ID, ' + completados + ' campos completados.');
-  if (sinId > 0) {
-    ss.toast(
-      sinId + ' registros en naranja necesitan perfil en Salesforce.',
-      '⚠️ Acción requerida', 10
+  var partes = [];
+  if (completados > 0)  partes.push(completados  + ' campos completados');
+  if (corregidos > 0)   partes.push(corregidos   + ' IDs corregidos (amarillo)');
+  if (sugerencias > 0)  partes.push(sugerencias  + ' posibles typos (ámbar) — revisar');
+  if (sinId > 0)        partes.push(sinId        + ' sin Creamos ID (naranja)');
+  if (noBD > 0)         partes.push(noBD         + ' IDs no encontrados en Salesforce (rojo)');
+  var msg = partes.length ? partes.join('\n') : 'Todo está correcto.';
+  Logger.log('Verificación Creamos: ' + msg);
+  ss.toast(msg, '🔍 Verificación completada', 10);
+}
+
+/**
+ * Genera un reporte de errores ortográficos / IDs no encontrados en todas las hojas.
+ * No modifica datos, solo lee y muestra un resumen en una alerta.
+ */
+function diagnosticarErroresCreamos() {
+  var ui      = SpreadsheetApp.getUi();
+  var mapaExt = _cargarMapaCreamos_();
+  if (mapaExt.todos.length === 0) {
+    ui.alert('❌ Error', 'No se encontró "' + HOJA_BD_CREAMOS + '" o está vacía.', ui.ButtonSet.OK);
+    return;
+  }
+  var ss       = SpreadsheetApp.getActiveSpreadsheet();
+  var problemas = [];
+
+  function _diagnosticar_(hoja, colCid) {
+    if (!hoja || hoja.getLastRow() < 2) return;
+    var nomH  = hoja.getName();
+    var data  = hoja.getRange(2, colCid + 1, hoja.getLastRow() - 1, 1).getValues();
+    for (var i = 0; i < data.length; i++) {
+      var cid = (data[i][0] || '').toString().trim();
+      if (!cid) continue;
+      var match = _buscarEnMapaFuzzy_(cid, mapaExt);
+      if (!match) {
+        problemas.push(nomH + ' fila ' + (i + 2) + ': "' + cid + '" — NO encontrado en Salesforce');
+      } else if (match.metodo === 'dist1' || match.metodo === 'normalizado') {
+        problemas.push(nomH + ' fila ' + (i + 2) + ': "' + cid + '" → corregir a "' + match.idSugerido + '"');
+      } else if (match.metodo === 'dist2') {
+        problemas.push(nomH + ' fila ' + (i + 2) + ': "' + cid + '" — ¿quisiste decir "' + match.idSugerido + '"?');
+      }
+    }
+  }
+
+  _diagnosticar_(ss.getSheetByName('Graduados'), 2);
+  ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'].forEach(function(n) {
+    _diagnosticar_(ss.getSheetByName(n), 1);
+  });
+
+  if (problemas.length === 0) {
+    ui.alert('✅ Sin errores', 'Todos los Creamos ID encontrados existen en Salesforce.', ui.ButtonSet.OK);
+  } else {
+    var texto = problemas.slice(0, 30).join('\n');
+    if (problemas.length > 30) texto += '\n... y ' + (problemas.length - 30) + ' más.';
+    ui.alert(
+      '⚠️ ' + problemas.length + ' problema(s) detectado(s)',
+      texto + '\n\nUsa "Verificar Creamos ID ahora" para corregir automáticamente.',
+      ui.ButtonSet.OK
     );
-  } else if (completados > 0) {
-    ss.toast(completados + ' campos completados automáticamente.', '✅ Actualizado', 5);
   }
 }
 
