@@ -56,7 +56,8 @@ function onOpen(e) {
       .addSubMenu(submenuImport)
       .addSeparator()
       // ── 2. Ver y clasificar ──────────────────────────
-      .addItem('📊 Generar Reporte',                         'generarReporte')
+      .addItem('📊 Generar Reporte (todo)',                   'generarReporte')
+      .addItem('📅 Generar Reporte 2025',                    'generarReporte2025')
       .addItem('📝 Clasificar Graduados',                    'mostrarFormularioClasificacion')
       .addItem('🎨 Aplicar colores y desplegables (Graduados)','aplicarColoresGraduados')
       .addSeparator()
@@ -64,6 +65,8 @@ function onOpen(e) {
       .addItem('🔄 Autocompletar con Creamos ID',            'autocompletarConCreamos')
       .addItem('🔍 Verificar Creamos ID ahora',              'verificarYCompletarCreamos')
       .addItem('🩺 Diagnosticar errores Creamos ID',         'diagnosticarErroresCreamos')
+      .addItem('⚡ Activar autocomplete al abrir',           'instalarTriggerAutocompletarAlAbrir')
+      .addItem('⏹ Desactivar autocomplete al abrir',         'desactivarTriggerAutocompletarAlAbrir')
       .addItem('🔒 Proteger base datos Salesforce',          'protegerBaseDatosSalesforce')
       .addSeparator()
       // ── 4. Avanzado ───────────────────────────────────
@@ -2633,8 +2636,14 @@ function obtenerNombreHojaClasificacion(clasificacion) {
  * @return {Array}
  */
 function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionales) {
+  // Usar la fecha real del graduado (col B = Fecha de envío), NO la fecha de hoy.
+  var _fechaOrigen = datosGraduado[1];
+  var _fechaIngreso = _fechaOrigen instanceof Date
+    ? _fechaOrigen.toLocaleDateString('es-ES')
+    : (_fechaOrigen ? _fechaOrigen.toString() : new Date().toLocaleDateString('es-ES'));
+
   const filaBase = [
-    new Date().toLocaleDateString('es-ES'), // Fecha de ingreso
+    _fechaIngreso, // Fecha de ingreso (ahora viene de la fila de Graduados, no de hoy)
     datosGraduado[2],                        // Creamos ID (índice 2)
     datosGraduado[3],                        // Nombre completo (índice 3)
     datosGraduado[7] || datosAdicionales.telefono || '',  // Número de teléfono (índice 7)
@@ -3783,13 +3792,16 @@ function registrarMovimientoEtapa(creamosId, nombreCompleto, etapa, nota) {
 }
 
 /**
- * Genera el reporte completo en la hoja "Reporte".
- * Lee datos directamente de las hojas de clasificación y Graduados.
- * Se puede ejecutar desde el menú o se llama automáticamente.
+ * Genera el reporte completo en la hoja "Reporte" (o "Reporte YYYY" si se
+ * pasa un año). Lee datos directamente de las hojas de clasificación y Graduados.
+ * @param {number} [año] - Si se pasa, filtra solo ese año (ej: 2025)
  */
-function generarReporte() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  var hoja = ss.getSheetByName('Reporte') || ss.insertSheet('Reporte');
+function generarReporte2025() { generarReporte(2025); }
+
+function generarReporte(año) {
+  const ss        = SpreadsheetApp.getActiveSpreadsheet();
+  const nomHoja   = año ? 'Reporte ' + año : 'Reporte';
+  var hoja = ss.getSheetByName(nomHoja) || ss.insertSheet(nomHoja);
   hoja.clear();
   hoja.setTabColor('#e91e63');
 
@@ -3820,11 +3832,32 @@ function generarReporte() {
   hoja.setColumnWidth(6, 100);
 
   // ── Helpers internos ──────────────────────────────────────────────────────
-  function contarFilas(nombreHoja, colNombre) {
+
+  // Extrae el año de un valor de celda (Date, string dd/mm/yyyy o ISO yyyy-mm-dd)
+  function _anioFecha_(raw) {
+    if (!raw) return null;
+    if (raw instanceof Date) return raw.getFullYear();
+    var s = raw.toString().trim();
+    if (s.length >= 10 && s.charAt(4) === '-') return parseInt(s.substring(0, 4), 10); // ISO
+    var p = s.split('/');
+    if (p.length === 3) return parseInt(p[2], 10); // dd/mm/yyyy
+    return null;
+  }
+
+  // colNombre: índice 0-based de la columna que determina si la fila tiene datos.
+  // colFecha: índice 0-based de la columna de fecha (para filtrar por año). Si es null, no filtra.
+  function contarFilas(nombreHoja, colNombre, colFecha) {
     var h = ss.getSheetByName(nombreHoja);
     if (!h || h.getLastRow() <= 1) return 0;
-    var vals = h.getRange(2, colNombre + 1, h.getLastRow() - 1, 1).getValues();
-    return vals.filter(function(r) { return r[0] && r[0].toString().trim() !== ''; }).length;
+    var nCols = Math.max(colNombre, colFecha !== undefined && colFecha !== null ? colFecha : 0) + 1;
+    var vals  = h.getRange(2, 1, h.getLastRow() - 1, nCols).getValues();
+    return vals.filter(function(r) {
+      if (!r[colNombre] || r[colNombre].toString().trim() === '') return false;
+      if (año && colFecha !== null && colFecha !== undefined) {
+        return _anioFecha_(r[colFecha]) === año;
+      }
+      return true;
+    }).length;
   }
   function titulo(f, texto, bg, fg, sz) {
     hoja.getRange(f, 1, 1, W).merge()
@@ -3854,16 +3887,18 @@ function generarReporte() {
 
   // ── DATOS ─────────────────────────────────────────────────────────────────
   // Seguimiento (etapas)
+  // colFecha=0 → "Fecha de ingreso" en las hojas de clasificación
+  // colFecha=1 → "Fecha de envío" en Graduados
   const conteos = {};
   var totalParticipantes = 0;
   ETAPAS_FLUJO.forEach(function(e) {
     var col = (e === 'Conexiones Laborales') ? 1 : 2;
-    conteos[e] = contarFilas(e, col);
+    conteos[e] = contarFilas(e, col, 0);
     totalParticipantes += conteos[e];
   });
 
-  // Graduados (col 4 → índice 3)
-  var totalGraduados = contarFilas('Graduados', 3);
+  // Graduados (col nombre = índice 3, col fecha = índice 1)
+  var totalGraduados = contarFilas('Graduados', 3, 1);
 
   // Seguimientos pendientes
   var totalPendientes = obtenerSeguimientosPendientes().length;
@@ -3898,6 +3933,7 @@ function generarReporte() {
       else if (typeof raw === 'string' && raw.indexOf('/') !== -1) {
         var p = raw.split('/'); fch = new Date(p[2], parseInt(p[1]) - 1, p[0]);
       } else { continue; }
+      if (año && fch.getFullYear() !== año) continue; // filtrar por año si se pidió
       var clave = MESES[fch.getMonth()] + ' ' + fch.getFullYear();
       if (!ipm[clave]) {
         ipm[clave] = { _t: fch.getTime() };
@@ -3923,6 +3959,7 @@ function generarReporte() {
         if (parts.length === 3) fch = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
       }
       if (!fch || isNaN(fch.getTime())) continue;
+      if (año && fch.getFullYear() !== año) continue; // filtrar por año
       var clave = MESES[fch.getMonth()] + ' ' + fch.getFullYear();
       if (!ipm[clave]) {
         ipm[clave] = { _t: fch.getTime() };
@@ -3948,7 +3985,7 @@ function generarReporte() {
   // ╚══════════════════════════════════════════╝
   hoja.setRowHeight(f, 46);
   hoja.getRange(f, 1, 1, W).merge()
-      .setValue('REPORTE DE SEGUIMIENTO — EMPLEABILIDAD')
+      .setValue(año ? 'REPORTE ' + año + ' — SEGUIMIENTO EMPLEABILIDAD' : 'REPORTE DE SEGUIMIENTO — EMPLEABILIDAD')
       .setBackground(C.bannerBg).setFontColor(C.bannerFg)
       .setFontWeight('bold').setFontSize(16)
       .setHorizontalAlignment('center').setVerticalAlignment('middle');
@@ -4720,6 +4757,51 @@ function diagnosticarErroresCreamos() {
  * Instala un trigger que ejecuta verificarYCompletarCreamos() cada 4 horas.
  * Elimina triggers anteriores del mismo nombre para evitar duplicados.
  */
+/**
+ * Instala un trigger onOpen (instalable, con autorización) que ejecuta
+ * autocompletarConCreamos() cada vez que alguien abre el documento.
+ * Elimina instalaciones previas para no duplicar.
+ */
+function instalarTriggerAutocompletarAlAbrir() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'autocompletarConCreamos' &&
+        t.getEventType() === ScriptApp.EventType.ON_OPEN) {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  ScriptApp.newTrigger('autocompletarConCreamos')
+    .forSpreadsheet(ss)
+    .onOpen()
+    .create();
+  SpreadsheetApp.getUi().alert(
+    '✅ Autocomplete activado al abrir',
+    'Cada vez que abras este documento, el sistema completará\n' +
+    'automáticamente los campos faltantes usando "Copy of CREAMOS ID nuevo".\n\n' +
+    'Puedes desactivarlo desde el menú si lo necesitas.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
+ * Desinstala el trigger onOpen de autocompletar.
+ */
+function desactivarTriggerAutocompletarAlAbrir() {
+  var eliminados = 0;
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'autocompletarConCreamos' &&
+        t.getEventType() === ScriptApp.EventType.ON_OPEN) {
+      ScriptApp.deleteTrigger(t);
+      eliminados++;
+    }
+  });
+  SpreadsheetApp.getUi().alert(
+    eliminados > 0 ? '✅ Desactivado' : 'ℹ️ No estaba activo',
+    'El autocomplete al abrir ha sido ' + (eliminados > 0 ? 'desactivado.' : 'no estaba instalado.'),
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
 function instalarTriggerVerificacionCreamos() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     if (t.getHandlerFunction() === 'verificarYCompletarCreamos') ScriptApp.deleteTrigger(t);
