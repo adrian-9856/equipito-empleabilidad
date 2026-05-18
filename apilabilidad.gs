@@ -58,6 +58,7 @@ function onOpen(e) {
       // ── 2. Ver y clasificar ──────────────────────────
       .addItem('📊 Generar Reporte (todo)',                   'generarReporte')
       .addItem('📅 Generar Reporte 2025',                    'generarReporte2025')
+      .addItem('📅 Corregir fechas de ingreso (2025)',       'corregirFechasIngreso')
       .addItem('📝 Clasificar Graduados',                    'mostrarFormularioClasificacion')
       .addItem('🎨 Aplicar colores y desplegables (Graduados)','aplicarColoresGraduados')
       .addSeparator()
@@ -3797,6 +3798,107 @@ function registrarMovimientoEtapa(creamosId, nombreCompleto, etapa, nota) {
  * @param {number} [año] - Si se pasa, filtra solo ese año (ej: 2025)
  */
 function generarReporte2025() { generarReporte(2025); }
+
+/**
+ * Corrige la columna "Fecha de ingreso" en todas las hojas de clasificación.
+ * Para cada fila busca la "Fecha de envío" real en Graduados usando el Creamos ID,
+ * y reemplaza la fecha incorrecta (ej: 18/5/2026 = hoy) con la fecha correcta de Graduados.
+ * Solo modifica filas donde la fecha parece incorrecta (año actual o vacía).
+ */
+function corregirFechasIngreso() {
+  var ui  = SpreadsheetApp.getUi();
+  var ss  = SpreadsheetApp.getActiveSpreadsheet();
+  var hoy = new Date();
+  var anioActual = hoy.getFullYear();
+
+  // ── Construir mapa Creamos ID → Fecha de envío desde Graduados ──
+  var hojaGrad = ss.getSheetByName('Graduados');
+  if (!hojaGrad || hojaGrad.getLastRow() < 2) {
+    ui.alert('❌ Error', 'No se encontró la hoja "Graduados" o está vacía.', ui.ButtonSet.OK);
+    return;
+  }
+  var datosGrad = hojaGrad.getRange(2, 1, hojaGrad.getLastRow() - 1, 4).getValues();
+  var mapaFechas = {}; // { creamosId: fechaDeEnvio }
+  datosGrad.forEach(function(fila) {
+    var cid   = (fila[2] || '').toString().trim(); // col C = Creamos ID (índice 2)
+    var fecha = fila[1];                            // col B = Fecha de envío (índice 1)
+    if (cid && fecha) mapaFechas[cid] = fecha;
+  });
+
+  // También mapa normalizado para manejar acentos (ej: GLPÉ vs GLPE)
+  var mapaNorm = {};
+  Object.keys(mapaFechas).forEach(function(cid) {
+    mapaNorm[_normalizarTexto_(cid)] = mapaFechas[cid];
+  });
+
+  var totalCorregidos = 0;
+  var detalle = [];
+
+  // ── Recorrer hojas de clasificación ──
+  // colFechaIngreso = índice 0-based de "Fecha de ingreso"
+  // colCreamosId    = índice 0-based de "Creamos ID"
+  var hojas = [
+    { nombre: 'Aliados',                   colFecha: 0, colCid: 1 },
+    { nombre: 'Plataforma',                colFecha: 0, colCid: 1 },
+    { nombre: 'Derivaciones',              colFecha: 0, colCid: 1 },
+    { nombre: 'Paso a paso',               colFecha: 0, colCid: 1 },
+    { nombre: 'Activamente busca trabajo', colFecha: 0, colCid: 1 },
+    { nombre: 'Conexiones Laborales',      colFecha: 0, colCid: 1 }
+  ];
+
+  hojas.forEach(function(def) {
+    var h = ss.getSheetByName(def.nombre);
+    if (!h || h.getLastRow() < 2) return;
+
+    var nCols = Math.max(def.colFecha, def.colCid) + 1;
+    var filas = h.getRange(2, 1, h.getLastRow() - 1, nCols).getValues();
+
+    for (var i = 0; i < filas.length; i++) {
+      var fechaActual = filas[i][def.colFecha];
+      var cid         = (filas[i][def.colCid] || '').toString().trim();
+      if (!cid) continue;
+
+      // Detectar si la fecha es "incorrecta": año actual (2026) o vacía
+      var esFechaIncorrecta = false;
+      if (!fechaActual || fechaActual.toString().trim() === '') {
+        esFechaIncorrecta = true;
+      } else {
+        var anioFecha = fechaActual instanceof Date
+          ? fechaActual.getFullYear()
+          : parseInt((fechaActual.toString().split('/')[2] || '').substring(0, 4), 10);
+        if (anioFecha === anioActual) esFechaIncorrecta = true;
+      }
+
+      if (!esFechaIncorrecta) continue; // fecha parece correcta, no tocar
+
+      // Buscar la fecha real en el mapa (exacto → normalizado)
+      var fechaCorrecta = mapaFechas[cid] || mapaNorm[_normalizarTexto_(cid)];
+      if (!fechaCorrecta) continue;
+
+      // Formatear y escribir
+      var fechaFormateada = fechaCorrecta instanceof Date
+        ? fechaCorrecta.toLocaleDateString('es-ES')
+        : fechaCorrecta.toString();
+
+      h.getRange(i + 2, def.colFecha + 1).setValue(fechaCorrecta);
+      totalCorregidos++;
+      detalle.push(def.nombre + ' fila ' + (i + 2) + ': ' + cid +
+                   ' → ' + fechaFormateada);
+    }
+  });
+
+  if (totalCorregidos === 0) {
+    ui.alert('✅ Sin cambios',
+      'No se encontraron fechas incorrectas (año ' + anioActual + ') en las hojas de clasificación.\n\n' +
+      'Si tienes filas con fechas incorrectas de otro año, usa "Verificar Creamos ID ahora" para diagnosticar.',
+      ui.ButtonSet.OK);
+  } else {
+    var resumen = '✅ Se corrigieron ' + totalCorregidos + ' fecha(s):\n\n' +
+      detalle.slice(0, 20).join('\n') +
+      (detalle.length > 20 ? '\n... y ' + (detalle.length - 20) + ' más.' : '');
+    ui.alert('📅 Fechas corregidas', resumen, ui.ButtonSet.OK);
+  }
+}
 
 function generarReporte(año) {
   const ss        = SpreadsheetApp.getActiveSpreadsheet();
