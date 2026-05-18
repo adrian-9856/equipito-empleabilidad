@@ -58,6 +58,7 @@ function onOpen(e) {
       // ── 2. Ver y clasificar ──────────────────────────
       .addItem('📊 Generar Reporte',                         'generarReporte')
       .addItem('📝 Clasificar Graduados',                    'mostrarFormularioClasificacion')
+      .addItem('🎨 Aplicar colores y desplegables (Graduados)','aplicarColoresGraduados')
       .addSeparator()
       // ── 3. Creamos ID / Salesforce ───────────────────
       .addItem('🔄 Autocompletar con Creamos ID',            'autocompletarConCreamos')
@@ -455,6 +456,60 @@ const ETAPAS_FLUJO = [
   'Conexiones Laborales'
 ];
 
+// Niveles educativos — opciones del dropdown "Nivel educativo" en Graduados
+const NIVELES_EDUCATIVOS = [
+  'Sin escolaridad',
+  'Primero primaria',
+  'Segundo primaria',
+  'Tercero primaria',
+  'Cuarto primaria',
+  'Quinto primaria',
+  'Sexto primaria',
+  'Primero básico',
+  'Segundo básico',
+  'Tercero básico',
+  'Cuarto bachillerato',
+  'Quinto bachillerato',
+  'Diversificado',
+  'Universidad'
+];
+
+// Colores de fondo por opción de dropdown (formato condicional).
+// clave = texto exacto de la opción, valor = { bg, fg }
+const COLORES_DROPDOWN = {
+  // Etapa (ETAPAS_FLUJO)
+  'Aliados':                     { bg: '#4285f4', fg: '#ffffff' },
+  'Plataforma':                  { bg: '#00bcd4', fg: '#003c43' },
+  'Derivaciones':                { bg: '#ab47bc', fg: '#ffffff' },
+  'Activamente busca trabajo':   { bg: '#ff7043', fg: '#ffffff' },
+  'Paso a paso':                 { bg: '#ffca28', fg: '#5f4300' },
+  'Conexiones Laborales':        { bg: '#66bb6a', fg: '#ffffff' },
+  // Empleado (siNo)
+  'Si':                          { bg: '#66bb6a', fg: '#ffffff' },
+  'No':                          { bg: '#ef5350', fg: '#ffffff' },
+  // Género
+  'Hombre':                      { bg: '#bbdefb', fg: '#0d47a1' },
+  'Mujer':                       { bg: '#f8bbd0', fg: '#880e4f' },
+  'Trans hombre':                { bg: '#c5cae9', fg: '#1a237e' },
+  'No binario':                  { bg: '#d1c4e9', fg: '#311b92' },
+  'Otro':                        { bg: '#e0e0e0', fg: '#424242' },
+  // Nivel educativo (gradiente claro de menor a mayor)
+  'Sin escolaridad':             { bg: '#eeeeee', fg: '#424242' },
+  'Primero primaria':            { bg: '#ffebee', fg: '#b71c1c' },
+  'Segundo primaria':            { bg: '#fce4ec', fg: '#880e4f' },
+  'Tercero primaria':            { bg: '#f3e5f5', fg: '#4a148c' },
+  'Cuarto primaria':             { bg: '#ede7f6', fg: '#311b92' },
+  'Quinto primaria':             { bg: '#e8eaf6', fg: '#1a237e' },
+  'Sexto primaria':              { bg: '#e3f2fd', fg: '#0d47a1' },
+  'Primero básico':              { bg: '#e1f5fe', fg: '#01579b' },
+  'Segundo básico':              { bg: '#e0f7fa', fg: '#006064' },
+  'Tercero básico':              { bg: '#e0f2f1', fg: '#004d40' },
+  'Cuarto bachillerato':         { bg: '#e8f5e9', fg: '#1b5e20' },
+  'Quinto bachillerato':         { bg: '#f1f8e9', fg: '#33691e' },
+  'Diversificado':               { bg: '#fff8e1', fg: '#e65100' },
+  'Universidad':                 { bg: '#fff3e0', fg: '#bf360c' }
+};
+
 // Áreas de trabajo — opciones del dropdown Área en Aliados
 const AREAS_TRABAJO = [
   'Tecnología',
@@ -491,7 +546,7 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Nombre completo',      ancho: 200, tipo: 'texto'  },
       { nombre: 'Género',               ancho: 120, tipo: 'dropdown', opciones: GENEROS },
       { nombre: 'Edad',                 ancho: 80,  tipo: 'texto'  },
-      { nombre: 'Nivel educativo',      ancho: 160, tipo: 'texto'  },
+      { nombre: 'Nivel educativo',      ancho: 160, tipo: 'dropdown', opciones: NIVELES_EDUCATIVOS },
       { nombre: 'Número de teléfono',   ancho: 150, tipo: 'texto'  },
       { nombre: 'Formación',            ancho: 180, tipo: 'texto'  },
       { nombre: 'Cohorte',              ancho: 100, tipo: 'texto'  },
@@ -972,7 +1027,106 @@ function _construirHoja(hoja, nombreHoja) {
         .applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false);
   } catch (e) { /* ignorar si no esta disponible */ }
 
+  // -- Colores por opción de dropdown (formato condicional) -----------------
+  _aplicarColoresDropdowns(hoja, columnas);
+
   Logger.log('Hoja construida: ' + nombreHoja);
+}
+
+/**
+ * Aplica formato condicional para que cada opción de un dropdown/siNo se
+ * muestre con su color (definido en COLORES_DROPDOWN). No borra datos.
+ * Conserva las reglas de formato condicional que NO apuntan a estas columnas.
+ * @param {Sheet} hoja
+ * @param {Array} columnas - definición de columnas (ESTRUCTURA_HOJAS[x].columnas)
+ */
+function _aplicarColoresDropdowns(hoja, columnas) {
+  const maxFilas = Math.max(hoja.getMaxRows() - 1, 1);
+
+  // Columnas objetivo (1-based) que vamos a (re)colorear
+  const colsObjetivo = [];
+  columnas.forEach((col, i) => {
+    if (col.tipo === 'dropdown' || col.tipo === 'siNo') colsObjetivo.push(i + 1);
+  });
+  if (colsObjetivo.length === 0) return;
+
+  // Conservar reglas existentes que no toquen nuestras columnas objetivo
+  const reglasPrevias = hoja.getConditionalFormatRules();
+  const reglasConservadas = reglasPrevias.filter(function (regla) {
+    const rangos = regla.getRanges();
+    for (let r = 0; r < rangos.length; r++) {
+      const ini = rangos[r].getColumn();
+      const fin = ini + rangos[r].getNumColumns() - 1;
+      for (let c = 0; c < colsObjetivo.length; c++) {
+        if (colsObjetivo[c] >= ini && colsObjetivo[c] <= fin) return false;
+      }
+    }
+    return true;
+  });
+
+  const nuevasReglas = [];
+  columnas.forEach((col, i) => {
+    if (col.tipo !== 'dropdown' && col.tipo !== 'siNo') return;
+    const colNum   = i + 1;
+    const opciones = col.tipo === 'siNo' ? ['Si', 'No'] : (col.opciones || []);
+    const rango    = hoja.getRange(2, colNum, maxFilas);
+
+    opciones.forEach(function (opcion) {
+      const c = COLORES_DROPDOWN[opcion];
+      if (!c) return;
+      const regla = SpreadsheetApp.newConditionalFormatRule()
+        .whenTextEqualTo(opcion)
+        .setBackground(c.bg)
+        .setFontColor(c.fg)
+        .setRanges([rango])
+        .build();
+      nuevasReglas.push(regla);
+    });
+  });
+
+  hoja.setConditionalFormatRules(reglasConservadas.concat(nuevasReglas));
+}
+
+/**
+ * Aplica el desplegable de "Nivel educativo" y los colores por opción a la
+ * hoja "Graduados" YA EXISTENTE, sin borrar datos. Pensado para ejecutarse
+ * desde el menú sobre una hoja que ya tiene registros.
+ */
+function aplicarColoresGraduados() {
+  const ss   = SpreadsheetApp.getActiveSpreadsheet();
+  const hoja = ss.getSheetByName('Graduados');
+  if (!hoja) {
+    SpreadsheetApp.getUi().alert('No se encontró la hoja "Graduados".');
+    return;
+  }
+
+  const columnas = ESTRUCTURA_HOJAS['Graduados'].columnas;
+  const maxFilas = Math.max(hoja.getMaxRows() - 1, 1);
+
+  // Reaplicar validaciones de dropdown/siNo (incluye el nuevo Nivel educativo)
+  columnas.forEach((col, i) => {
+    const rango = hoja.getRange(2, i + 1, maxFilas);
+    if (col.tipo === 'siNo') {
+      rango.setDataValidation(
+        SpreadsheetApp.newDataValidation()
+          .requireValueInList(['Si', 'No'], true).setAllowInvalid(false).build()
+      );
+    } else if (col.tipo === 'dropdown' && col.opciones && col.opciones.length) {
+      rango.setDataValidation(
+        SpreadsheetApp.newDataValidation()
+          .requireValueInList(col.opciones, true).setAllowInvalid(false).build()
+      );
+    }
+  });
+
+  _aplicarColoresDropdowns(hoja, columnas);
+
+  SpreadsheetApp.getUi().alert(
+    '✅ Listo',
+    'Se aplicó el desplegable de "Nivel educativo" y los colores por opción ' +
+    'en la hoja Graduados (sin borrar datos).',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
 }
 
 /**
