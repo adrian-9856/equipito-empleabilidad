@@ -4974,6 +4974,52 @@ function _normalizarGenero_(valor) {
   return ''; // valor desconocido → celda vacía (evita error de validación)
 }
 
+// Normaliza valores de Nivel educativo a los valores del dropdown local
+function _normalizarNivelEducativo_(valor) {
+  const v = String(valor || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  if (!v) return '';
+
+  // Sin escolaridad
+  if (v === 'sin escolaridad' || v === 'ninguno' || v === 'ninguna' ||
+      v === 'analfabeto' || v === 'analfabeta' || v === 'sin educacion') return 'Sin escolaridad';
+
+  // Primaria (grados individuales)
+  if (v.indexOf('prim') !== -1) {
+    if (v.indexOf('sex') !== -1 || v.indexOf('6') !== -1) return 'Sexto primaria';
+    if (v.indexOf('quin') !== -1 || v.indexOf('5') !== -1) return 'Quinto primaria';
+    if (v.indexOf('cuar') !== -1 || v.indexOf('4') !== -1) return 'Cuarto primaria';
+    if (v.indexOf('ter') !== -1  || v.indexOf('3') !== -1) return 'Tercero primaria';
+    if (v.indexOf('seg') !== -1  || v.indexOf('2') !== -1) return 'Segundo primaria';
+    if (v.indexOf('pri') !== -1  || v.indexOf('1') !== -1) return 'Primero primaria';
+    return 'Sexto primaria'; // "Primaria" genérico → asume completo
+  }
+
+  // Básico
+  if (v.indexOf('basic') !== -1 || v.indexOf('basico') !== -1) {
+    if (v.indexOf('ter') !== -1 || v.indexOf('3') !== -1) return 'Tercero básico';
+    if (v.indexOf('seg') !== -1 || v.indexOf('2') !== -1) return 'Segundo básico';
+    if (v.indexOf('pri') !== -1 || v.indexOf('1') !== -1) return 'Primero básico';
+    return 'Tercero básico'; // "Básico" genérico → asume completo
+  }
+
+  // Bachillerato / Diversificado
+  if (v.indexOf('bach') !== -1) {
+    if (v.indexOf('cuar') !== -1 || v.indexOf('4') !== -1) return 'Cuarto bachillerato';
+    return 'Quinto bachillerato'; // genérico → asume 5to
+  }
+  if (v.indexOf('divers') !== -1 || v.indexOf('carrera') !== -1 ||
+      v.indexOf('perito') !== -1  || v.indexOf('secretar') !== -1 ||
+      v.indexOf('magist') !== -1  || v.indexOf('maestro') !== -1) return 'Diversificado';
+
+  // Universidad
+  if (v.indexOf('univer') !== -1 || v.indexOf('licenc') !== -1 ||
+      v.indexOf('ingeni') !== -1  || v.indexOf('tecnico uni') !== -1 ||
+      v.indexOf('postgrado') !== -1 || v.indexOf('maestria') !== -1) return 'Universidad';
+
+  return ''; // desconocido → celda vacía
+}
+
 /**
  * Convierte una fila del sheet externo (con sus encabezados) a las 15
  * columnas de "Graduados", usando el mapa de nombres de columna.
@@ -4988,8 +5034,10 @@ function _mapearFilaAGraduados_(headers, fila) {
     const key = norm(headers[i]);
     if (!(key in _MAPA_GRADUADOS_)) continue;
     const destIdx = _MAPA_GRADUADOS_[key];
-    // Género necesita normalización para pasar la validación del dropdown
-    fila15[destIdx] = (destIdx === 4) ? _normalizarGenero_(fila[i]) : fila[i];
+    var val = fila[i];
+    if (destIdx === 4)  val = _normalizarGenero_(val);         // col E: Género
+    if (destIdx === 6)  val = _normalizarNivelEducativo_(val); // col G: Nivel educativo
+    fila15[destIdx] = val;
   }
   return fila15;
 }
