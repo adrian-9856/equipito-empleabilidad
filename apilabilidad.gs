@@ -28,6 +28,7 @@ function onOpen(e) {
       .addItem('📥 Importar todos (Kobo + externo)',         'importarTodosLosDatos')
       .addItem('📥 Graduados (externo)',                     'importarGraduadosDesdeExterno')
       .addItem('🔍 Diagnosticar import Graduados',           'diagnosticarImportGraduados')
+      .addItem('🗑️ Eliminar hoja "Graduados Importados"',   'eliminarHojaGraduadosImportados')
       .addItem('🔄 Solo Graduados (Kobo)',                   'importarDatosKobo')
       .addSeparator()
       .addItem('📋 Clasificación de Perfiles',               'importarClasificacionPerfiles')
@@ -4961,6 +4962,18 @@ const _MAPA_GRADUADOS_ = {
   'etapa':               14
 };
 
+// Normaliza valores de Género del sheet externo a los valores del dropdown local
+function _normalizarGenero_(valor) {
+  const v = String(valor || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  if (v === 'hombre' || v === 'masculino' || v === 'm') return 'Hombre';
+  if (v === 'mujer'  || v === 'femenino'  || v === 'f') return 'Mujer';
+  if (v.indexOf('trans') !== -1)                         return 'Trans hombre';
+  if (v.indexOf('binario') !== -1 || v === 'nb')         return 'No binario';
+  if (v === 'otro' || v === 'other')                     return 'Otro';
+  return ''; // valor desconocido → celda vacía (evita error de validación)
+}
+
 /**
  * Convierte una fila del sheet externo (con sus encabezados) a las 15
  * columnas de "Graduados", usando el mapa de nombres de columna.
@@ -4973,9 +4986,10 @@ function _mapearFilaAGraduados_(headers, fila) {
   const fila15 = new Array(15).fill('');
   for (let i = 0; i < headers.length; i++) {
     const key = norm(headers[i]);
-    if (key in _MAPA_GRADUADOS_) {
-      fila15[_MAPA_GRADUADOS_[key]] = fila[i];
-    }
+    if (!(key in _MAPA_GRADUADOS_)) continue;
+    const destIdx = _MAPA_GRADUADOS_[key];
+    // Género necesita normalización para pasar la validación del dropdown
+    fila15[destIdx] = (destIdx === 4) ? _normalizarGenero_(fila[i]) : fila[i];
   }
   return fila15;
 }
@@ -5107,6 +5121,25 @@ function importarGraduadosDesdeExterno() {
 function _obtenerHojaGraduadosImportados() {
   // Mantenida por compatibilidad con código existente
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Graduados');
+}
+
+/** Elimina la hoja auxiliar "Graduados Importados" si existe. */
+function eliminarHojaGraduadosImportados() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+  const hoja = ss.getSheetByName('Graduados Importados');
+  if (!hoja) {
+    ui.alert('ℹ️ Info', 'La hoja "Graduados Importados" no existe.', ui.ButtonSet.OK);
+    return;
+  }
+  const resp = ui.alert(
+    '¿Eliminar hoja?',
+    'Se eliminará la hoja "Graduados Importados" (' + (hoja.getLastRow() - 1) + ' registros).\n\nEsta acción no se puede deshacer.',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (resp !== ui.Button.OK) return;
+  ss.deleteSheet(hoja);
+  ss.toast('Hoja "Graduados Importados" eliminada', '✅ Listo', 4);
 }
 
 /**
