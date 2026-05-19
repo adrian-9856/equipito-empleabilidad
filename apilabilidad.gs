@@ -27,6 +27,7 @@ function onOpen(e) {
     const submenuImport = ui.createMenu('📂 Importar datos')
       .addItem('📥 Importar todos (Kobo + externo)',         'importarTodosLosDatos')
       .addItem('📥 Graduados (externo)',                     'importarGraduadosDesdeExterno')
+      .addItem('🔍 Diagnosticar import Graduados',           'diagnosticarImportGraduados')
       .addItem('🔄 Solo Graduados (Kobo)',                   'importarDatosKobo')
       .addSeparator()
       .addItem('📋 Clasificación de Perfiles',               'importarClasificacionPerfiles')
@@ -5095,4 +5096,76 @@ function instalarTriggerGraduados() {
              'No se pudo instalar el trigger: ' + error.message,
              ui.ButtonSet.OK);
   }
+}
+
+/**
+ * Diagnóstico: muestra un reporte de lo que ve el script en cada fuente externa.
+ * Ejecutar desde el menú para saber por qué no importa.
+ */
+function diagnosticarImportGraduados() {
+  const ss  = SpreadsheetApp.getActiveSpreadsheet();
+  const ui  = SpreadsheetApp.getUi();
+  let informe = '🔍 DIAGNÓSTICO IMPORT GRADUADOS\n';
+  informe += '================================\n\n';
+
+  for (let c = 0; c < CONFIGS_GRADUADOS_EXTERNOS.length; c++) {
+    const cfg = CONFIGS_GRADUADOS_EXTERNOS[c];
+    informe += '📂 FUENTE: ' + cfg.FUENTE + '\n';
+    informe += '   FILE_ID: ' + cfg.FILE_ID + '\n';
+
+    // 1. ¿Se puede abrir?
+    let archivo;
+    try {
+      archivo = SpreadsheetApp.openById(cfg.FILE_ID);
+      informe += '   ✅ Archivo accesible: "' + archivo.getName() + '"\n';
+    } catch (e) {
+      informe += '   ❌ NO se pudo abrir: ' + e.message + '\n\n';
+      continue;
+    }
+
+    // 2. ¿Qué hojas tiene?
+    const hojas = archivo.getSheets();
+    informe += '   Hojas encontradas (' + hojas.length + '):\n';
+    let hojaObj = null;
+    for (let i = 0; i < hojas.length; i++) {
+      const marcador = (hojas[i].getName() === cfg.SHEET_NAME || hojas[i].getSheetId() === cfg.SHEET_GID) ? ' ← ESTA' : '';
+      informe += '      · "' + hojas[i].getName() + '" (GID: ' + hojas[i].getSheetId() + ')' + marcador + '\n';
+      if (marcador) hojaObj = hojas[i];
+    }
+
+    if (!hojaObj) {
+      informe += '   ❌ No se encontró la hoja "' + cfg.SHEET_NAME + '" (GID ' + cfg.SHEET_GID + ')\n\n';
+      continue;
+    }
+
+    // 3. ¿Cuántas filas tiene?
+    const ultFila = hojaObj.getLastRow();
+    informe += '   ✅ Hoja "' + hojaObj.getName() + '" encontrada\n';
+    informe += '   Filas totales: ' + ultFila + ' (incluyendo encabezado)\n';
+
+    if (ultFila < 2) {
+      informe += '   ⚠️ La hoja está VACÍA (sin datos)\n\n';
+      continue;
+    }
+
+    // 4. Encabezados (fila 1)
+    const numCols = Math.min(hojaObj.getLastColumn(), 16);
+    const headers = hojaObj.getRange(1, 1, 1, numCols).getValues()[0];
+    informe += '   Columnas (' + numCols + '): ' + headers.slice(0, 6).join(' | ') + '\n';
+
+    // 5. Primera fila de datos
+    const primera = hojaObj.getRange(2, 1, 1, numCols).getValues()[0];
+    informe += '   Primera fila: ' + primera.slice(0, 4).join(' | ') + '\n';
+
+    // 6. ¿Cuántas pasarían deduplicación?
+    const hojaLocal = ss.getSheetByName('Graduados Importados');
+    if (!hojaLocal || hojaLocal.getLastRow() < 2) {
+      informe += '   "Graduados Importados" vacía → todas las filas serían nuevas\n\n';
+    } else {
+      informe += '   "Graduados Importados" tiene ' + (hojaLocal.getLastRow() - 1) + ' registro(s)\n\n';
+    }
+  }
+
+  Logger.log(informe);
+  ui.alert('Diagnóstico Import Graduados', informe, ui.ButtonSet.OK);
 }
