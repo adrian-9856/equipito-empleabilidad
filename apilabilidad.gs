@@ -4963,6 +4963,7 @@ const _MAPA_GRADUADOS_ = {
   'nombre completo':     3,
   'nombre':              3,
   'genero':              4,
+  'sexo':                4,   // alias por si el externo usa "Sexo" en vez de "Género"
   'edad':                5,
   'nivel educativo':     6,
   'numero de telefono':  7,
@@ -4982,12 +4983,15 @@ const _MAPA_GRADUADOS_ = {
 function _normalizarGenero_(valor) {
   const v = String(valor || '').toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
-  if (v === 'hombre' || v === 'masculino' || v === 'm') return 'Hombre';
-  if (v === 'mujer'  || v === 'femenino'  || v === 'f') return 'Mujer';
-  if (v.indexOf('trans') !== -1)                         return 'Trans hombre';
-  if (v.indexOf('binario') !== -1 || v === 'nb')         return 'No binario';
-  if (v === 'otro' || v === 'other')                     return 'Otro';
-  return ''; // valor desconocido → celda vacía (evita error de validación)
+  if (v === 'hombre' || v === 'masculino' || v === 'm' || v === 'male')   return 'Hombre';
+  if (v === 'mujer'  || v === 'femenino'  || v === 'f' || v === 'female') return 'Mujer';
+  if (v.indexOf('trans') !== -1)                                           return 'Trans hombre';
+  if (v.indexOf('binario') !== -1 || v === 'nb' || v === 'no binario')    return 'No binario';
+  if (v === 'otro' || v === 'other' || v === 'prefiero no decir')          return 'Otro';
+  // Intentar por inicial si el valor tiene más de 1 carácter
+  if (v.charAt(0) === 'h') return 'Hombre';
+  if (v.charAt(0) === 'm' && v.length > 1) return 'Mujer';
+  return ''; // desconocido → celda vacía (evita error de validación)
 }
 
 // Normaliza valores de Nivel educativo a los valores del dropdown local
