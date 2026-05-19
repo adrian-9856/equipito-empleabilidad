@@ -4920,41 +4920,85 @@ function instalarTriggerVerificacionCreamos() {
   );
 }
 
-// Fuentes externas de Graduadx → se importan a "Graduados Importados"
+// Fuentes externas: hoja "Graduadx" de AYB y TECH → llegan a "Graduados"
 const CONFIGS_GRADUADOS_EXTERNOS = [
   {
     FUENTE:     'AYB',
     FILE_ID:    '1Ay1z3HdFHTzSjq7891sQVuEpIXBA8g9XGibjI-wFklc',
     SHEET_NAME: 'Graduadx',
-    SHEET_GID:  2143517721,
-    DESTINO:    'Graduados Importados',
-    NUM_COLS:   16
+    SHEET_GID:  2143517721
   },
   {
     FUENTE:     'TECH',
     FILE_ID:    '1En60zjrwPTrSMFrLUWr2KgXmH7y3vcopfpQgy6lY3HU',
     SHEET_NAME: 'Graduadx',
-    SHEET_GID:  1986708697,
-    DESTINO:    'Graduados Importados',
-    NUM_COLS:   16
+    SHEET_GID:  1808109947  // corregido: era 1986708697 que apuntaba a PowerBI_Export
   }
 ];
 
+// Columnas de la hoja "Graduados" (índice 0-based)
+// 0=No. | 1=Fecha de envío | 2=Creamos ID | 3=Nombre completo | 4=Género
+// 5=Edad | 6=Nivel educativo | 7=Número de teléfono | 8=Formación
+// 9=Cohorte | 10=Fecha de entrevista | 11=Empleado | 12=Próxima llamada
+// 13=Notas | 14=Etapa
+const _MAPA_GRADUADOS_ = {
+  'creamos id':          2,
+  'nombre completo':     3,
+  'nombre':              3,
+  'genero':              4,
+  'edad':                5,
+  'nivel educativo':     6,
+  'numero de telefono':  7,
+  'telefono':            7,
+  'formacion':           8,
+  'cohorte':             9,
+  'fecha de entrevista': 10,
+  'fecha graduacion':    1,   // "Fecha Graduación" → Fecha de envío
+  'fecha de envio':      1,
+  'empleado':            11,
+  'proxima llamada':     12,
+  'notas':               13,
+  'etapa':               14
+};
+
 /**
- * Jala (pull) la hoja "Graduadx" de cada fuente externa (AYB y TECH)
- * hacia la hoja local "Graduados Importados". Solo inserta filas nuevas,
- * deduplicando por "Creamos ID" (col C) o, si está vacío, por Nombre (col D).
+ * Convierte una fila del sheet externo (con sus encabezados) a las 15
+ * columnas de "Graduados", usando el mapa de nombres de columna.
+ */
+function _mapearFilaAGraduados_(headers, fila) {
+  const norm = function(s) {
+    return String(s || '').toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  };
+  const fila15 = new Array(15).fill('');
+  for (let i = 0; i < headers.length; i++) {
+    const key = norm(headers[i]);
+    if (key in _MAPA_GRADUADOS_) {
+      fila15[_MAPA_GRADUADOS_[key]] = fila[i];
+    }
+  }
+  return fila15;
+}
+
+/**
+ * Jala la hoja "Graduadx" de AYB y TECH hacia "Graduados".
+ * Solo inserta filas nuevas (dedup por Creamos ID o Nombre normalizado).
+ * Seguro de ejecutar varias veces: nunca duplica registros existentes.
  */
 function importarGraduadosDesdeExterno() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const hojaDestino = _obtenerHojaGraduadosImportados();
+  const ss          = SpreadsheetApp.getActiveSpreadsheet();
+  const hojaDestino = ss.getSheetByName('Graduados');
+  if (!hojaDestino) {
+    ss.toast('No se encontró la hoja "Graduados"', '❌ Importar Graduados', 8);
+    return;
+  }
 
-  // Cargar índices de lo que ya existe (compartido entre ambas fuentes)
+  // Cargar índices de lo que ya existe en Graduados (cols C y D: Creamos ID y Nombre)
   const existentesId     = {};
   const existentesNombre = {};
   const ultFilaLocal = hojaDestino.getLastRow();
   if (ultFilaLocal >= 2) {
-    const datosLocal = hojaDestino.getRange(2, 1, ultFilaLocal - 1, 16).getValues();
+    const datosLocal = hojaDestino.getRange(2, 1, ultFilaLocal - 1, 15).getValues();
     for (let i = 0; i < datosLocal.length; i++) {
       const creamosId = String(datosLocal[i][2] || '').trim();
       const nombre    = _normalizarTexto_(datosLocal[i][3]);
@@ -4970,43 +5014,56 @@ function importarGraduadosDesdeExterno() {
     const cfg = CONFIGS_GRADUADOS_EXTERNOS[c];
 
     // 1. Abrir archivo externo
-    let archivoExterno;
+    let archivo;
     try {
-      archivoExterno = SpreadsheetApp.openById(cfg.FILE_ID);
+      archivo = SpreadsheetApp.openById(cfg.FILE_ID);
     } catch (e) {
-      Logger.log('importarGraduadosDesdeExterno [' + cfg.FUENTE + ']: error abriendo — ' + e);
       errores.push(cfg.FUENTE + ': no se pudo abrir (' + e.message + ')');
       continue;
     }
 
     // 2. Localizar hoja por nombre; fallback por GID
-    let hojaExterna = archivoExterno.getSheetByName(cfg.SHEET_NAME);
-    if (!hojaExterna) {
-      const hojas = archivoExterno.getSheets();
+    let hojaExt = archivo.getSheetByName(cfg.SHEET_NAME);
+    if (!hojaExt) {
+      const hojas = archivo.getSheets();
       for (let i = 0; i < hojas.length; i++) {
-        if (hojas[i].getSheetId() === cfg.SHEET_GID) { hojaExterna = hojas[i]; break; }
+        if (hojas[i].getSheetId() === cfg.SHEET_GID) { hojaExt = hojas[i]; break; }
       }
     }
-    if (!hojaExterna) {
-      errores.push(cfg.FUENTE + ': no se encontró la hoja "' + cfg.SHEET_NAME + '"');
+    if (!hojaExt) {
+      errores.push(cfg.FUENTE + ': no se encontró "' + cfg.SHEET_NAME + '"');
       continue;
     }
 
     try {
-      const ultFilaExt = hojaExterna.getLastRow();
-      if (ultFilaExt < 2) continue;
+      const ultFila = hojaExt.getLastRow();
+      if (ultFila < 2) continue;
 
-      const numCols  = Math.min(hojaExterna.getLastColumn(), cfg.NUM_COLS);
-      const datosExt = hojaExterna.getRange(2, 1, ultFilaExt - 1, numCols).getValues();
+      const numCols  = hojaExt.getLastColumn();
+      // Fila 1 = encabezados, fila 2+ = datos
+      const headers  = hojaExt.getRange(1, 1, 1, numCols).getValues()[0];
+      const datosExt = hojaExt.getRange(2, 1, ultFila - 1, numCols).getValues();
 
-      // 3. Filtrar nuevas (dedup por Creamos ID; fallback por Nombre)
+      // Encontrar índices de Creamos ID y Nombre en el sheet externo
+      const norm = function(s) {
+        return String(s || '').toLowerCase()
+          .normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+      };
+      let idxId     = -1;
+      let idxNombre = -1;
+      for (let h = 0; h < headers.length; h++) {
+        const n = norm(headers[h]);
+        if (n === 'creamos id')                      idxId     = h;
+        if (n === 'nombre completo' || n === 'nombre') idxNombre = h;
+      }
+
       const nuevas = [];
       for (let i = 0; i < datosExt.length; i++) {
         const fila      = datosExt[i];
-        const creamosId = String(fila[2] || '').trim();
-        const nombre    = _normalizarTexto_(fila[3]);
+        const creamosId = idxId     >= 0 ? String(fila[idxId]     || '').trim() : '';
+        const nombre    = idxNombre >= 0 ? _normalizarTexto_(fila[idxNombre])    : '';
 
-        if (!creamosId && !nombre) continue;
+        if (!creamosId && !nombre) continue; // fila vacía
 
         if (creamosId) {
           if (existentesId[creamosId]) continue;
@@ -5015,23 +5072,24 @@ function importarGraduadosDesdeExterno() {
           if (existentesNombre[nombre]) continue;
           existentesNombre[nombre] = true;
         }
+        if (nombre) existentesNombre[nombre] = true;
 
-        // Normalizar largo de fila a cfg.NUM_COLS
-        while (fila.length < cfg.NUM_COLS) fila.push('');
-        nuevas.push(fila.slice(0, cfg.NUM_COLS));
+        nuevas.push(_mapearFilaAGraduados_(headers, fila));
       }
 
       if (nuevas.length === 0) continue;
 
+      // Asignar número secuencial en col A
       const filaInicio = Math.max(hojaDestino.getLastRow() + 1, 2);
       for (let j = 0; j < nuevas.length; j++) {
         nuevas[j][0] = (filaInicio - 1) + j;
       }
-      hojaDestino.getRange(filaInicio, 1, nuevas.length, cfg.NUM_COLS).setValues(nuevas);
+      hojaDestino.getRange(filaInicio, 1, nuevas.length, 15).setValues(nuevas);
       totalNuevas += nuevas.length;
+      Logger.log('importarGraduadosDesdeExterno [' + cfg.FUENTE + ']: ' + nuevas.length + ' nuevas');
 
     } catch (error) {
-      Logger.log('Error importando [' + cfg.FUENTE + ']: ' + error);
+      Logger.log('Error [' + cfg.FUENTE + ']: ' + error);
       errores.push(cfg.FUENTE + ': ' + error.message);
     }
   }
@@ -5039,29 +5097,16 @@ function importarGraduadosDesdeExterno() {
   if (errores.length > 0) {
     ss.toast('Errores: ' + errores.join(' | '), '⚠️ Importar Graduados', 10);
   } else if (totalNuevas === 0) {
-    ss.toast('Sin registros nuevos (AYB + TECH)', 'ℹ️ Importar Graduados', 4);
+    ss.toast('Sin registros nuevos en AYB ni TECH', 'ℹ️ Importar Graduados', 4);
   } else {
-    ss.toast('Se importaron ' + totalNuevas + ' registro(s) nuevo(s) de AYB y TECH',
-             '✅ Importar Graduados', 5);
+    ss.toast('✅ ' + totalNuevas + ' registro(s) nuevo(s) agregado(s) a Graduados (AYB + TECH)',
+             '✅ Importar Graduados', 6);
   }
 }
 
 function _obtenerHojaGraduadosImportados() {
-  const ss     = SpreadsheetApp.getActiveSpreadsheet();
-  const nombre = CONFIGS_GRADUADOS_EXTERNOS[0].DESTINO;
-  let hoja = ss.getSheetByName(nombre);
-  if (!hoja) {
-    hoja = ss.insertSheet(nombre);
-    const encabezados = [
-      'No.', 'Fecha de envío', 'Creamos ID', 'Nombre completo', 'Teléfono',
-      'Formación / Nivel Educativo', 'Cohorte', 'Fecha de entrevista', 'Entrevistador',
-      'Resultado entrevista', 'Siguiente paso', 'Clasificación', 'Empleado',
-      'Próxima llamada', 'Notas', 'Etapa'
-    ];
-    hoja.getRange(1, 1, 1, encabezados.length).setValues([encabezados]).setFontWeight('bold');
-    hoja.setFrozenRows(1);
-  }
-  return hoja;
+  // Mantenida por compatibilidad con código existente
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Graduados');
 }
 
 /**
@@ -5158,11 +5203,11 @@ function diagnosticarImportGraduados() {
     informe += '   Primera fila: ' + primera.slice(0, 4).join(' | ') + '\n';
 
     // 6. ¿Cuántas pasarían deduplicación?
-    const hojaLocal = ss.getSheetByName('Graduados Importados');
+    const hojaLocal = ss.getSheetByName('Graduados');
     if (!hojaLocal || hojaLocal.getLastRow() < 2) {
-      informe += '   "Graduados Importados" vacía → todas las filas serían nuevas\n\n';
+      informe += '   "Graduados" vacía → todas las filas serían nuevas\n\n';
     } else {
-      informe += '   "Graduados Importados" tiene ' + (hojaLocal.getLastRow() - 1) + ' registro(s)\n\n';
+      informe += '   "Graduados" tiene ' + (hojaLocal.getLastRow() - 1) + ' registro(s)\n\n';
     }
   }
 
