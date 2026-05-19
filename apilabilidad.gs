@@ -33,7 +33,10 @@ function onOpen(e) {
       .addSeparator()
       .addItem('📋 Clasificación de Perfiles',               'importarClasificacionPerfiles')
       .addItem('😊 Satisfacción Empleo (IL-06)',             'importarSatisfaccionEmpleo')
-      .addItem('🤝 Sesiones Acompañamiento (IL-08)',         'importarSesionesAcompanamiento');
+      .addItem('🤝 Sesiones Acompañamiento (IL-08)',         'importarSesionesAcompanamiento')
+      .addSeparator()
+      .addItem('⏱ Activar Auto-import',                     'activarAutoImport')
+      .addItem('⏹ Desactivar Auto-import',                  'desactivarAutoImport');
 
     ui.createMenu('📊 Equipito Empleabilidad')
       // ── Importar ────────────────────────────────────
