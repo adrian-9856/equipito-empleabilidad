@@ -4919,122 +4919,138 @@ function instalarTriggerVerificacionCreamos() {
   );
 }
 
-const CONFIG_GRADUADOS_EXTERNO = {
-  FILE_ID:    '1_596FX6yr8tX93UyIks4emSeE2_vxLJMDyw9Zncsnzs',
-  SHEET_NAME: 'Graduados',
-  SHEET_GID:  676353499,
-  DESTINO:    'Graduados Importados',
-  NUM_COLS:   16
-};
+// Fuentes externas de Graduadx → se importan a "Graduados Importados"
+const CONFIGS_GRADUADOS_EXTERNOS = [
+  {
+    FUENTE:     'AYB',
+    FILE_ID:    '1Ay1z3HdFHTzSjq7891sQVuEpIXBA8g9XGibjI-wFklc',
+    SHEET_NAME: 'Graduadx',
+    SHEET_GID:  2143517721,
+    DESTINO:    'Graduados Importados',
+    NUM_COLS:   16
+  },
+  {
+    FUENTE:     'TECH',
+    FILE_ID:    '1En60zjrwPTrSMFrLUWr2KgXmH7y3vcopfpQgy6lY3HU',
+    SHEET_NAME: 'Graduadx',
+    SHEET_GID:  1986708697,
+    DESTINO:    'Graduados Importados',
+    NUM_COLS:   16
+  }
+];
 
 /**
- * Jala (pull) datos desde un archivo externo de Google Sheets hacia la
- * hoja local "Graduados Importados". Solo inserta filas nuevas,
+ * Jala (pull) la hoja "Graduadx" de cada fuente externa (AYB y TECH)
+ * hacia la hoja local "Graduados Importados". Solo inserta filas nuevas,
  * deduplicando por "Creamos ID" (col C) o, si está vacío, por Nombre (col D).
- *
- * Diseñada para ser segura ante errores: no lanza excepciones al usuario,
- * solo muestra toasts.
  */
 function importarGraduadosDesdeExterno() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hojaDestino = _obtenerHojaGraduadosImportados();
 
-  // 1. Abrir archivo externo
-  let archivoExterno;
-  try {
-    archivoExterno = SpreadsheetApp.openById(CONFIG_GRADUADOS_EXTERNO.FILE_ID);
-  } catch (e) {
-    Logger.log('importarGraduadosDesdeExterno: error abriendo archivo externo — ' + e);
-    ss.toast('No se pudo abrir el archivo externo: ' + e.message, '❌ Importar Graduados', 8);
-    return;
-  }
-
-  // 2. Localizar la hoja (por nombre; si no, por GID de respaldo)
-  let hojaExterna = archivoExterno.getSheetByName(CONFIG_GRADUADOS_EXTERNO.SHEET_NAME);
-  if (!hojaExterna) {
-    const hojas = archivoExterno.getSheets();
-    for (let i = 0; i < hojas.length; i++) {
-      if (hojas[i].getSheetId() === CONFIG_GRADUADOS_EXTERNO.SHEET_GID) {
-        hojaExterna = hojas[i];
-        break;
-      }
+  // Cargar índices de lo que ya existe (compartido entre ambas fuentes)
+  const existentesId     = {};
+  const existentesNombre = {};
+  const ultFilaLocal = hojaDestino.getLastRow();
+  if (ultFilaLocal >= 2) {
+    const datosLocal = hojaDestino.getRange(2, 1, ultFilaLocal - 1, 16).getValues();
+    for (let i = 0; i < datosLocal.length; i++) {
+      const creamosId = String(datosLocal[i][2] || '').trim();
+      const nombre    = _normalizarTexto_(datosLocal[i][3]);
+      if (creamosId) existentesId[creamosId] = true;
+      if (nombre)    existentesNombre[nombre] = true;
     }
   }
-  if (!hojaExterna) {
-    ss.toast('No se encontró la hoja "' + CONFIG_GRADUADOS_EXTERNO.SHEET_NAME +
-             '" ni el GID ' + CONFIG_GRADUADOS_EXTERNO.SHEET_GID,
-             '❌ Importar Graduados', 8);
-    return;
+
+  let totalNuevas = 0;
+  const errores   = [];
+
+  for (let c = 0; c < CONFIGS_GRADUADOS_EXTERNOS.length; c++) {
+    const cfg = CONFIGS_GRADUADOS_EXTERNOS[c];
+
+    // 1. Abrir archivo externo
+    let archivoExterno;
+    try {
+      archivoExterno = SpreadsheetApp.openById(cfg.FILE_ID);
+    } catch (e) {
+      Logger.log('importarGraduadosDesdeExterno [' + cfg.FUENTE + ']: error abriendo — ' + e);
+      errores.push(cfg.FUENTE + ': no se pudo abrir (' + e.message + ')');
+      continue;
+    }
+
+    // 2. Localizar hoja por nombre; fallback por GID
+    let hojaExterna = archivoExterno.getSheetByName(cfg.SHEET_NAME);
+    if (!hojaExterna) {
+      const hojas = archivoExterno.getSheets();
+      for (let i = 0; i < hojas.length; i++) {
+        if (hojas[i].getSheetId() === cfg.SHEET_GID) { hojaExterna = hojas[i]; break; }
+      }
+    }
+    if (!hojaExterna) {
+      errores.push(cfg.FUENTE + ': no se encontró la hoja "' + cfg.SHEET_NAME + '"');
+      continue;
+    }
+
+    try {
+      const ultFilaExt = hojaExterna.getLastRow();
+      if (ultFilaExt < 2) continue;
+
+      const numCols  = Math.min(hojaExterna.getLastColumn(), cfg.NUM_COLS);
+      const datosExt = hojaExterna.getRange(2, 1, ultFilaExt - 1, numCols).getValues();
+
+      // 3. Filtrar nuevas (dedup por Creamos ID; fallback por Nombre)
+      const nuevas = [];
+      for (let i = 0; i < datosExt.length; i++) {
+        const fila      = datosExt[i];
+        const creamosId = String(fila[2] || '').trim();
+        const nombre    = _normalizarTexto_(fila[3]);
+
+        if (!creamosId && !nombre) continue;
+
+        if (creamosId) {
+          if (existentesId[creamosId]) continue;
+          existentesId[creamosId] = true;
+        } else {
+          if (existentesNombre[nombre]) continue;
+          existentesNombre[nombre] = true;
+        }
+
+        // Normalizar largo de fila a cfg.NUM_COLS
+        while (fila.length < cfg.NUM_COLS) fila.push('');
+        nuevas.push(fila.slice(0, cfg.NUM_COLS));
+      }
+
+      if (nuevas.length === 0) continue;
+
+      const filaInicio = Math.max(hojaDestino.getLastRow() + 1, 2);
+      for (let j = 0; j < nuevas.length; j++) {
+        nuevas[j][0] = (filaInicio - 1) + j;
+      }
+      hojaDestino.getRange(filaInicio, 1, nuevas.length, cfg.NUM_COLS).setValues(nuevas);
+      totalNuevas += nuevas.length;
+
+    } catch (error) {
+      Logger.log('Error importando [' + cfg.FUENTE + ']: ' + error);
+      errores.push(cfg.FUENTE + ': ' + error.message);
+    }
   }
 
-  try {
-    const ultFilaExt = hojaExterna.getLastRow();
-    if (ultFilaExt < 2) {
-      ss.toast('Sin registros nuevos', 'ℹ️ Importar Graduados', 4);
-      return;
-    }
-    const datosExt = hojaExterna.getRange(2, 1, ultFilaExt - 1, CONFIG_GRADUADOS_EXTERNO.NUM_COLS).getValues();
-
-    // 3. Hoja local destino (se crea con encabezados si no existe)
-    const hojaDestino = _obtenerHojaGraduadosImportados();
-
-    // 4. Construir índices de lo que ya existe localmente
-    const existentesId = {};
-    const existentesNombre = {};
-    const ultFilaLocal = hojaDestino.getLastRow();
-    if (ultFilaLocal >= 2) {
-      const datosLocal = hojaDestino.getRange(2, 1, ultFilaLocal - 1, CONFIG_GRADUADOS_EXTERNO.NUM_COLS).getValues();
-      for (let i = 0; i < datosLocal.length; i++) {
-        const creamosId = String(datosLocal[i][2] || '').trim();
-        const nombre    = _normalizarTexto_(datosLocal[i][3]); // normaliza acentos, mayúsculas y espacios
-        if (creamosId) existentesId[creamosId] = true;
-        if (nombre)    existentesNombre[nombre] = true;
-      }
-    }
-
-    // 5. Filtrar filas nuevas (dedup por Creamos ID; fallback por Nombre normalizado)
-    const nuevas = [];
-    for (let i = 0; i < datosExt.length; i++) {
-      const fila = datosExt[i];
-      const creamosId = String(fila[2] || '').trim();
-      const nombre    = _normalizarTexto_(fila[3]); // "Méndez" == "Mendez" tras normalizar
-
-      if (!creamosId && !nombre) continue; // fila vacía
-
-      if (creamosId) {
-        if (existentesId[creamosId]) continue;
-        existentesId[creamosId] = true;
-      } else {
-        if (existentesNombre[nombre]) continue;
-        existentesNombre[nombre] = true;
-      }
-      nuevas.push(fila);
-    }
-
-    if (nuevas.length === 0) {
-      ss.toast('Sin registros nuevos', 'ℹ️ Importar Graduados', 4);
-      return;
-    }
-
-    const filaInicio = Math.max(hojaDestino.getLastRow() + 1, 2);
-    // Asignar número secuencial en col A antes de escribir
-    for (let j = 0; j < nuevas.length; j++) {
-      nuevas[j][0] = (filaInicio - 1) + j; // 1, 2, 3... continúa desde el último
-    }
-    hojaDestino.getRange(filaInicio, 1, nuevas.length, CONFIG_GRADUADOS_EXTERNO.NUM_COLS).setValues(nuevas);
-
-    ss.toast('Se importaron ' + nuevas.length + ' registro(s) nuevo(s)',
+  if (errores.length > 0) {
+    ss.toast('Errores: ' + errores.join(' | '), '⚠️ Importar Graduados', 10);
+  } else if (totalNuevas === 0) {
+    ss.toast('Sin registros nuevos (AYB + TECH)', 'ℹ️ Importar Graduados', 4);
+  } else {
+    ss.toast('Se importaron ' + totalNuevas + ' registro(s) nuevo(s) de AYB y TECH',
              '✅ Importar Graduados', 5);
-  } catch (error) {
-    Logger.log('Error en importarGraduadosDesdeExterno: ' + error);
-    ss.toast('Error al importar: ' + error.message, '❌ Importar Graduados', 8);
   }
 }
 
 function _obtenerHojaGraduadosImportados() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let hoja = ss.getSheetByName(CONFIG_GRADUADOS_EXTERNO.DESTINO);
+  const ss     = SpreadsheetApp.getActiveSpreadsheet();
+  const nombre = CONFIGS_GRADUADOS_EXTERNOS[0].DESTINO;
+  let hoja = ss.getSheetByName(nombre);
   if (!hoja) {
-    hoja = ss.insertSheet(CONFIG_GRADUADOS_EXTERNO.DESTINO);
+    hoja = ss.insertSheet(nombre);
     const encabezados = [
       'No.', 'Fecha de envío', 'Creamos ID', 'Nombre completo', 'Teléfono',
       'Formación / Nivel Educativo', 'Cohorte', 'Fecha de entrevista', 'Entrevistador',
