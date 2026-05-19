@@ -287,26 +287,32 @@ function importarTodosLosDatos() {
 
   ss.toast('Importando todos los datos...', '📥 Importando', -1);
 
-  // 1. Graduados
+  // 1. Graduados externos (AYB + TECH)
+  try {
+    importarGraduadosDesdeExterno();
+    res.push('✅ Graduados externos (AYB + TECH): importados');
+  } catch (e) { res.push('⚠️ Graduados externos: ' + e.message); }
+
+  // 2. Graduados Kobo
   try {
     var d = obtenerDatosKoboToolbox();
     var g = procesarDatosGraduados(d);
-    res.push('✅ Graduados: ' + g.nuevos + ' nuevos (total ' + g.total + ')');
-  } catch (e) { res.push('⚠️ Graduados: ' + e.message); }
+    res.push('✅ Graduados Kobo: ' + g.nuevos + ' nuevos (total ' + g.total + ')');
+  } catch (e) { res.push('⚠️ Graduados Kobo: ' + e.message); }
 
-  // 2. Clasificación de Perfiles
+  // 3. Clasificación de Perfiles
   try {
     var c = _syncClasificacionSoloNuevos();
     res.push('✅ Clasificación de Perfiles: ' + c.nuevos + ' nuevos (total ' + c.total + ')');
   } catch (e) { res.push('⚠️ Clasificación: ' + e.message); }
 
-  // 3. Satisfacción Empleo (IL-06)
+  // 4. Satisfacción Empleo (IL-06)
   try {
     var s = _syncSatisfaccionSoloNuevos();
     res.push('✅ Satisfacción Empleo: ' + s.nuevos + ' nuevos (total ' + s.total + ')');
   } catch (e) { res.push('⚠️ Satisfacción: ' + e.message); }
 
-  // 4. Sesiones Acompañamiento (IL-08)
+  // 5. Sesiones Acompañamiento (IL-08)
   try {
     var se = _syncSesionesSoloNuevos();
     res.push('✅ Sesiones Acompañamiento: ' + se.nuevos + ' nuevos (total ' + se.total + ')');
@@ -2005,13 +2011,19 @@ function autoImportarNuevos() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var msgs = [];
   try {
-    ss.toast('Revisando nuevos registros en KoboToolbox...', '🔄 Auto-import', 5);
+    ss.toast('Revisando nuevos registros...', '🔄 Auto-import', 5);
 
+    // Sheets externos (AYB + TECH)
+    try {
+      importarGraduadosDesdeExterno();
+    } catch(e) { Logger.log('Auto-import externo omitido: ' + e.message); }
+
+    // KoboToolbox
     try {
       var datos = obtenerDatosKoboToolbox();
       var resG  = procesarDatosGraduados(datos);
-      if (resG.nuevos > 0) msgs.push('Graduados: +' + resG.nuevos);
-    } catch(e) { Logger.log('Auto-import Graduados omitido: ' + e.message); }
+      if (resG.nuevos > 0) msgs.push('Graduados Kobo: +' + resG.nuevos);
+    } catch(e) { Logger.log('Auto-import Graduados Kobo omitido: ' + e.message); }
 
     try {
       var resC = _syncClasificacionSoloNuevos();
@@ -4927,13 +4939,17 @@ const CONFIGS_GRADUADOS_EXTERNOS = [
     FUENTE:     'AYB',
     FILE_ID:    '1Ay1z3HdFHTzSjq7891sQVuEpIXBA8g9XGibjI-wFklc',
     SHEET_NAME: 'Graduadx',
-    SHEET_GID:  2143517721
+    SHEET_GID:  2143517721,
+    FORMACION:  'Alimentos y Bebidas',  // se escribe en col "Formación" de Graduados
+    FILTRO:     null                    // sin filtro: jala todos
   },
   {
     FUENTE:     'TECH',
     FILE_ID:    '1En60zjrwPTrSMFrLUWr2KgXmH7y3vcopfpQgy6lY3HU',
     SHEET_NAME: 'Graduadx',
-    SHEET_GID:  1808109947  // corregido: era 1986708697 que apuntaba a PowerBI_Export
+    SHEET_GID:  1808109947,
+    FORMACION:  'Tech',
+    FILTRO:     { COL: 'Cohorte', VALOR: 'SAC' }  // solo personas cuya cohorte contenga "SAC"
   }
 ];
 
@@ -5021,10 +5037,10 @@ function _normalizarNivelEducativo_(valor) {
 }
 
 /**
- * Convierte una fila del sheet externo (con sus encabezados) a las 15
- * columnas de "Graduados", usando el mapa de nombres de columna.
+ * Convierte una fila del sheet externo a las 15 columnas de "Graduados".
+ * formacionDefecto: valor fijo para col Formación (ej. "Tech", "Alimentos y Bebidas")
  */
-function _mapearFilaAGraduados_(headers, fila) {
+function _mapearFilaAGraduados_(headers, fila, formacionDefecto) {
   const norm = function(s) {
     return String(s || '').toLowerCase()
       .normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
@@ -5039,6 +5055,8 @@ function _mapearFilaAGraduados_(headers, fila) {
     if (destIdx === 6)  val = _normalizarNivelEducativo_(val); // col G: Nivel educativo
     fila15[destIdx] = val;
   }
+  // Formación siempre viene del config (AYB = "Alimentos y Bebidas", TECH = "Tech")
+  if (formacionDefecto) fila15[8] = formacionDefecto;
   return fila15;
 }
 
@@ -5106,22 +5124,31 @@ function importarGraduadosDesdeExterno() {
       const headers  = hojaExt.getRange(1, 1, 1, numCols).getValues()[0];
       const datosExt = hojaExt.getRange(2, 1, ultFila - 1, numCols).getValues();
 
-      // Encontrar índices de Creamos ID y Nombre en el sheet externo
+      // Encontrar índices clave en el sheet externo (por nombre de encabezado)
       const norm = function(s) {
         return String(s || '').toLowerCase()
           .normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
       };
       let idxId     = -1;
       let idxNombre = -1;
+      let idxFiltro = -1;
       for (let h = 0; h < headers.length; h++) {
         const n = norm(headers[h]);
-        if (n === 'creamos id')                      idxId     = h;
+        if (n === 'creamos id')                        idxId     = h;
         if (n === 'nombre completo' || n === 'nombre') idxNombre = h;
+        if (cfg.FILTRO && n === norm(cfg.FILTRO.COL))  idxFiltro = h;
       }
 
       const nuevas = [];
       for (let i = 0; i < datosExt.length; i++) {
         const fila      = datosExt[i];
+
+        // Aplicar filtro por columna si está configurado (ej. Cohorte = SAC en TECH)
+        if (cfg.FILTRO && idxFiltro >= 0) {
+          const valFiltro = String(fila[idxFiltro] || '').toUpperCase();
+          if (valFiltro.indexOf(cfg.FILTRO.VALOR.toUpperCase()) === -1) continue;
+        }
+
         const creamosId = idxId     >= 0 ? String(fila[idxId]     || '').trim() : '';
         const nombre    = idxNombre >= 0 ? _normalizarTexto_(fila[idxNombre])    : '';
 
@@ -5136,7 +5163,7 @@ function importarGraduadosDesdeExterno() {
         }
         if (nombre) existentesNombre[nombre] = true;
 
-        nuevas.push(_mapearFilaAGraduados_(headers, fila));
+        nuevas.push(_mapearFilaAGraduados_(headers, fila, cfg.FORMACION));
       }
 
       if (nuevas.length === 0) continue;
