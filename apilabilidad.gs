@@ -23,56 +23,28 @@ function onOpen(e) {
   try {
     const ui = SpreadsheetApp.getUi();
 
-    // ── Submenú: Importar datos ────────────────────────────────────────────
+    // ── Submenú: Importar datos (uso frecuente) ───────────────────────────
     const submenuImport = ui.createMenu('📂 Importar datos')
       .addItem('📥 Importar todos (Kobo + externo)',         'importarTodosLosDatos')
       .addItem('📥 Graduados (externo)',                     'importarGraduadosDesdeExterno')
-      .addSeparator()
       .addItem('🔄 Solo Graduados (Kobo)',                   'importarDatosKobo')
+      .addSeparator()
       .addItem('📋 Clasificación de Perfiles',               'importarClasificacionPerfiles')
       .addItem('😊 Satisfacción Empleo (IL-06)',             'importarSatisfaccionEmpleo')
-      .addItem('🤝 Sesiones Acompañamiento (IL-08)',         'importarSesionesAcompanamiento')
-      .addSeparator()
-      .addItem('♻️ Reimportar Sesiones desde cero',          'reimportarSesionesDesdeCero')
-      .addItem('♻️ Reimportar Satisfacción desde cero',      'reimportarSatisfaccionDesdeCero')
-      .addItem('🧹 Limpiar duplicados (Clasificación)',      'limpiarDuplicadosClasificacion');
-
-    // ── Submenú: Herramientas avanzadas ───────────────────────────────────
-    const submenuAvanzado = ui.createMenu('⚙️ Herramientas avanzadas')
-      .addItem('🔍 Diagnosticar Clasificación de Perfiles',  'diagnosticarClasificacionPerfiles')
-      .addItem('🔧 Limpiar triggers duplicados',             'limpiarTriggersDuplicados')
-      .addItem('⏱ Activar auto-import (cada hora)',          'activarAutoImport')
-      .addItem('⏹ Desactivar auto-import',                   'desactivarAutoImport')
-      .addItem('⏹ Desactivar sincronización horaria',        'desactivarSincronizacionAutomatica')
-      .addSeparator()
-      .addItem('⏰ Instalar trigger Graduados',               'instalarTriggerGraduados')
-      .addItem('⏰ Activar verificación Creamos ID',          'instalarTriggerVerificacionCreamos')
-      .addSeparator()
-      .addItem('🚀 Instalar Sistema (primera vez)',           'instalarSistema')
-      .addItem('🔁 Reinstalar Sistema (borra todo)',          'reinstalarSistema');
+      .addItem('🤝 Sesiones Acompañamiento (IL-08)',         'importarSesionesAcompanamiento');
 
     ui.createMenu('📊 Equipito Empleabilidad')
-      // ── 1. Importar ──────────────────────────────────
+      // ── Importar ────────────────────────────────────
       .addSubMenu(submenuImport)
       .addSeparator()
-      // ── 2. Ver y clasificar ──────────────────────────
-      .addItem('📊 Generar Reporte (todo)',                   'generarReporte')
+      // ── Reportes y clasificación ────────────────────
       .addItem('📅 Generar Reporte 2025',                    'generarReporte2025')
-      .addItem('📅 Corregir fechas de ingreso (2025)',       'corregirFechasIngreso')
-      .addItem('🔢 Numerar filas de Graduados',              'numerarGraduados')
+      .addItem('📊 Generar Reporte (todo)',                  'generarReporte')
       .addItem('📝 Clasificar Graduados',                    'mostrarFormularioClasificacion')
-      .addItem('🎨 Aplicar colores y desplegables (Graduados)','aplicarColoresGraduados')
       .addSeparator()
-      // ── 3. Creamos ID / Salesforce ───────────────────
+      // ── Creamos ID (uso periódico) ──────────────────
       .addItem('🔄 Autocompletar con Creamos ID',            'autocompletarConCreamos')
       .addItem('🔍 Verificar Creamos ID ahora',              'verificarYCompletarCreamos')
-      .addItem('🩺 Diagnosticar errores Creamos ID',         'diagnosticarErroresCreamos')
-      .addItem('⚡ Activar autocomplete al abrir',           'instalarTriggerAutocompletarAlAbrir')
-      .addItem('⏹ Desactivar autocomplete al abrir',         'desactivarTriggerAutocompletarAlAbrir')
-      .addItem('🔒 Proteger base datos Salesforce',          'protegerBaseDatosSalesforce')
-      .addSeparator()
-      // ── 4. Avanzado ───────────────────────────────────
-      .addSubMenu(submenuAvanzado)
       .addToUi();
   } catch (error) {
     Logger.log('onOpen: no se pudo crear el menú — ' + error.message);
