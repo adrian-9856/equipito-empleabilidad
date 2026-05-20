@@ -59,7 +59,7 @@ function onEdit(e) {
     if (e.range.getRow() <= 1) return;
 
     const nuevaEtapa = e.value;
-    if (!nuevaEtapa || nuevaEtapa === 'Conexiones Laborales') return;
+    if (!nuevaEtapa || nuevaEtapa === 'Conexiones Laborales' || nuevaEtapa === 'Paso a paso - Cierre') return;
 
     const fila       = e.range.getRow();
     const datosGrad  = hoja.getRange(fila, 1, 1, 15).getValues()[0];
@@ -99,13 +99,39 @@ function onEditInstalable(e) {
     if (e.range.getRow() <= 1) return;
 
     const nuevaEtapa = e.value;
-    if (nuevaEtapa !== 'Conexiones Laborales') return;
+    if (nuevaEtapa !== 'Conexiones Laborales' && nuevaEtapa !== 'Paso a paso - Cierre') return;
 
     const fila      = e.range.getRow();
     const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
     const creamosId = datosGrad[2] || '';
     const nombre    = datosGrad[3] || '';
 
+    // -- Manejo de Paso a paso - Cierre ----------------------------------------
+    if (nuevaEtapa === 'Paso a paso - Cierre') {
+      if (!nombre) {
+        SpreadsheetApp.getActiveSpreadsheet().toast('La fila no tiene nombre.', '⚠️ Sin datos', 3);
+        return;
+      }
+      const ui = SpreadsheetApp.getUi();
+      const respuesta = ui.prompt(
+        '📋 Cierre formal — ' + nombre,
+        'Escribe el comentario de cierre formal (motivo, observaciones, etc.):',
+        ui.ButtonSet.OK_CANCEL
+      );
+      if (respuesta.getSelectedButton() !== ui.Button.OK) {
+        e.range.setValue('');
+        return;
+      }
+      const comentarioCierre = respuesta.getResponseText().trim() || 'Cierre formal';
+      copiarAHojaClasificacion(datosGrad, 'Paso a paso - Cierre', { nota: comentarioCierre });
+      generarReporte();
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        nombre + ' derivado a Paso a paso (cierre formal)', '✅ Clasificado', 4
+      );
+      return;
+    }
+
+    // -- Manejo de Conexiones Laborales ----------------------------------------
     // Limpiar el dropdown
     e.range.setValue('');
 
@@ -308,6 +334,7 @@ const ETAPAS_FLUJO = [
   'Derivaciones',
   'Por su cuenta',
   'Paso a paso',
+  'Paso a paso - Cierre',
   'Activamente busca trabajo',
   'Conexiones Laborales'
 ];
@@ -1481,6 +1508,7 @@ function obtenerNombreHojaClasificacion(clasificacion) {
     'Derivaciones':               'Derivaciones',
     'Por su cuenta':              'Por su cuenta',
     'Paso a paso':                'Paso a paso',
+    'Paso a paso - Cierre':       'Paso a paso',
     // legacy
     'No busca trabajo':           'Paso a paso',
     'Fito':                       'Paso a paso',
@@ -1581,6 +1609,17 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
         datosAdicionales.cohorte   || datosGraduado[9] || '',  // índice 9 = Cohorte
         datosAdicionales.nota      || '',
         datosAdicionales.activo    || 'No'
+      ]);
+
+    case 'Paso a paso - Cierre':
+      return filaBase.concat([
+        datosAdicionales.dpi       || '',
+        datosAdicionales.telefono  || datosGraduado[7] || '',
+        datosAdicionales.formacion || datosGraduado[8] || '',
+        datosAdicionales.cohorte   || datosGraduado[9] || '',
+        // El comentario de cierre formal del asesor de empleabilidad
+        '[CIERRE FORMAL] ' + (datosAdicionales.nota || ''),
+        'No'
       ]);
 
     case 'Activamente busca trabajo':
