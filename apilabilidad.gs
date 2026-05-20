@@ -269,6 +269,42 @@ function configurarEditTrigger() {
 }
 
 /**
+ * Actualiza el dropdown de la columna Etapa en la hoja Graduados
+ * con las opciones más recientes de ETAPAS_FLUJO.
+ * NO borra ni modifica ningún dato existente.
+ * Ejecútala una sola vez después de pegar el código actualizado.
+ */
+function actualizarDropdownEtapa() {
+  const ss   = SpreadsheetApp.getActiveSpreadsheet();
+  const hoja = ss.getSheetByName('Graduados');
+
+  if (!hoja) {
+    SpreadsheetApp.getUi().alert('No se encontró la hoja "Graduados".');
+    return;
+  }
+
+  const ultimaFila = hoja.getLastRow();
+  if (ultimaFila < 2) {
+    ss.toast('La hoja Graduados no tiene filas de datos.', '⚠️ Sin datos', 3);
+    return;
+  }
+
+  const rango = hoja.getRange(2, 15, ultimaFila - 1, 1);
+  const regla = SpreadsheetApp.newDataValidation()
+    .requireValueInList(ETAPAS_FLUJO, true)
+    .setAllowInvalid(false)
+    .build();
+  rango.setDataValidation(regla);
+
+  ss.toast(
+    'Dropdown de Etapa actualizado con ' + ETAPAS_FLUJO.length + ' opciones. Ningún dato fue modificado.',
+    '✅ Listo',
+    5
+  );
+  Logger.log('actualizarDropdownEtapa completado. Opciones: ' + ETAPAS_FLUJO.join(', '));
+}
+
+/**
  * Trigger instalable: úsalo si onOpen no crea el menú automáticamente.
  * Para instalarlo ejecuta: configurarMenuTrigger()
  */
