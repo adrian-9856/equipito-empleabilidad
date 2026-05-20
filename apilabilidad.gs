@@ -78,7 +78,7 @@ function onEdit(e) {
     // ── Hoja Graduados: columna Etapa (col 15) ─────────────────────────────
     if (nombreHoja === 'Graduados' && col === 15) {
       const nuevaEtapa = e.value;
-      if (!nuevaEtapa || nuevaEtapa === 'Conexiones Laborales') return;
+      if (!nuevaEtapa || nuevaEtapa === 'Conexiones Laborales' || nuevaEtapa === 'Paso a paso - Cierre') return;
 
       const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
       const nombre    = datosGrad[3];
@@ -155,6 +155,37 @@ function onEditInstalable(e) {
     const col        = e.range.getColumn();
     const fila       = e.range.getRow();
     if (fila <= 1) return;
+
+    // ── Graduados: Etapa = "Paso a paso - Cierre" ────────────────────────
+    if (nombreHoja === 'Graduados' && col === 15 && e.value === 'Paso a paso - Cierre') {
+      const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
+      const nombre    = datosGrad[3] || '';
+
+      if (!nombre) {
+        SpreadsheetApp.getActiveSpreadsheet().toast('La fila no tiene nombre.', '⚠️ Sin datos', 3);
+        return;
+      }
+
+      const ui = SpreadsheetApp.getUi();
+      const respuesta = ui.prompt(
+        '📋 Cierre formal — ' + nombre,
+        'Escribe el comentario de cierre formal (motivo, observaciones, etc.):',
+        ui.ButtonSet.OK_CANCEL
+      );
+
+      if (respuesta.getSelectedButton() !== ui.Button.OK) {
+        e.range.setValue('');
+        return;
+      }
+
+      const comentarioCierre = respuesta.getResponseText().trim() || 'Cierre formal';
+      copiarAHojaClasificacion(datosGrad, 'Paso a paso - Cierre', { nota: comentarioCierre });
+      generarReporte();
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        nombre + ' derivado a Paso a paso (cierre formal)', '✅ Clasificado', 4
+      );
+      return;
+    }
 
     // ── Graduados: Etapa = "Conexiones Laborales" ─────────────────────────
     if (nombreHoja === 'Graduados' && col === 15) {
@@ -442,6 +473,7 @@ const ETAPAS_FLUJO = [
   'Derivaciones',
   'Activamente busca trabajo',
   'Paso a paso',
+  'Paso a paso - Cierre',
   'Conexiones Laborales'
 ];
 
@@ -472,6 +504,7 @@ const COLORES_DROPDOWN = {
   'Derivaciones':                { bg: '#ab47bc', fg: '#ffffff' },
   'Activamente busca trabajo':   { bg: '#ff7043', fg: '#ffffff' },
   'Paso a paso':                 { bg: '#ffca28', fg: '#5f4300' },
+  'Paso a paso - Cierre':        { bg: '#f57f17', fg: '#ffffff' },
   'Conexiones Laborales':        { bg: '#66bb6a', fg: '#ffffff' },
   // Empleado (siNo)
   'Si':                          { bg: '#66bb6a', fg: '#ffffff' },
@@ -2597,6 +2630,7 @@ function obtenerNombreHojaClasificacion(clasificacion) {
     'Plataforma':                 'Plataforma',
     'Derivaciones':               'Derivaciones',
     'Paso a paso':                'Paso a paso',
+    'Paso a paso - Cierre':       'Paso a paso',
     // legacy
     'No busca trabajo':           'Paso a paso',
     'Fito':                       'Paso a paso',
@@ -2706,6 +2740,15 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
         datosAdicionales.cohorte   || datosGraduado[9] || '',  // índice 9 = Cohorte
         datosAdicionales.nota      || '',
         datosAdicionales.activo    || 'No'
+      ]);
+
+    case 'Paso a paso - Cierre':
+      return filaBase.concat([
+        datosAdicionales.dpi       || '',
+        datosAdicionales.formacion || datosGraduado[8] || '',
+        datosAdicionales.cohorte   || datosGraduado[9] || '',
+        '[CIERRE FORMAL] ' + (datosAdicionales.nota || ''),
+        'No'
       ]);
 
     case 'Activamente busca trabajo':
