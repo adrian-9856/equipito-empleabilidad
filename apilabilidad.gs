@@ -23,12 +23,10 @@ function onOpen(e) {
   try {
     const ui = SpreadsheetApp.getUi();
 
-    // ── Submenú: Importar datos (uso frecuente) ───────────────────────────
+    // ── Submenú: Importar datos ───────────────────────────────────────────
     const submenuImport = ui.createMenu('📂 Importar datos')
       .addItem('📥 Importar todos (Kobo + externo)',         'importarTodosLosDatos')
       .addItem('📥 Graduados (externo)',                     'importarGraduadosDesdeExterno')
-      .addItem('🔍 Diagnosticar import Graduados',           'diagnosticarImportGraduados')
-      .addItem('🗑️ Eliminar hoja "Graduados Importados"',   'eliminarHojaGraduadosImportados')
       .addItem('🔄 Solo Graduados (Kobo)',                   'importarDatosKobo')
       .addSeparator()
       .addItem('📋 Clasificación de Perfiles',               'importarClasificacionPerfiles')
@@ -36,21 +34,40 @@ function onOpen(e) {
       .addItem('🤝 Sesiones Acompañamiento (IL-08)',         'importarSesionesAcompanamiento')
       .addSeparator()
       .addItem('⏱ Activar Auto-import',                     'activarAutoImport')
-      .addItem('⏹ Desactivar Auto-import',                  'desactivarAutoImport');
-
-    ui.createMenu('📊 Equipito Empleabilidad')
-      // ── Importar ────────────────────────────────────
-      .addSubMenu(submenuImport)
+      .addItem('⏹ Desactivar Auto-import',                  'desactivarAutoImport')
       .addSeparator()
-      // ── Reportes y clasificación ────────────────────
+      .addItem('🔍 Diagnosticar import Graduados',           'diagnosticarImportGraduados')
+      .addItem('🗑️ Eliminar hoja "Graduados Importados"',   'eliminarHojaGraduadosImportados');
+
+    // ── Submenú: Reportes ─────────────────────────────────────────────────
+    const submenuReportes = ui.createMenu('📊 Reportes')
       .addItem('📅 Generar Reporte 2025',                    'generarReporte2025')
       .addItem('📊 Generar Reporte (todo)',                  'generarReporte')
-      .addItem('📝 Clasificar Graduados',                    'mostrarFormularioClasificacion')
       .addSeparator()
-      // ── Creamos ID (uso periódico) ──────────────────
+      .addItem('📝 Clasificar Graduados',                    'mostrarFormularioClasificacion');
+
+    // ── Submenú: Power BI ─────────────────────────────────────────────────
+    const submenuPowerBI = ui.createMenu('📡 Power BI')
+      .addItem('▶ Actualizar ahora',                         'generarExportPowerBI')
+      .addItem('⏱ Activar auto-actualización (6 h)',         'configurarTriggerPowerBI');
+
+    // ── Submenú: Configuración ────────────────────────────────────────────
+    const submenuConfig = ui.createMenu('⚙️ Configuración')
+      .addItem('🔄 Actualizar dropdown Etapa',               'actualizarDropdownEtapa')
       .addItem('🔄 Autocompletar con Creamos ID',            'autocompletarConCreamos')
       .addItem('🔍 Verificar Creamos ID ahora',              'verificarYCompletarCreamos')
+      .addSeparator()
+      .addItem('⚙️ Instalar triggers',                       'configurarEditTrigger')
+      .addItem('💼 Enviar a Conexiones Laborales',           'enviarAConexionesLaborales');
+
+    ui.createMenu('📊 Equipito Empleabilidad')
+      .addSubMenu(submenuImport)
+      .addSubMenu(submenuReportes)
+      .addSubMenu(submenuPowerBI)
+      .addSeparator()
+      .addSubMenu(submenuConfig)
       .addToUi();
+
   } catch (error) {
     Logger.log('onOpen: no se pudo crear el menú — ' + error.message);
   }
@@ -5479,7 +5496,7 @@ function generarExportPowerBI() {
   headerRange.setBackground('#1a73e8');
   headerRange.setFontColor('#ffffff');
   headerRange.setFontWeight('bold');
-  headerRange.setFrozenRows(1);
+  hojaExport.setFrozenRows(1);
 
   var filas = [];
 
