@@ -5408,3 +5408,353 @@ function diagnosticarImportGraduados() {
   Logger.log(informe);
   ui.alert('Diagnóstico Import Graduados', informe, ui.ButtonSet.OK);
 }
+
+// ===========================================================================
+// SECCIÓN 9: EXPORTACIÓN POWER BI
+// ===========================================================================
+// Genera y mantiene la hoja "Power BI Export" con datos consolidados de
+// todas las hojas operativas. Se actualiza automáticamente cada 6 horas
+// mediante un trigger de tiempo instalado con configurarTriggerPowerBI().
+//
+// Columnas de la hoja de exportación:
+//   Última actualización | Fuente | Creamos ID | Nombre completo | Género |
+//   Edad | Nivel educativo | Número de teléfono | Formación | Cohorte |
+//   Fecha ingreso | Empleado | Etapa / Clasificación | Activo | Nota |
+//   Empresa | Cargo | Tipo contrato | Fecha inicio empleo | Salario mensual |
+//   Tipo seguimiento | Estado seguimiento | Tipo servicio sesión |
+//   Satisfacción empleo | Promedio satisfacción
+// ===========================================================================
+
+const NOMBRE_HOJA_POWERBI = 'Power BI Export';
+
+const HEADERS_POWERBI = [
+  'Última actualización',
+  'Fuente',
+  'Creamos ID',
+  'Nombre completo',
+  'Género',
+  'Edad',
+  'Nivel educativo',
+  'Número de teléfono',
+  'Formación',
+  'Cohorte',
+  'Fecha ingreso',
+  'Empleado',
+  'Etapa / Clasificación',
+  'Activo',
+  'Nota',
+  'Empresa',
+  'Cargo',
+  'Tipo contrato',
+  'Fecha inicio empleo',
+  'Salario mensual',
+  'Tipo seguimiento',
+  'Estado seguimiento',
+  'Tipo servicio sesión',
+  'Satisfacción empleo (1-5)',
+  'Promedio satisfacción (1-5)'
+];
+
+/**
+ * Genera (o regenera) la hoja "Power BI Export" con datos de todas las hojas.
+ * Se puede ejecutar manualmente o es llamada por el trigger cada 6 horas.
+ */
+function generarExportPowerBI() {
+  const ss        = SpreadsheetApp.getActiveSpreadsheet();
+  const ahora     = new Date().toLocaleString('es-GT', { timeZone: 'America/Guatemala' });
+
+  // Obtener o crear la hoja de exportación
+  var hojaExport = ss.getSheetByName(NOMBRE_HOJA_POWERBI);
+  if (!hojaExport) {
+    hojaExport = ss.insertSheet(NOMBRE_HOJA_POWERBI);
+  }
+
+  // Limpiar contenido anterior (solo datos, no la hoja entera)
+  hojaExport.clearContents();
+  hojaExport.clearFormats();
+
+  // Escribir encabezados
+  var headerRange = hojaExport.getRange(1, 1, 1, HEADERS_POWERBI.length);
+  headerRange.setValues([HEADERS_POWERBI]);
+  headerRange.setBackground('#1a73e8');
+  headerRange.setFontColor('#ffffff');
+  headerRange.setFontWeight('bold');
+  headerRange.setFrozenRows(1);
+
+  var filas = [];
+
+  // ── 1. GRADUADOS ─────────────────────────────────────────────────────────
+  // Cols: 0=No | 1=Fecha envío | 2=Creamos ID | 3=Nombre | 4=Género |
+  //       5=Edad | 6=Nivel edu | 7=Teléfono | 8=Formación | 9=Cohorte |
+  //       10=Fecha entrevista | 11=Empleado | 12=Próxima llamada |
+  //       13=Notas | 14=Etapa
+  var hGrad = ss.getSheetByName('Graduados');
+  if (hGrad && hGrad.getLastRow() > 1) {
+    var datosGrad = hGrad.getRange(2, 1, hGrad.getLastRow() - 1, 15).getValues();
+    datosGrad.forEach(function(r) {
+      if (!r[2] && !r[3]) return; // fila vacía
+      filas.push(_filaPowerBI(ahora, 'Graduados', {
+        creamosId:  r[2],
+        nombre:     r[3],
+        genero:     r[4],
+        edad:       r[5],
+        nivelEdu:   r[6],
+        telefono:   r[7],
+        formacion:  r[8],
+        cohorte:    r[9],
+        fechaIngreso: r[1],
+        empleado:   r[11],
+        etapa:      r[14],
+        nota:       r[13]
+      }));
+    });
+  }
+
+  // ── 2. ALIADOS ────────────────────────────────────────────────────────────
+  // Cols: 0-6=COMUNES | 7=CompartióCV | 8=Área | 9=Entrevista |
+  //       10=DíaPrueba | 11=Confirmación | 12=Notas | 13=Activo
+  var hAliados = ss.getSheetByName('Aliados');
+  if (hAliados && hAliados.getLastRow() > 1) {
+    var datosAliados = hAliados.getRange(2, 1, hAliados.getLastRow() - 1, 14).getValues();
+    datosAliados.forEach(function(r) {
+      if (!r[1] && !r[2]) return;
+      filas.push(_filaPowerBI(ahora, 'Aliados', {
+        fechaIngreso: r[0], creamosId: r[1], nombre: r[2],
+        telefono: r[3], genero: r[4], edad: r[5], nivelEdu: r[6],
+        etapa: 'Aliados', activo: r[13], nota: r[12]
+      }));
+    });
+  }
+
+  // ── 3. PLATAFORMA ─────────────────────────────────────────────────────────
+  // Cols: 0-6=COMUNES | 7=Cita | 8=CreacionPerfil | 9=Contacto |
+  //       10=Tramites | 11=Entrevista | 12=Confirmacion | 13=Recepcion |
+  //       14=Nota | 15=Activo
+  var hPlat = ss.getSheetByName('Plataforma');
+  if (hPlat && hPlat.getLastRow() > 1) {
+    var datosPlat = hPlat.getRange(2, 1, hPlat.getLastRow() - 1, 16).getValues();
+    datosPlat.forEach(function(r) {
+      if (!r[1] && !r[2]) return;
+      filas.push(_filaPowerBI(ahora, 'Plataforma', {
+        fechaIngreso: r[0], creamosId: r[1], nombre: r[2],
+        telefono: r[3], genero: r[4], edad: r[5], nivelEdu: r[6],
+        etapa: 'Plataforma', activo: r[15], nota: r[14]
+      }));
+    });
+  }
+
+  // ── 4. DERIVACIONES ───────────────────────────────────────────────────────
+  // Cols: 0-6=COMUNES | 7-12=Envíos/Llamadas | 13=Notas | 14=Activo
+  var hDeriv = ss.getSheetByName('Derivaciones');
+  if (hDeriv && hDeriv.getLastRow() > 1) {
+    var datosDeriv = hDeriv.getRange(2, 1, hDeriv.getLastRow() - 1, 15).getValues();
+    datosDeriv.forEach(function(r) {
+      if (!r[1] && !r[2]) return;
+      filas.push(_filaPowerBI(ahora, 'Derivaciones', {
+        fechaIngreso: r[0], creamosId: r[1], nombre: r[2],
+        telefono: r[3], genero: r[4], edad: r[5], nivelEdu: r[6],
+        etapa: 'Derivaciones', activo: r[14], nota: r[13]
+      }));
+    });
+  }
+
+  // ── 5. PASO A PASO ────────────────────────────────────────────────────────
+  // Cols: 0-6=COMUNES | 7=DPI | 8=Formación | 9=Cohorte | 10=Nota | 11=Activo
+  var hPap = ss.getSheetByName('Paso a paso');
+  if (hPap && hPap.getLastRow() > 1) {
+    var datosPap = hPap.getRange(2, 1, hPap.getLastRow() - 1, 12).getValues();
+    datosPap.forEach(function(r) {
+      if (!r[1] && !r[2]) return;
+      var esCierre = (r[10] || '').toString().indexOf('[CIERRE FORMAL]') !== -1;
+      filas.push(_filaPowerBI(ahora, 'Paso a paso', {
+        fechaIngreso: r[0], creamosId: r[1], nombre: r[2],
+        telefono: r[3], genero: r[4], edad: r[5], nivelEdu: r[6],
+        formacion: r[8], cohorte: r[9],
+        etapa: esCierre ? 'Paso a paso - Cierre' : 'Paso a paso',
+        activo: r[11], nota: r[10]
+      }));
+    });
+  }
+
+  // ── 6. ACTIVAMENTE BUSCA TRABAJO ──────────────────────────────────────────
+  // Cols: 0-6=COMUNES | 7=TipoBúsqueda | 8=Mensaje | 9=Llamada |
+  //       10=Nota | 11=Entrevista | 12=Trámites | 13=Activo
+  var hAbt = ss.getSheetByName('Activamente busca trabajo');
+  if (hAbt && hAbt.getLastRow() > 1) {
+    var datosAbt = hAbt.getRange(2, 1, hAbt.getLastRow() - 1, 14).getValues();
+    datosAbt.forEach(function(r) {
+      if (!r[1] && !r[2]) return;
+      filas.push(_filaPowerBI(ahora, 'Activamente busca trabajo', {
+        fechaIngreso: r[0], creamosId: r[1], nombre: r[2],
+        telefono: r[3], genero: r[4], edad: r[5], nivelEdu: r[6],
+        etapa: r[7] || 'Activamente busca trabajo',
+        activo: r[13], nota: r[10]
+      }));
+    });
+  }
+
+  // ── 7. CONEXIONES LABORALES ───────────────────────────────────────────────
+  // Cols: 0=CreamosID | 1=Nombre | 2=Teléfono | 3=Género | 4=Edad |
+  //       5=NivelEdu | 6=Tipo | 7=Programa | 8=Proyecto | 9=Especialidad |
+  //       10=Empresa | 11=Cargo | 12=TipoDuración | 13=TipoContrato |
+  //       14=FechaInicio | 15=FechaFinal | 16=Duración | 17=Salario
+  var hCl = ss.getSheetByName('Conexiones Laborales');
+  if (hCl && hCl.getLastRow() > 1) {
+    var datosCl = hCl.getRange(2, 1, hCl.getLastRow() - 1, 18).getValues();
+    datosCl.forEach(function(r) {
+      if (!r[0] && !r[1]) return;
+      filas.push(_filaPowerBI(ahora, 'Conexiones Laborales', {
+        creamosId: r[0], nombre: r[1], telefono: r[2],
+        genero: r[3], edad: r[4], nivelEdu: r[5],
+        etapa: 'Conexiones Laborales', empleado: 'Si',
+        empresa: r[10], cargo: r[11],
+        tipoContrato: r[13], fechaInicioEmpleo: r[14],
+        salario: r[17]
+      }));
+    });
+  }
+
+  // ── 8. SATISFACCIÓN EMPLEO ────────────────────────────────────────────────
+  // Cols: 0=CreamosID | 1=FechaEnvío | 2=SatEmpleo | 3=CumpleExp |
+  //       4=AmbLaboral | 5=SalBeneficios | 6=Permanencia |
+  //       7=AspMejorar | 8=OtroAspecto | 9=Nota | 10=Promedio
+  var hSat = ss.getSheetByName('Satisfacción Empleo');
+  if (hSat && hSat.getLastRow() > 1) {
+    var datosSat = hSat.getRange(2, 1, hSat.getLastRow() - 1, 11).getValues();
+    datosSat.forEach(function(r) {
+      if (!r[0]) return;
+      filas.push(_filaPowerBI(ahora, 'Satisfacción Empleo', {
+        creamosId: r[0], fechaIngreso: r[1],
+        etapa: 'Satisfacción Empleo',
+        nota: r[9],
+        satisfaccionEmpleo: r[2],
+        promedioSat: r[10]
+      }));
+    });
+  }
+
+  // ── 9. SESIONES ACOMPAÑAMIENTO ────────────────────────────────────────────
+  // Cols: 0=CreamosID | 1=FechaEnvío | 2=InicioSesión | 3=Proyecto |
+  //       4=Nombre | 5=Apellidos | 6=Teléfono | 7=FechaNac | 8=Edad |
+  //       9=Género | 10=AñoIngreso | 11=EnQueAño | 12=GradoAcad |
+  //       13=TipoServicio | 14=Comentario | 15=Acción
+  var hSes = ss.getSheetByName('Sesiones Acompañamiento');
+  if (hSes && hSes.getLastRow() > 1) {
+    var datosSes = hSes.getRange(2, 1, hSes.getLastRow() - 1, 15).getValues();
+    datosSes.forEach(function(r) {
+      if (!r[0] && !r[4]) return;
+      filas.push(_filaPowerBI(ahora, 'Sesiones Acompañamiento', {
+        creamosId: r[0], fechaIngreso: r[1],
+        nombre: ((r[4] || '') + ' ' + (r[5] || '')).trim(),
+        telefono: r[6], edad: r[8], genero: r[9],
+        etapa: 'Sesiones Acompañamiento',
+        nota: r[14], tipoServicioSesion: r[13]
+      }));
+    });
+  }
+
+  // ── 10. SEGUIMIENTO BOT ───────────────────────────────────────────────────
+  // Cols: 0=CreamosID | 1=Nombre | 2=Telefono | 3=Empresa | 4=Cargo |
+  //       5=FechaEmpleo | ... | 10=EstadoActual | 18=TipoSeguimiento
+  var hBot = ss.getSheetByName('Seguimiento Bot');
+  if (hBot && hBot.getLastRow() > 1) {
+    var lastColBot = Math.min(hBot.getLastColumn(), 20);
+    var datosBot = hBot.getRange(2, 1, hBot.getLastRow() - 1, lastColBot).getValues();
+    datosBot.forEach(function(r) {
+      if (!r[0] && !r[1]) return;
+      filas.push(_filaPowerBI(ahora, 'Seguimiento Bot', {
+        creamosId: r[0], nombre: r[1], telefono: r[2],
+        etapa: 'Seguimiento Bot',
+        empresa: r[3], cargo: r[4],
+        tipoSeguimiento: r[18] !== undefined ? r[18] : '',
+        estadoSeguimiento: r[9] !== undefined ? r[9] : ''
+      }));
+    });
+  }
+
+  // Escribir todas las filas de una vez (más eficiente que appendRow)
+  if (filas.length > 0) {
+    hojaExport.getRange(2, 1, filas.length, HEADERS_POWERBI.length).setValues(filas);
+  }
+
+  // Formato final
+  hojaExport.autoResizeColumns(1, HEADERS_POWERBI.length);
+  hojaExport.setFrozenRows(1);
+
+  // Celda de estado en la fila 1, última columna + 2
+  var colEstado = HEADERS_POWERBI.length + 2;
+  hojaExport.getRange(1, colEstado).setValue('Actualizado: ' + ahora);
+  hojaExport.getRange(1, colEstado).setFontStyle('italic').setFontColor('#666666');
+
+  Logger.log('generarExportPowerBI: ' + filas.length + ' filas exportadas. ' + ahora);
+  return filas.length;
+}
+
+/**
+ * Construye una fila de la hoja Power BI Export con los campos en orden.
+ * Cualquier campo no provisto queda como cadena vacía.
+ */
+function _filaPowerBI(ahora, fuente, d) {
+  return [
+    ahora,
+    fuente,
+    d.creamosId            || '',
+    d.nombre               || '',
+    d.genero               || '',
+    d.edad                 || '',
+    d.nivelEdu             || '',
+    d.telefono             || '',
+    d.formacion            || '',
+    d.cohorte              || '',
+    d.fechaIngreso         || '',
+    d.empleado             || '',
+    d.etapa                || '',
+    d.activo               || '',
+    d.nota                 || '',
+    d.empresa              || '',
+    d.cargo                || '',
+    d.tipoContrato         || '',
+    d.fechaInicioEmpleo    || '',
+    d.salario              || '',
+    d.tipoSeguimiento      || '',
+    d.estadoSeguimiento    || '',
+    d.tipoServicioSesion   || '',
+    d.satisfaccionEmpleo   || '',
+    d.promedioSat          || ''
+  ];
+}
+
+/**
+ * Instala (o reinstala) el trigger de tiempo para actualizar Power BI cada 6 horas.
+ * Ejecutar una sola vez desde el editor de Apps Script.
+ */
+function configurarTriggerPowerBI() {
+  // Eliminar triggers previos de este tipo
+  var eliminados = 0;
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'generarExportPowerBI') {
+      ScriptApp.deleteTrigger(t);
+      eliminados++;
+    }
+  });
+
+  // Crear trigger cada 6 horas
+  ScriptApp.newTrigger('generarExportPowerBI')
+    .timeBased()
+    .everyHours(6)
+    .create();
+
+  // Ejecutar una vez inmediatamente para poblar la hoja ahora mismo
+  var filas = generarExportPowerBI();
+
+  SpreadsheetApp.getUi().alert(
+    '✅ Power BI Export configurado',
+    'Hoja "Power BI Export" creada con ' + filas + ' filas.\n\n' +
+    'Triggers previos eliminados: ' + eliminados + '\n' +
+    'Nuevo trigger instalado: cada 6 horas\n\n' +
+    'Para conectar a Power BI usa:\n' +
+    'Obtener datos → Web → URL pública de la hoja\n' +
+    'o usa el conector de Google Sheets.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
