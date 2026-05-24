@@ -60,10 +60,18 @@ function onOpen(e) {
       .addItem('⚙️ Instalar triggers',                       'configurarEditTrigger')
       .addItem('💼 Enviar a Conexiones Laborales',           'enviarAConexionesLaborales');
 
+    const submenuVerificacion = ui.createMenu('🔍 Verificación de IDs')
+      .addItem('Auditar IDs',              'auditarIDs')
+      .addItem('Limpiar IDs incorrectos',  'limpiarIDsIncorrectos')
+      .addItem('Reporte sin ID',           'reporteSinID');
+
     ui.createMenu('📊 Equipito Empleabilidad')
       .addSubMenu(submenuImport)
       .addSubMenu(submenuReportes)
       .addSubMenu(submenuPowerBI)
+      .addSeparator()
+      .addSubMenu(submenuVerificacion)
+      .addItem('⚡ Prueba de Rendimiento',  'pruebaRendimiento')
       .addSeparator()
       .addSubMenu(submenuConfig)
       .addToUi();
@@ -5773,5 +5781,647 @@ function configurarTriggerPowerBI() {
     'Obtener datos → Web → URL pública de la hoja\n' +
     'o usa el conector de Google Sheets.',
     SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+// ===========================================================================
+// SECCIÓN 10: VERIFICACIÓN DE IDs Y AUDITORÍA
+// ===========================================================================
+// Audita la integridad de los Creamos ID en todas las hojas operativas,
+// detecta IDs que no existen en Graduados o cuyo nombre no coincide, y
+// genera reportes de registros sin ID asignado.
+//
+// CONSTANTES del sistema — ajustar si cambia la estructura:
+const NOMBRE_DIRECTORIO_IDS   = 'Graduados';
+const NOMBRE_COLUMNA_ID_IDS   = 'Creamos ID';
+// Hojas del sistema que NO deben auditarse
+const HOJAS_EXCLUIR_AUDITORIA = [
+  'Graduados',
+  'Reporte',
+  'Reporte 2025',
+  'Reportes mensuales',
+  'Reportes Mensuales',
+  'Power BI Export',
+  'Clasificación de Perfiles',
+  'Satisfacción Empleo',
+  'Sesiones Acompañamiento',
+  'Seguimiento Bot',
+  'Graduados Importados',
+  '🔍 Auditoría IDs',
+  '📋 Sin ID',
+  '⚡ Rendimiento'
+];
+
+// ---------------------------------------------------------------------------
+// 1. DETECCIÓN DE HOJAS CON ID (con caché de 1 hora)
+// ---------------------------------------------------------------------------
+
+/**
+ * Detecta qué hojas del spreadsheet tienen la columna 'Creamos ID'.
+ * Usa CacheService para evitar releer encabezados en cada llamada.
+ *
+ * @param {Spreadsheet} ss
+ * @param {string}      nombreDirectorio  Hoja raíz a excluir
+ * @param {boolean}     forzarRefresh     Si true, ignora la caché
+ * @return {string[]}   Nombres de hojas que tienen la columna ID
+ */
+function _detectarHojasConID(ss, nombreDirectorio, forzarRefresh) {
+  var cacheKey = 'hojas_con_id_' + ss.getId();
+  var cache    = CacheService.getScriptCache();
+
+  if (!forzarRefresh) {
+    var cached = cache.get(cacheKey);
+    if (cached) {
+      try { return JSON.parse(cached); } catch (e) {}
+    }
+  }
+
+  var excluir = HOJAS_EXCLUIR_AUDITORIA.slice();
+  if (excluir.indexOf(nombreDirectorio) === -1) excluir.push(nombreDirectorio);
+
+  var resultado = [];
+  var hojas = ss.getSheets();
+
+  for (var i = 0; i < hojas.length; i++) {
+    var hoja = hojas[i];
+    var nombre = hoja.getName();
+
+    // Excluir hojas del sistema
+    var excluida = false;
+    for (var e = 0; e < excluir.length; e++) {
+      if (excluir[e] === nombre) { excluida = true; break; }
+    }
+    if (excluida) continue;
+
+    // Leer solo el encabezado, máximo 60 columnas
+    var maxCol = Math.min(hoja.getMaxColumns(), 60);
+    if (maxCol === 0) continue;
+    var encabezado = hoja.getRange(1, 1, 1, maxCol).getValues()[0];
+
+    for (var c = 0; c < encabezado.length; c++) {
+      if ((encabezado[c] || '').toString().trim() === NOMBRE_COLUMNA_ID_IDS) {
+        resultado.push(nombre);
+        break;
+      }
+    }
+  }
+
+  // Guardar en caché por 1 hora (3600 segundos)
+  try { cache.put(cacheKey, JSON.stringify(resultado), 3600); } catch (e) {}
+  return resultado;
+}
+
+/**
+ * Dado el encabezado de una hoja, devuelve el índice (0-based) de una columna
+ * o -1 si no existe.
+ */
+function _indiceColumna(encabezado, nombreColumna) {
+  for (var i = 0; i < encabezado.length; i++) {
+    if ((encabezado[i] || '').toString().trim() === nombreColumna) return i;
+  }
+  return -1;
+}
+
+// ---------------------------------------------------------------------------
+// 6. SIMILITUD DE NOMBRES (declarada antes para uso interno)
+// ---------------------------------------------------------------------------
+
+/**
+ * Normaliza un nombre: minúsculas, sin tildes, sin caracteres especiales.
+ */
+function _normalizarNombre(nombre) {
+  var s = (nombre || '').toString().toLowerCase();
+  var tildes = { 'á':'a','é':'e','í':'i','ó':'o','ú':'u','ü':'u','ñ':'n',
+                 'à':'a','è':'e','ì':'i','ò':'o','ù':'u' };
+  var resultado = '';
+  for (var i = 0; i < s.length; i++) {
+    var c = s[i];
+    resultado += tildes[c] !== undefined ? tildes[c] : c;
+  }
+  // Solo letras, números y espacios
+  resultado = resultado.replace(/[^a-z0-9 ]/g, ' ');
+  // Colapsar espacios múltiples
+  resultado = resultado.replace(/\s+/g, ' ').trim();
+  return resultado;
+}
+
+/**
+ * Verifica si dos palabras cortas coinciden con tolerancia de hasta 1 carácter
+ * de diferencia (solo aplica a palabras > 4 letras).
+ */
+function _palabrasCoinciden(p1, p2) {
+  if (p1 === p2) return true;
+  if (p1.length <= 4 || p2.length <= 4) return false;
+  // Diferencia de longitud > 1 → no coinciden con tolerancia 1
+  if (Math.abs(p1.length - p2.length) > 1) return false;
+  // Contar caracteres diferentes
+  var diferencias = 0;
+  var largo = Math.max(p1.length, p2.length);
+  var i1 = 0; var i2 = 0;
+  while (i1 < p1.length || i2 < p2.length) {
+    var c1 = i1 < p1.length ? p1[i1] : '';
+    var c2 = i2 < p2.length ? p2[i2] : '';
+    if (c1 !== c2) {
+      diferencias++;
+      if (diferencias > 1) return false;
+      // Intentar saltar en el más largo para alinear
+      if (p1.length > p2.length) { i1++; continue; }
+      if (p2.length > p1.length) { i2++; continue; }
+    }
+    i1++; i2++;
+  }
+  return diferencias <= 1;
+}
+
+/**
+ * Calcula similitud entre dos nombres (0–100).
+ * Basada en palabras: precision*0.65 + recall*0.35
+ *
+ * @param {string} nombre1
+ * @param {string} nombre2
+ * @return {number} 0-100
+ */
+function similitudNombre(nombre1, nombre2) {
+  if (!nombre1 || !nombre2) return 0;
+  var n1 = _normalizarNombre(nombre1);
+  var n2 = _normalizarNombre(nombre2);
+  if (n1 === n2) return 100;
+
+  var palabras1 = n1.split(' ').filter(function(p) { return p.length >= 2; });
+  var palabras2 = n2.split(' ').filter(function(p) { return p.length >= 2; });
+  if (palabras1.length === 0 || palabras2.length === 0) return 0;
+
+  var matches = 0;
+  var usadas2 = [];
+  for (var i = 0; i < palabras1.length; i++) {
+    for (var j = 0; j < palabras2.length; j++) {
+      if (usadas2.indexOf(j) !== -1) continue;
+      if (_palabrasCoinciden(palabras1[i], palabras2[j])) {
+        matches++;
+        usadas2.push(j);
+        break;
+      }
+    }
+  }
+
+  var precision = matches / palabras1.length;
+  var recall    = matches / palabras2.length;
+  return Math.round((precision * 0.65 + recall * 0.35) * 100);
+}
+
+// ---------------------------------------------------------------------------
+// 2. AUDITORÍA DE IDs
+// ---------------------------------------------------------------------------
+
+/**
+ * Construye el mapa ID → nombre completo leyendo la hoja Graduados.
+ * Retorna { mapaID: {}, totalGrads: N }
+ */
+function _cargarDirectorio(ss) {
+  var hoja = ss.getSheetByName(NOMBRE_DIRECTORIO_IDS);
+  if (!hoja || hoja.getLastRow() < 2) return { mapaID: {}, totalGrads: 0 };
+
+  var maxCol = Math.min(hoja.getLastColumn(), 20);
+  var datos  = hoja.getRange(2, 1, hoja.getLastRow() - 1, maxCol).getValues();
+  var header = hoja.getRange(1, 1, 1, maxCol).getValues()[0];
+
+  var colID     = _indiceColumna(header, NOMBRE_COLUMNA_ID_IDS);
+  var colNombre = _indiceColumna(header, 'Nombre completo');
+  if (colID === -1) return { mapaID: {}, totalGrads: 0 };
+
+  var mapaID = {};
+  for (var i = 0; i < datos.length; i++) {
+    var id = (datos[i][colID] || '').toString().trim();
+    if (!id) continue;
+    mapaID[id] = colNombre !== -1 ? (datos[i][colNombre] || '').toString().trim() : '';
+  }
+  return { mapaID: mapaID, totalGrads: datos.length };
+}
+
+/**
+ * Recorre todas las hojas detectadas y devuelve array de problemas.
+ * Cada problema: { hoja, fila, nombreHoja, id, nombreDirectorio, problema }
+ */
+function _detectarProblemas(ss, mapaID) {
+  var nombresHojas = _detectarHojasConID(ss, NOMBRE_DIRECTORIO_IDS, false);
+  var problemas = [];
+  var totalRevisados = 0;
+
+  for (var h = 0; h < nombresHojas.length; h++) {
+    var hoja   = ss.getSheetByName(nombresHojas[h]);
+    if (!hoja || hoja.getLastRow() < 2) continue;
+
+    var maxCol   = Math.min(hoja.getLastColumn(), 60);
+    var header   = hoja.getRange(1, 1, 1, maxCol).getValues()[0];
+    var colID     = _indiceColumna(header, NOMBRE_COLUMNA_ID_IDS);
+    var colNombre = _indiceColumna(header, 'Nombre completo');
+    if (colID === -1) continue;
+
+    var datos = hoja.getRange(2, 1, hoja.getLastRow() - 1, maxCol).getValues();
+
+    for (var i = 0; i < datos.length; i++) {
+      var id = (datos[i][colID] || '').toString().trim();
+      if (!id || id.indexOf('⚠️') === 0) continue;
+
+      totalRevisados++;
+      var nombreEnHoja = colNombre !== -1 ? (datos[i][colNombre] || '').toString().trim() : '';
+
+      if (mapaID[id] === undefined) {
+        problemas.push({
+          hoja:             nombresHojas[h],
+          fila:             i + 2,
+          colID:            colID,
+          nombreHoja:       nombreEnHoja,
+          id:               id,
+          nombreDirectorio: '',
+          problema:         '⚠️ ID no encontrado'
+        });
+      } else if (nombreEnHoja && mapaID[id]) {
+        var sim = similitudNombre(nombreEnHoja, mapaID[id]);
+        if (sim < 60) {
+          problemas.push({
+            hoja:             nombresHojas[h],
+            fila:             i + 2,
+            colID:            colID,
+            nombreHoja:       nombreEnHoja,
+            id:               id,
+            nombreDirectorio: mapaID[id],
+            problema:         '⚠️ Nombre no coincide (' + sim + '%)'
+          });
+        }
+      }
+    }
+  }
+  return { problemas: problemas, totalRevisados: totalRevisados };
+}
+
+/**
+ * Genera la hoja de resultados de auditoría y la llena con los problemas.
+ */
+function auditarIDs() {
+  var ss  = SpreadsheetApp.getActiveSpreadsheet();
+  var ui  = SpreadsheetApp.getUi();
+
+  ss.toast('Cargando directorio...', '🔍 Auditoría', -1);
+
+  var dir    = _cargarDirectorio(ss);
+  var result = _detectarProblemas(ss, dir.mapaID);
+
+  // Crear / limpiar hoja de auditoría
+  var nombreHojaAudit = '🔍 Auditoría IDs';
+  var hojaAudit = ss.getSheetByName(nombreHojaAudit);
+  if (!hojaAudit) hojaAudit = ss.insertSheet(nombreHojaAudit);
+  hojaAudit.clearContents();
+  hojaAudit.clearFormats();
+
+  var headers = ['Hoja', 'Fila', 'Nombre en hoja', 'ID', 'Nombre en directorio', 'Problema'];
+  var hrng = hojaAudit.getRange(1, 1, 1, headers.length);
+  hrng.setValues([headers]);
+  hrng.setBackground('#b71c1c').setFontColor('#ffffff').setFontWeight('bold');
+  hojaAudit.setFrozenRows(1);
+
+  if (result.problemas.length > 0) {
+    var filas = result.problemas.map(function(p) {
+      return [p.hoja, p.fila, p.nombreHoja, p.id, p.nombreDirectorio, p.problema];
+    });
+    hojaAudit.getRange(2, 1, filas.length, headers.length).setValues(filas);
+    // Color naranja para filas con problema
+    hojaAudit.getRange(2, 1, filas.length, headers.length).setBackground('#fff3e0');
+    hojaAudit.autoResizeColumns(1, headers.length);
+  } else {
+    hojaAudit.getRange(2, 1).setValue('✅ No se encontraron problemas');
+  }
+
+  ss.toast('Listo', '🔍 Auditoría', 3);
+
+  var totalOk = result.totalRevisados - result.problemas.length;
+  ui.alert(
+    '🔍 Resultado de Auditoría',
+    'Registros revisados: ' + result.totalRevisados + '\n' +
+    'Con problemas:       ' + result.problemas.length + '\n' +
+    'Sin problemas:       ' + totalOk + '\n\n' +
+    'Ver hoja "' + nombreHojaAudit + '" para el detalle.',
+    ui.ButtonSet.OK
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 3. LIMPIEZA DE IDs INCORRECTOS
+// ---------------------------------------------------------------------------
+
+/**
+ * Muestra los IDs con problemas, pide confirmación y borra SOLO el valor
+ * de la celda ID en cada caso, marcándola en naranja.
+ */
+function limpiarIDsIncorrectos() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+
+  ss.toast('Analizando IDs...', '🧹 Limpieza', -1);
+
+  var dir    = _cargarDirectorio(ss);
+  var result = _detectarProblemas(ss, dir.mapaID);
+
+  ss.toast('', '', 1);
+
+  if (result.problemas.length === 0) {
+    ui.alert('✅ Sin problemas', 'No se encontraron IDs incorrectos.', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Construir lista para mostrar al usuario (máx 20 líneas)
+  var lista = '';
+  var mostrar = Math.min(result.problemas.length, 20);
+  for (var i = 0; i < mostrar; i++) {
+    var p = result.problemas[i];
+    lista += '• ' + p.hoja + ' fila ' + p.fila + ' — ' + p.id + ': ' + p.problema + '\n';
+  }
+  if (result.problemas.length > 20) {
+    lista += '... y ' + (result.problemas.length - 20) + ' más.\n';
+  }
+
+  var confirm = ui.alert(
+    '🧹 Confirmar limpieza',
+    'Se borrarán ' + result.problemas.length + ' celdas de ID (solo el valor, no el nombre):\n\n' +
+    lista + '\n¿Continuar?',
+    ui.ButtonSet.YES_NO
+  );
+  if (confirm !== ui.Button.YES) return;
+
+  // Agrupar por hoja para minimizar llamadas al servidor
+  var porHoja = {};
+  for (var j = 0; j < result.problemas.length; j++) {
+    var prob = result.problemas[j];
+    if (!porHoja[prob.hoja]) porHoja[prob.hoja] = [];
+    porHoja[prob.hoja].push({ fila: prob.fila, colID: prob.colID + 1 }); // +1 para GAS (1-based)
+  }
+
+  var limpiados = 0;
+  var hojasConProblema = Object.keys(porHoja);
+  for (var k = 0; k < hojasConProblema.length; k++) {
+    var nombreHoja  = hojasConProblema[k];
+    var hoja        = ss.getSheetByName(nombreHoja);
+    if (!hoja) continue;
+    var celdas = porHoja[nombreHoja];
+    for (var m = 0; m < celdas.length; m++) {
+      var celda = hoja.getRange(celdas[m].fila, celdas[m].colID);
+      celda.clearContent();
+      celda.setBackground('#ff9800'); // naranja = necesita revisarse
+      limpiados++;
+    }
+  }
+
+  ui.alert(
+    '✅ Limpieza completada',
+    limpiados + ' celdas de ID borradas y marcadas en naranja.\n' +
+    'Busca las celdas naranjas para asignar el ID correcto.',
+    ui.ButtonSet.OK
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 4. REPORTE DE REGISTROS SIN ID
+// ---------------------------------------------------------------------------
+
+/**
+ * Genera la hoja "📋 Sin ID" con todas las filas que tienen nombre pero
+ * no tienen ID asignado (celda vacía o que empieza con ⚠️).
+ */
+function reporteSinID() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+
+  ss.toast('Buscando registros sin ID...', '📋 Sin ID', -1);
+
+  var nombresHojas = _detectarHojasConID(ss, NOMBRE_DIRECTORIO_IDS, false);
+  var filasSinID   = [];
+  var conteosPorHoja = {};
+
+  for (var h = 0; h < nombresHojas.length; h++) {
+    var nombreHoja = nombresHojas[h];
+    var hoja       = ss.getSheetByName(nombreHoja);
+    if (!hoja || hoja.getLastRow() < 2) continue;
+
+    var maxCol  = Math.min(hoja.getLastColumn(), 60);
+    var header  = hoja.getRange(1, 1, 1, maxCol).getValues()[0];
+    var colID     = _indiceColumna(header, NOMBRE_COLUMNA_ID_IDS);
+    var colNombre = _indiceColumna(header, 'Nombre completo');
+    var colDpi    = _indiceColumna(header, 'DPI');
+    if (colID === -1 || colNombre === -1) continue;
+
+    var datos = hoja.getRange(2, 1, hoja.getLastRow() - 1, maxCol).getValues();
+    var countHoja = 0;
+
+    for (var i = 0; i < datos.length; i++) {
+      var nombre = (datos[i][colNombre] || '').toString().trim();
+      var id     = (datos[i][colID]     || '').toString().trim();
+
+      if (!nombre) continue; // fila vacía
+      if (id && id.indexOf('⚠️') !== 0) continue; // tiene ID válido
+
+      var dpi = colDpi !== -1 ? (datos[i][colDpi] || '').toString().trim() : '';
+      filasSinID.push([nombreHoja, i + 2, nombre, dpi]);
+      countHoja++;
+    }
+
+    if (countHoja > 0) conteosPorHoja[nombreHoja] = countHoja;
+  }
+
+  // Crear / limpiar hoja de reporte
+  var nombreHojaReporte = '📋 Sin ID';
+  var hojaReporte = ss.getSheetByName(nombreHojaReporte);
+  if (!hojaReporte) hojaReporte = ss.insertSheet(nombreHojaReporte);
+  hojaReporte.clearContents();
+  hojaReporte.clearFormats();
+
+  var headers = ['Hoja', 'Fila', 'Nombre', 'DPI'];
+  var hrng = hojaReporte.getRange(1, 1, 1, headers.length);
+  hrng.setValues([headers]);
+  hrng.setBackground('#e65100').setFontColor('#ffffff').setFontWeight('bold');
+  hojaReporte.setFrozenRows(1);
+
+  if (filasSinID.length > 0) {
+    hojaReporte.getRange(2, 1, filasSinID.length, headers.length).setValues(filasSinID);
+    // Colorear filas alternadas por hoja para facilitar lectura
+    hojaReporte.getRange(2, 1, filasSinID.length, headers.length).setBackground('#fff8e1');
+    hojaReporte.autoResizeColumns(1, headers.length);
+  } else {
+    hojaReporte.getRange(2, 1).setValue('✅ Todos los registros con nombre tienen ID asignado');
+  }
+
+  ss.toast('Listo', '📋 Sin ID', 3);
+
+  // Construir resumen por hoja
+  var resumen = '';
+  var hojasConSinID = Object.keys(conteosPorHoja);
+  for (var r = 0; r < hojasConSinID.length; r++) {
+    resumen += '  • ' + hojasConSinID[r] + ': ' + conteosPorHoja[hojasConSinID[r]] + '\n';
+  }
+
+  ui.alert(
+    '📋 Registros sin ID',
+    'Total sin ID: ' + filasSinID.length + '\n\n' +
+    (resumen ? 'Por hoja:\n' + resumen : '✅ Ninguno') + '\n' +
+    'Ver hoja "' + nombreHojaReporte + '" para el detalle.',
+    ui.ButtonSet.OK
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 5. PRUEBA DE RENDIMIENTO
+// ---------------------------------------------------------------------------
+
+/**
+ * Mide el tiempo de las operaciones principales del sistema y genera
+ * un reporte visual en la hoja "⚡ Rendimiento".
+ */
+function pruebaRendimiento() {
+  var ss  = SpreadsheetApp.getActiveSpreadsheet();
+  var ui  = SpreadsheetApp.getUi();
+  ss.toast('Ejecutando prueba de rendimiento...', '⚡', -1);
+
+  var resultados = [];
+  var inicio; var duracion;
+
+  // ── 1. Carga del directorio ───────────────────────────────────────────────
+  inicio = new Date().getTime();
+  var dir = _cargarDirectorio(ss);
+  duracion = new Date().getTime() - inicio;
+  resultados.push({
+    paso: '1. Carga del directorio',
+    detalle: dir.totalGrads + ' filas en ' + NOMBRE_DIRECTORIO_IDS,
+    ms: duracion
+  });
+
+  // ── 2. Detección de hojas con ID (forzar refresh) ─────────────────────────
+  inicio = new Date().getTime();
+  var hojas = _detectarHojasConID(ss, NOMBRE_DIRECTORIO_IDS, true);
+  duracion = new Date().getTime() - inicio;
+  resultados.push({
+    paso: '2. Detección de hojas con ID',
+    detalle: hojas.length + ' hojas detectadas: ' + hojas.join(', '),
+    ms: duracion
+  });
+
+  // ── 3. Lectura de todas las hojas con getDataRange ────────────────────────
+  inicio = new Date().getTime();
+  var totalFilas = 0;
+  for (var h = 0; h < hojas.length; h++) {
+    var hoja = ss.getSheetByName(hojas[h]);
+    if (hoja && hoja.getLastRow() > 1) {
+      var datos = hoja.getDataRange().getValues();
+      totalFilas += datos.length;
+    }
+  }
+  duracion = new Date().getTime() - inicio;
+  resultados.push({
+    paso: '3. Lectura de todas las hojas',
+    detalle: totalFilas + ' filas totales en ' + hojas.length + ' hojas',
+    ms: duracion
+  });
+
+  // ── 4. Construcción del mapa de búsqueda ──────────────────────────────────
+  inicio = new Date().getTime();
+  var ids = Object.keys(dir.mapaID);
+  var mapaInvertido = {};
+  for (var i = 0; i < ids.length; i++) mapaInvertido[ids[i].toLowerCase()] = ids[i];
+  duracion = new Date().getTime() - inicio;
+  resultados.push({
+    paso: '4. Construcción del mapa de búsqueda',
+    detalle: ids.length + ' IDs indexados',
+    ms: duracion
+  });
+
+  // ── 5. 100 comparaciones de similitud ─────────────────────────────────────
+  inicio = new Date().getTime();
+  var nombres = Object.values ? Object.values(dir.mapaID) : ids.map(function(k) { return dir.mapaID[k]; });
+  var len = nombres.length;
+  for (var c = 0; c < 100; c++) {
+    var a = nombres[c % len] || 'Ana García López';
+    var b = nombres[(c + 1) % len] || 'Ana Garcia Lopez';
+    similitudNombre(a, b);
+  }
+  duracion = new Date().getTime() - inicio;
+  resultados.push({
+    paso: '5. 100 comparaciones de similitud',
+    detalle: '~' + Math.round(duracion / 100) + ' ms por comparación',
+    ms: duracion
+  });
+
+  // ── 6. Conteo de triggers instalados ──────────────────────────────────────
+  inicio = new Date().getTime();
+  var triggers       = ScriptApp.getProjectTriggers();
+  var triggersOnEdit = triggers.filter(function(t) {
+    return t.getEventType() === ScriptApp.EventType.ON_EDIT;
+  });
+  duracion = new Date().getTime() - inicio;
+  resultados.push({
+    paso: '6. Conteo de triggers instalados',
+    detalle: triggers.length + ' triggers totales, ' + triggersOnEdit.length + ' onEdit',
+    ms: duracion
+  });
+
+  // ── Generar hoja de resultados ────────────────────────────────────────────
+  var nombreHoja = '⚡ Rendimiento';
+  var hojaR = ss.getSheetByName(nombreHoja);
+  if (!hojaR) hojaR = ss.insertSheet(nombreHoja);
+  hojaR.clearContents();
+  hojaR.clearFormats();
+
+  var headers = ['Paso', 'Detalle', 'Tiempo (ms)', 'Estado'];
+  var hrng = hojaR.getRange(1, 1, 1, headers.length);
+  hrng.setValues([headers]);
+  hrng.setBackground('#37474f').setFontColor('#ffffff').setFontWeight('bold');
+  hojaR.setFrozenRows(1);
+
+  var tiempoTotal = 0;
+  for (var r = 0; r < resultados.length; r++) {
+    var res  = resultados[r];
+    var fila = r + 2;
+    tiempoTotal += res.ms;
+
+    var estado; var colorFondo;
+    if (res.ms < 2000)      { estado = '🟢 Rápido';    colorFondo = '#e8f5e9'; }
+    else if (res.ms < 5000) { estado = '🟡 Aceptable'; colorFondo = '#fff9c4'; }
+    else                    { estado = '🔴 Lento';     colorFondo = '#ffebee'; }
+
+    hojaR.getRange(fila, 1).setValue(res.paso);
+    hojaR.getRange(fila, 2).setValue(res.detalle);
+    hojaR.getRange(fila, 3).setValue(res.ms);
+    hojaR.getRange(fila, 4).setValue(estado);
+    hojaR.getRange(fila, 1, 1, 4).setBackground(colorFondo);
+  }
+
+  // Fila de total
+  var filaTotal = resultados.length + 2;
+  hojaR.getRange(filaTotal, 1).setValue('TOTAL');
+  hojaR.getRange(filaTotal, 3).setValue(tiempoTotal);
+  var veredicto;
+  var colorVeredicto;
+  if (tiempoTotal < 10000)      { veredicto = '🟢 Rápido (<10s)';    colorVeredicto = '#1b5e20'; }
+  else if (tiempoTotal < 20000) { veredicto = '🟡 Aceptable (<20s)'; colorVeredicto = '#f57f17'; }
+  else                          { veredicto = '🔴 Lento (>20s)';     colorVeredicto = '#b71c1c'; }
+  hojaR.getRange(filaTotal, 4).setValue(veredicto);
+  hojaR.getRange(filaTotal, 1, 1, 4)
+    .setBackground(colorVeredicto).setFontColor('#ffffff').setFontWeight('bold');
+
+  hojaR.autoResizeColumns(1, headers.length);
+  ss.toast('Listo', '⚡ Rendimiento', 3);
+
+  // Alerta si hay más de 1 trigger onEdit (causa diálogos dobles)
+  var alertaTriggers = triggersOnEdit.length > 1
+    ? '\n\n⚠️ ATENCIÓN: Tienes ' + triggersOnEdit.length + ' triggers onEdit instalados.\n' +
+      'Esto puede causar que los diálogos se abran dos veces.\n' +
+      'Ejecuta configurarEditTrigger() para corregirlo.'
+    : '';
+
+  ui.alert(
+    '⚡ Resultado de Rendimiento',
+    'Tiempo total: ' + tiempoTotal + ' ms\n' +
+    'Veredicto: ' + veredicto + '\n\n' +
+    'Triggers onEdit: ' + triggersOnEdit.length +
+    alertaTriggers + '\n\n' +
+    'Ver hoja "' + nombreHoja + '" para el detalle.',
+    ui.ButtonSet.OK
   );
 }
