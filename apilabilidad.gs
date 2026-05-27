@@ -54,11 +54,14 @@ function onOpen(e) {
     // ── Submenú: Configuración ────────────────────────────────────────────
     const submenuConfig = ui.createMenu('⚙️ Configuración')
       .addItem('🔄 Actualizar dropdown Etapa',               'actualizarDropdownEtapa')
+      .addItem('🎨 Aplicar colores de fila (Graduados)',     'aplicarColoresFilasGraduados')
       .addItem('🔄 Autocompletar con Creamos ID',            'autocompletarConCreamos')
       .addItem('🔍 Verificar Creamos ID ahora',              'verificarYCompletarCreamos')
       .addSeparator()
       .addItem('⚙️ Instalar triggers',                       'configurarEditTrigger')
-      .addItem('💼 Enviar a Conexiones Laborales',           'enviarAConexionesLaborales');
+      .addItem('💼 Enviar a Conexiones Laborales',           'enviarAConexionesLaborales')
+      .addSeparator()
+      .addItem('📧 Configurar correos Conexiones Laborales', 'configurarEmailsConexionesLaborales');
 
     const submenuVerificacion = ui.createMenu('🔍 Verificación de IDs')
       .addItem('Auditar IDs',              'auditarIDs')
@@ -560,13 +563,13 @@ const NIVELES_EDUCATIVOS = [
 // clave = texto exacto de la opción, valor = { bg, fg }
 const COLORES_DROPDOWN = {
   // Etapa (ETAPAS_FLUJO)
-  'Aliados':                     { bg: '#4285f4', fg: '#ffffff' },
-  'Plataforma':                  { bg: '#00bcd4', fg: '#003c43' },
-  'Derivaciones':                { bg: '#ab47bc', fg: '#ffffff' },
-  'Activamente busca trabajo':   { bg: '#ff7043', fg: '#ffffff' },
-  'Paso a paso':                 { bg: '#ffca28', fg: '#5f4300' },
-  'Paso a paso - Cierre':        { bg: '#f57f17', fg: '#ffffff' },
-  'Conexiones Laborales':        { bg: '#66bb6a', fg: '#ffffff' },
+  'Aliados':                     { bg: '#1e88e5', fg: '#ffffff' },
+  'Plataforma':                  { bg: '#9e9e9e', fg: '#ffffff' },
+  'Derivaciones':                { bg: '#f48fb1', fg: '#880e4f' },
+  'Activamente busca trabajo':   { bg: '#ce93d8', fg: '#4a148c' },
+  'Paso a paso':                 { bg: '#fb8c00', fg: '#ffffff' },
+  'Paso a paso - Cierre':        { bg: '#e53935', fg: '#ffffff' },
+  'Conexiones Laborales':        { bg: '#43a047', fg: '#ffffff' },
   // Empleado (siNo)
   'Si':                          { bg: '#66bb6a', fg: '#ffffff' },
   'No':                          { bg: '#ef5350', fg: '#ffffff' },
@@ -751,6 +754,7 @@ const ESTRUCTURA_HOJAS = {
     color: '#00897b',
     columnas: [
       { nombre: 'Creamos ID',           ancho: 130, tipo: 'texto' },
+      { nombre: 'Nombre completo',      ancho: 200, tipo: 'texto' },
       { nombre: 'Fecha envío',          ancho: 160, tipo: 'texto' },
       { nombre: 'Satisfacción empleo',  ancho: 110, tipo: 'texto' },
       { nombre: 'Cumple expectativas',  ancho: 110, tipo: 'texto' },
@@ -1113,6 +1117,11 @@ function _construirHoja(hoja, nombreHoja) {
   // -- Colores por opción de dropdown (formato condicional) -----------------
   _aplicarColoresDropdowns(hoja, columnas);
 
+  // -- Coloreado de fila completa por Etapa (solo en Graduados) --------------
+  if (nombreHoja === 'Graduados') {
+    _colorearFilasPorEtapa(hoja, columnas.length, 15);
+  }
+
   Logger.log('Hoja construida: ' + nombreHoja);
 }
 
@@ -1168,6 +1177,69 @@ function _aplicarColoresDropdowns(hoja, columnas) {
   });
 
   hoja.setConditionalFormatRules(reglasConservadas.concat(nuevasReglas));
+}
+
+/**
+ * Colorea FILAS COMPLETAS en la hoja indicada según el valor de la columna
+ * "Etapa" (columna etapaCol, 1-based). Usa formato condicional basado en
+ * fórmula para que toda la fila refleje el color del estado.
+ * Las reglas se insertan con PRIORIDAD MÁS ALTA (al inicio del array) para
+ * que dominen sobre las reglas de dropdown de columnas individuales.
+ *
+ * @param {Sheet}  hoja
+ * @param {number} numCols   - número de columnas a colorear (ancho de la fila)
+ * @param {number} etapaCol  - columna (1-based) que contiene el valor de Etapa
+ */
+function _colorearFilasPorEtapa(hoja, numCols, etapaCol) {
+  var maxFilas = Math.max(hoja.getMaxRows() - 1, 1);
+
+  // Convertir número de columna a letra(s) A1 notation
+  function colLetra(n) {
+    var s = '';
+    while (n > 0) { var r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); }
+    return s;
+  }
+  var letra = colLetra(etapaCol);
+
+  // Eliminar reglas anteriores de coloreado de fila (las nuestras cubren col 1 con numCols de ancho)
+  var reglasPrevias = hoja.getConditionalFormatRules();
+  var reglasConservadas = reglasPrevias.filter(function(regla) {
+    var rangos = regla.getRanges();
+    for (var r = 0; r < rangos.length; r++) {
+      if (rangos[r].getColumn() === 1 && rangos[r].getNumColumns() >= numCols) return false;
+    }
+    return true;
+  });
+
+  // Crear nuevas reglas de fila para cada etapa
+  var nuevasReglas = [];
+  ETAPAS_FLUJO.forEach(function(etapa) {
+    var c = COLORES_DROPDOWN[etapa];
+    if (!c) return;
+    var rango = hoja.getRange(2, 1, maxFilas, numCols);
+    var regla = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=$' + letra + '2="' + etapa + '"')
+      .setBackground(c.bg)
+      .setFontColor(c.fg)
+      .setRanges([rango])
+      .build();
+    nuevasReglas.push(regla);
+  });
+
+  // Insertar con mayor prioridad (al inicio)
+  hoja.setConditionalFormatRules(nuevasReglas.concat(reglasConservadas));
+}
+
+/**
+ * Aplica colores de fila por Etapa en la hoja Graduados (menú / llamada manual).
+ */
+function aplicarColoresFilasGraduados() {
+  var ss   = SpreadsheetApp.getActiveSpreadsheet();
+  var hoja = ss.getSheetByName('Graduados');
+  if (!hoja) { SpreadsheetApp.getUi().alert('No se encontró la hoja "Graduados".'); return; }
+  var numCols = ESTRUCTURA_HOJAS['Graduados'].columnas.length;
+  _colorearFilasPorEtapa(hoja, numCols, 15); // col 15 = Etapa
+  SpreadsheetApp.getUi().alert('✅ Colores de fila aplicados en Graduados.');
 }
 
 /**
@@ -1821,6 +1893,18 @@ function _syncSatisfaccionSoloNuevos() {
     var CAMPO_ID    = 'intro/Creamos_ID';
     var CAMPO_FECHA = '_submission_time';
 
+    // Mapa Creamos ID → Nombre completo desde la hoja Graduados
+    var mapaNombres = {};
+    (function() {
+      var hGrad = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Graduados');
+      if (!hGrad || hGrad.getLastRow() < 2) return;
+      hGrad.getRange(2, 3, hGrad.getLastRow() - 1, 2).getValues().forEach(function(r) {
+        var cid    = (r[0] || '').toString().trim();
+        var nombre = (r[1] || '').toString().trim();
+        if (cid && nombre) mapaNombres[cid] = nombre;
+      });
+    })();
+
     // Helper: calcular promedio de las 5 preguntas (ignorando vacíos)
     function calcularPromedio(d) {
       var suma = 0, n = 0;
@@ -1831,9 +1915,12 @@ function _syncSatisfaccionSoloNuevos() {
       return n > 0 ? (suma / n).toFixed(2) : '';
     }
 
-    // Helper: arma la fila completa (NOMBRES + Promedio)
+    // Helper: arma la fila completa (Creamos ID | Nombre completo | resto de NOMBRES | Promedio)
     function armarFila(d) {
-      var row = ORDEN.map(function(k) { return d[k] || ''; });
+      var cid    = (d[CAMPO_ID] || '').toString().trim();
+      var nombre = mapaNombres[cid] || '';
+      var row    = [cid, nombre];
+      ORDEN.slice(1).forEach(function(k) { row.push(d[k] || ''); }); // desde Fecha envío en adelante
       row.push(calcularPromedio(d));
       return row;
     }
@@ -1843,7 +1930,8 @@ function _syncSatisfaccionSoloNuevos() {
 
     // --- Primera importación (hoja vacía) ----------------------------------
     if (hoja.getLastRow() <= 1) {
-      var headers = ORDEN.map(function(k) { return NOMBRES[k]; });
+      var headers = ['Creamos ID', 'Nombre completo'];
+      ORDEN.slice(1).forEach(function(k) { headers.push(NOMBRES[k]); });
       headers.push('Promedio (1-5)');
       hoja.clearContents();
       var hr = hoja.getRange(1, 1, 1, headers.length);
@@ -1864,13 +1952,14 @@ function _syncSatisfaccionSoloNuevos() {
     }
 
     // --- Importación incremental (solo registros más nuevos que la última fecha) ---
+    // Col 1 = Creamos ID, Col 3 = Fecha envío (con nueva col Nombre completo en col 2)
     var existentes = {};
     if (!ultimaFechaSatisf) {
       var uf = hoja.getLastRow();
       if (uf > 1) {
-        hoja.getRange(2, 1, uf - 1, 2).getValues().forEach(function(r) {
+        hoja.getRange(2, 1, uf - 1, 3).getValues().forEach(function(r) {
           var id = (r[0] || '').toString().trim();
-          var f  = (r[1] || '').toString().trim();
+          var f  = (r[2] || '').toString().trim(); // col 3 = Fecha envío
           var k  = id ? (id + '||' + f) : ('noId||' + f);
           existentes[k] = true;
         });
@@ -3302,11 +3391,107 @@ function guardarConexionLaboral(datos) {
     // Crear fila en Seguimiento Bot para n8n/WhatsApp
     crearFilaSeguimientoBot(datos, fechaInicio);
 
+    // Enviar notificación por correo a los destinatarios configurados
+    _enviarNotificacionConexionLaboral(datos, fechaInicio);
+
     return { exito: true, mensaje: 'Conexión laboral guardada. Seguimiento WhatsApp programado.' };
   } catch (error) {
     Logger.log('Error al guardar conexión laboral: ' + error);
     return { exito: false, mensaje: 'Error al guardar: ' + error.message };
   }
+}
+
+// ---------------------------------------------------------------------------
+// EMAIL PARA CONEXIONES LABORALES
+// ---------------------------------------------------------------------------
+
+const PROP_EMAILS_CONEXIONES = 'EMAILS_CONEXIONES_LABORALES';
+
+/**
+ * Envía un correo de notificación a todos los destinatarios configurados
+ * cuando se registra una nueva conexión laboral.
+ */
+function _enviarNotificacionConexionLaboral(datos, fechaInicio) {
+  try {
+    var emailsRaw = PropertiesService.getScriptProperties().getProperty(PROP_EMAILS_CONEXIONES) || '';
+    var emails = emailsRaw.split(',').map(function(e) { return e.trim(); }).filter(function(e) { return e.length > 0; });
+    if (emails.length === 0) return;
+
+    var nombre   = datos.nombreCompleto || datos.creamosId || '';
+    var empresa  = datos.empresa || '(sin empresa)';
+    var cargo    = datos.cargo   || '(sin cargo)';
+    var telefono = datos.telefono || '';
+    var salario  = datos.salario ? 'Q' + datos.salario : '(no indicado)';
+
+    var asunto = '🟢 Nueva Conexión Laboral: ' + nombre + ' en ' + empresa;
+    var cuerpo =
+      '<h2 style="color:#2e7d32;">✅ Nueva Conexión Laboral Registrada</h2>' +
+      '<table style="border-collapse:collapse;font-size:14px;">' +
+      '<tr><td style="padding:6px 12px;font-weight:bold;">Nombre:</td><td style="padding:6px 12px;">' + nombre + '</td></tr>' +
+      '<tr style="background:#f1f8e9;"><td style="padding:6px 12px;font-weight:bold;">Creamos ID:</td><td style="padding:6px 12px;">' + (datos.creamosId || '') + '</td></tr>' +
+      '<tr><td style="padding:6px 12px;font-weight:bold;">Empresa:</td><td style="padding:6px 12px;">' + empresa + '</td></tr>' +
+      '<tr style="background:#f1f8e9;"><td style="padding:6px 12px;font-weight:bold;">Cargo:</td><td style="padding:6px 12px;">' + cargo + '</td></tr>' +
+      '<tr><td style="padding:6px 12px;font-weight:bold;">Teléfono:</td><td style="padding:6px 12px;">' + telefono + '</td></tr>' +
+      '<tr style="background:#f1f8e9;"><td style="padding:6px 12px;font-weight:bold;">Fecha de inicio:</td><td style="padding:6px 12px;">' + (fechaInicio || '(no indicada)') + '</td></tr>' +
+      '<tr><td style="padding:6px 12px;font-weight:bold;">Salario mensual:</td><td style="padding:6px 12px;">' + salario + '</td></tr>' +
+      '</table>' +
+      '<p style="color:#555;font-size:12px;margin-top:16px;">— Sistema Empleabilidad Creamos</p>';
+
+    emails.forEach(function(email) {
+      MailApp.sendEmail({ to: email, subject: asunto, htmlBody: cuerpo });
+      Logger.log('Correo Conexión Laboral enviado a: ' + email);
+    });
+  } catch (err) {
+    Logger.log('Error al enviar correo de Conexión Laboral: ' + err);
+  }
+}
+
+/**
+ * Abre un diálogo para gestionar los correos fijos que reciben
+ * notificaciones de nuevas Conexiones Laborales.
+ */
+function configurarEmailsConexionesLaborales() {
+  var ui      = SpreadsheetApp.getUi();
+  var props   = PropertiesService.getScriptProperties();
+  var actual  = props.getProperty(PROP_EMAILS_CONEXIONES) || '';
+
+  var html = HtmlService.createHtmlOutput(
+    '<style>body{font-family:Arial,sans-serif;font-size:13px;padding:16px;}' +
+    'label{font-weight:bold;}textarea{width:100%;height:120px;margin:8px 0;padding:6px;font-size:13px;}' +
+    'button{padding:8px 16px;margin:4px;font-size:13px;cursor:pointer;}' +
+    '.info{color:#555;font-size:11px;margin-bottom:8px;}' +
+    '.ok{color:green;} .err{color:red;}</style>' +
+    '<h3 style="color:#1565c0;">📧 Correos para Conexiones Laborales</h3>' +
+    '<p class="info">Ingresa los correos que recibirán una notificación cada vez que se ' +
+    'registre una nueva Conexión Laboral. Separa múltiples correos con coma (,).</p>' +
+    '<label>Destinatarios:</label>' +
+    '<textarea id="emails">' + actual + '</textarea>' +
+    '<div id="msg"></div>' +
+    '<button onclick="guardar()">💾 Guardar</button>' +
+    '<button onclick="google.script.host.close()">Cerrar</button>' +
+    '<script>' +
+    'function guardar(){' +
+    '  var v=document.getElementById("emails").value.trim();' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function(){document.getElementById("msg").innerHTML=' +
+    '      "<span class=ok>✅ Guardado correctamente.</span>";})' +
+    '    .withFailureHandler(function(e){document.getElementById("msg").innerHTML=' +
+    '      "<span class=err>❌ "+e.message+"</span>";})' +
+    '    ._guardarEmailsConexiones(v);' +
+    '}' +
+    '</script>'
+  ).setWidth(480).setHeight(300);
+
+  ui.showModalDialog(html, '📧 Configurar correos — Conexiones Laborales');
+}
+
+/**
+ * Guarda la lista de correos en las propiedades del script.
+ * Llamada desde el diálogo HTML.
+ */
+function _guardarEmailsConexiones(emailsTexto) {
+  PropertiesService.getScriptProperties().setProperty(PROP_EMAILS_CONEXIONES, emailsTexto);
+  Logger.log('Correos Conexiones Laborales guardados: ' + emailsTexto);
 }
 
 /**
@@ -4483,6 +4668,41 @@ function generarReporte(año) {
     }
   }
 
+  // ╔══════════════════════════════════════════╗
+  // ║  LEYENDA DE COLORES POR ETAPA           ║
+  // ╚══════════════════════════════════════════╝
+  f = titulo(f, '🎨  LEYENDA — SIGNIFICADO DE COLORES POR ETAPA', C.secBg, C.secFg);
+
+  var leyendaItems = [
+    { etapa: 'Paso a paso - Cierre',      accion: 'Proceso de cierre formal del acompañamiento.' },
+    { etapa: 'Paso a paso',               accion: 'Persona en acompañamiento activo paso a paso.' },
+    { etapa: 'Conexiones Laborales',      accion: 'Persona con conexión laboral activa (empleada).' },
+    { etapa: 'Aliados',                   accion: 'Persona postulando con empresa aliada.' },
+    { etapa: 'Plataforma',                accion: 'Persona registrada en plataforma de empleo.' },
+    { etapa: 'Derivaciones',              accion: 'Persona derivada a empresa para proceso.' },
+    { etapa: 'Activamente busca trabajo', accion: 'Persona buscando empleo activamente / formándose.' }
+  ];
+
+  var filaInicioLeyenda = f;
+  leyendaItems.forEach(function(item) {
+    var c = COLORES_DROPDOWN[item.etapa] || { bg: '#eeeeee', fg: '#000000' };
+    hoja.setRowHeight(f, 28);
+    // Celda de color (muestra el color de la etapa)
+    hoja.getRange(f, 1, 1, 1)
+        .setValue('  ' + item.etapa)
+        .setBackground(c.bg).setFontColor(c.fg)
+        .setFontWeight('bold').setFontSize(10)
+        .setVerticalAlignment('middle');
+    // Descripción de la acción
+    hoja.getRange(f, 2, 1, W - 1).merge()
+        .setValue(item.accion)
+        .setBackground('#fafafa').setFontSize(10)
+        .setVerticalAlignment('middle');
+    f++;
+  });
+  borde(filaInicioLeyenda, 1, leyendaItems.length, W);
+  f += 2;
+
   // ── Footer ────────────────────────────────────────────────────────────────
   hoja.getRange(f, 1, 1, W).merge()
       .setValue('Generado automáticamente · Sistema Empleabilidad Creamos')
@@ -4778,6 +4998,30 @@ function autocompletarConCreamos() {
       if (!filas[i][2] && rec.nombre) _llenar_(hojaClasif, i + 2, 3, rec.nombre);
     }
   }
+
+  // ── Satisfacción Empleo: Creamos ID = col A (idx 0), Nombre = col B (idx 1) ──
+  // Completa "Nombre completo" usando la hoja Graduados como fuente.
+  (function() {
+    var hSatEmp = ss.getSheetByName('Satisfacción Empleo');
+    if (!hSatEmp || hSatEmp.getLastRow() < 2) return;
+    // Construir mapa desde Graduados: creamosId → nombreCompleto
+    var mapaNombres = {};
+    if (hojaGrad && hojaGrad.getLastRow() > 1) {
+      hojaGrad.getRange(2, 3, hojaGrad.getLastRow() - 1, 2).getValues().forEach(function(r) {
+        var cid = (r[0] || '').toString().trim();
+        var nom = (r[1] || '').toString().trim();
+        if (cid && nom) mapaNombres[cid] = nom;
+      });
+    }
+    var filSat = hSatEmp.getRange(2, 1, hSatEmp.getLastRow() - 1, 2).getValues();
+    for (var i = 0; i < filSat.length; i++) {
+      var cid = (filSat[i][0] || '').toString().trim();
+      var nom = (filSat[i][1] || '').toString().trim();
+      if (cid && !nom && mapaNombres[cid]) {
+        _llenar_(hSatEmp, i + 2, 2, mapaNombres[cid]);
+      }
+    }
+  })();
 
   var partes = [];
   if (cambios > 0)     partes.push(cambios     + ' campos completados');
@@ -5641,19 +5885,20 @@ function generarExportPowerBI() {
 
   // ── 8. SATISFACCIÓN EMPLEO ────────────────────────────────────────────────
   // Cols: 0=CreamosID | 1=FechaEnvío | 2=SatEmpleo | 3=CumpleExp |
-  //       4=AmbLaboral | 5=SalBeneficios | 6=Permanencia |
-  //       7=AspMejorar | 8=OtroAspecto | 9=Nota | 10=Promedio
+  //       0=CreamosID | 1=NombreCompleto | 2=FechaEnvío | 3=SatisfEmpleo |
+  //       4=CumpleExp | 5=AmbLaboral | 6=SalBeneficios | 7=Permanencia |
+  //       8=AspMejorar | 9=OtroAspecto | 10=Nota | 11=Promedio
   var hSat = ss.getSheetByName('Satisfacción Empleo');
   if (hSat && hSat.getLastRow() > 1) {
-    var datosSat = hSat.getRange(2, 1, hSat.getLastRow() - 1, 11).getValues();
+    var datosSat = hSat.getRange(2, 1, hSat.getLastRow() - 1, 12).getValues();
     datosSat.forEach(function(r) {
       if (!r[0]) return;
       filas.push(_filaPowerBI(ahora, 'Satisfacción Empleo', {
-        creamosId: r[0], fechaIngreso: r[1],
+        creamosId: r[0], nombre: r[1], fechaIngreso: r[2],
         etapa: 'Satisfacción Empleo',
-        nota: r[9],
-        satisfaccionEmpleo: r[2],
-        promedioSat: r[10]
+        nota: r[10],
+        satisfaccionEmpleo: r[3],
+        promedioSat: r[11]
       }));
     });
   }
