@@ -2161,8 +2161,6 @@ function _syncSesionesSoloNuevos() {
       'Fecha de nacimiento':        'Fecha nacimiento',
       'Edad_001':                   'Edad',
       'Género':                     'Género',
-      'Año que ingreso a Creamos':  'Año ingreso Creamos',
-      'En que año':                 'En qué año',
       'Grado académico':            'Grado académico',
       'Tipo de servicio':           'Tipo servicio',
       'Comentario':                 'Comentario'
@@ -2187,8 +2185,6 @@ function _syncSesionesSoloNuevos() {
       'Teléfono':     function(n) { return n.indexOf('telefon') !== -1 || (n.indexOf('tel') !== -1 && n.length < 10); },
       'Edad_001':     function(n) { return n === 'edad' || n === 'edad_001' || n === 'edad_002' || n === 'age'; },
       'Género':       function(n) { return n.indexOf('genero') !== -1 || n.indexOf('gender') !== -1 || n === 'sexo'; },
-      'Año que ingreso a Creamos': function(n) { return (n.indexOf('ingreso') !== -1 || n.indexOf('ingres') !== -1) && (n.indexOf('creamos') !== -1 || n.indexOf('ano') !== -1 || n.indexOf('year') !== -1); },
-      'En que año':   function(n) { return (n.indexOf('en_que') !== -1 || n.indexOf('en_qu') !== -1) && n.indexOf('ano') !== -1; },
       'Fecha de nacimiento': function(n) { return n.indexOf('nacimiento') !== -1 || n.indexOf('nacim') !== -1; },
       'Grado académico': function(n) { return n.indexOf('grado') !== -1 || n.indexOf('academico') !== -1 || n.indexOf('educativ') !== -1; },
       'Tipo de servicio': function(n) { return (n.indexOf('tipo') !== -1 && n.indexOf('servicio') !== -1); },
@@ -2241,9 +2237,7 @@ function _syncSesionesSoloNuevos() {
         var v = _obtenerCampo_(d, k);
         // Si el valor viene vacío, intentar completar desde el BD
         if (!v && recBD) {
-          if (k === 'Año que ingreso a Creamos') v = ex.anio || '';
-          else if (k === 'En que año')           v = ex.anio || '';
-          else if (k === 'Edad_001')             v = ex.edad || '';
+          if (k === 'Edad_001')             v = ex.edad || '';
           else if (k === 'Género')               v = ex.genero || '';
           else if (k === 'Fecha de nacimiento')  v = ex.fechaNac || '';
           else if (k === 'Nombre' && recBD.nombre) {
@@ -2389,7 +2383,9 @@ function actualizarSesionesCompleto() {
     var mapaExt = _cargarMapaCreamos_();
     hoja = ss.getSheetByName('Sesiones Acompañamiento');
     if (hoja && hoja.getLastRow() > 1 && mapaExt.todos.length > 0) {
-      var filas = hoja.getRange(2, 1, hoja.getLastRow() - 1, 12).getValues();
+      // Columnas actuales: 1=Creamos ID, 2=Fecha envío, 3=Inicio sesión, 4=Proyecto,
+      // 5=Nombre, 6=Apellidos, 7=Teléfono, 8=Fecha nacimiento, 9=Edad, 10=Género
+      var filas = hoja.getRange(2, 1, hoja.getLastRow() - 1, 10).getValues();
       for (var i = 0; i < filas.length; i++) {
         var cid = (filas[i][0] || '').toString().trim();
         if (!cid) continue;
@@ -2397,18 +2393,14 @@ function actualizarSesionesCompleto() {
         if (!match) continue;
         var rec = match.rec;
         var row = i + 2;
-        if (!filas[i][4] && rec.nombre) {
+        if (rec.nombre) {
           var pts = rec.nombre.split(' ');
-          if (!hoja.getRange(row, 5).getValue()) { hoja.getRange(row, 5).setValue(pts[0]); llenados++; }
-          if (pts.length > 1 && !hoja.getRange(row, 6).getValue()) {
-            hoja.getRange(row, 6).setValue(pts.slice(1).join(' ')); llenados++;
-          }
+          if (!filas[i][4]) { hoja.getRange(row, 5).setValue(pts[0]); llenados++; }
+          if (pts.length > 1 && !filas[i][5]) { hoja.getRange(row, 6).setValue(pts.slice(1).join(' ')); llenados++; }
         }
-        if (!filas[i][7]  && rec.fechaNac) { hoja.getRange(row, 8).setValue(rec.fechaNac);  llenados++; }
-        if (!filas[i][8]  && rec.edad)     { hoja.getRange(row, 9).setValue(rec.edad);       llenados++; }
-        if (!filas[i][9]  && rec.genero)   { hoja.getRange(row, 10).setValue(rec.genero);    llenados++; }
-        if (!filas[i][10] && rec.anio)     { hoja.getRange(row, 11).setValue(rec.anio);      llenados++; }
-        if (!filas[i][11] && rec.anio)     { hoja.getRange(row, 12).setValue(rec.anio);      llenados++; }
+        if (!filas[i][7] && rec.fechaNac) { hoja.getRange(row, 8).setValue(rec.fechaNac); llenados++; }
+        if (!filas[i][8] && rec.edad)     { hoja.getRange(row, 9).setValue(rec.edad);     llenados++; }
+        if (!filas[i][9] && rec.genero)   { hoja.getRange(row, 10).setValue(rec.genero);  llenados++; }
       }
     }
   } catch (e) {
