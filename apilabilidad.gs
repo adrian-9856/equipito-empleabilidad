@@ -128,24 +128,15 @@ function implementarCambiosNuevos() {
             .setFontWeight('bold').setFontSize(11);
         hSat.setColumnWidth(2, 200);
       }
-      // Llenar nombres vacíos desde Graduados (búsqueda exacta + normalizada)
-      var mapaNombres = {}, mapaNombresNorm = {};
-      if (hGrad && hGrad.getLastRow() > 1) {
-        hGrad.getRange(2, 3, hGrad.getLastRow() - 1, 2).getValues().forEach(function(r) {
-          var cid = (r[0] || '').toString().trim();
-          var nom = (r[1] || '').toString().trim();
-          if (!cid || !nom) return;
-          mapaNombres[cid] = nom;
-          mapaNombresNorm[_normalizarTexto_(cid)] = nom;
-        });
-      }
+      // Llenar nombres vacíos — busca en BD Salesforce, Graduados y todas las hojas
+      var mapaCompleto = _construirMapaNombresCompleto_();
       var llenados = 0;
       var datSat = hSat.getRange(2, 1, hSat.getLastRow() - 1, 2).getValues();
       for (var i = 0; i < datSat.length; i++) {
         var cid = (datSat[i][0] || '').toString().trim();
         var nom = (datSat[i][1] || '').toString().trim();
         if (cid && !nom) {
-          var encontrado = mapaNombres[cid] || mapaNombresNorm[_normalizarTexto_(cid)] || '';
+          var encontrado = _buscarNombreEnMapa_(cid, mapaCompleto);
           if (encontrado) {
             hSat.getRange(i + 2, 2).setValue(encontrado);
             llenados++;
@@ -1990,26 +1981,11 @@ function _syncSatisfaccionSoloNuevos() {
     var CAMPO_ID    = 'intro/Creamos_ID';
     var CAMPO_FECHA = '_submission_time';
 
-    // Mapa Creamos ID → Nombre completo desde la hoja Graduados
-    // Se construye con clave exacta Y clave normalizada para tolerar acentos/mayúsculas
-    var mapaNombres = {};
-    var mapaNombresNorm = {};
-    (function() {
-      var hGrad = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Graduados');
-      if (!hGrad || hGrad.getLastRow() < 2) return;
-      hGrad.getRange(2, 3, hGrad.getLastRow() - 1, 2).getValues().forEach(function(r) {
-        var cid    = (r[0] || '').toString().trim();
-        var nombre = (r[1] || '').toString().trim();
-        if (!cid || !nombre) return;
-        mapaNombres[cid] = nombre;
-        mapaNombresNorm[_normalizarTexto_(cid)] = nombre;
-      });
-    })();
+    // Mapa completo de nombres (BD Salesforce + Graduados + hojas + Conexiones)
+    var _mapaNombres_ = _construirMapaNombresCompleto_();
 
-    // Busca nombre por ID exacto, luego normalizado
     function _buscarNombre_(cid) {
-      if (!cid) return '';
-      return mapaNombres[cid] || mapaNombresNorm[_normalizarTexto_(cid)] || '';
+      return _buscarNombreEnMapa_(cid, _mapaNombres_);
     }
 
     // Helper: calcular promedio de las 5 preguntas (ignorando vacíos)
@@ -4941,6 +4917,84 @@ function _cargarMapaCreamos_() {
   return { porId: porId, porNorm: porNorm, porDpi: porDpi, todos: todos };
 }
 
+/**
+ * Construye un mapa completo Creamos ID → Nombre completo buscando en
+ * TODAS las fuentes disponibles (prioridad: BD Salesforce > Graduados >
+ * hojas de clasificación > Conexiones Laborales).
+ * Devuelve { exacto: {cid:nombre}, norm: {cidNorm:nombre}, lista: [{cid,norm,nombre}] }
+ */
+function _construirMapaNombresCompleto_() {
+  var ss     = SpreadsheetApp.getActiveSpreadsheet();
+  var exacto = {};
+  var norm   = {};
+  var lista  = [];
+
+  function _agregar_(cid, nombre) {
+    if (!cid || !nombre) return;
+    cid = cid.toString().trim();
+    nombre = nombre.toString().trim();
+    if (!cid || !nombre) return;
+    if (!exacto[cid]) {                        // no sobreescribir si ya existe
+      exacto[cid] = nombre;
+      var n = _normalizarTexto_(cid);
+      if (!norm[n]) norm[n] = nombre;
+      lista.push({ cid: cid, norm: n, nombre: nombre });
+    }
+  }
+
+  // 1. Fuente primaria: BD Salesforce (col B = Creamos ID, col A = Nombre)
+  var hBD = ss.getSheetByName(HOJA_BD_CREAMOS);
+  if (hBD && hBD.getLastRow() > 1) {
+    hBD.getRange(2, 1, hBD.getLastRow() - 1, 2).getValues().forEach(function(r) {
+      _agregar_(r[1], r[0]); // col B = cid, col A = nombre
+    });
+  }
+
+  // 2. Graduados (col C = Creamos ID, col D = Nombre)
+  var hGrad = ss.getSheetByName('Graduados');
+  if (hGrad && hGrad.getLastRow() > 1) {
+    hGrad.getRange(2, 3, hGrad.getLastRow() - 1, 2).getValues().forEach(function(r) {
+      _agregar_(r[0], r[1]);
+    });
+  }
+
+  // 3. Hojas de clasificación (col B = Creamos ID, col C = Nombre)
+  ['Aliados','Plataforma','Derivaciones','Paso a paso','Activamente busca trabajo'].forEach(function(nom) {
+    var h = ss.getSheetByName(nom);
+    if (!h || h.getLastRow() < 2) return;
+    h.getRange(2, 2, h.getLastRow() - 1, 2).getValues().forEach(function(r) {
+      _agregar_(r[0], r[1]);
+    });
+  });
+
+  // 4. Conexiones Laborales (col A = Creamos ID, col B = Nombre)
+  var hCon = ss.getSheetByName('Conexiones Laborales');
+  if (hCon && hCon.getLastRow() > 1) {
+    hCon.getRange(2, 1, hCon.getLastRow() - 1, 2).getValues().forEach(function(r) {
+      _agregar_(r[0], r[1]);
+    });
+  }
+
+  return { exacto: exacto, norm: norm, lista: lista };
+}
+
+/**
+ * Busca el nombre para un Creamos ID usando el mapa completo.
+ * Estrategia: 1=exacto, 2=normalizado, 3=fuzzy Levenshtein≤1
+ */
+function _buscarNombreEnMapa_(cid, mapa) {
+  if (!cid) return '';
+  var encontrado = mapa.exacto[cid];
+  if (encontrado) return encontrado;
+  encontrado = mapa.norm[_normalizarTexto_(cid)];
+  if (encontrado) return encontrado;
+  var normCid = _normalizarTexto_(cid);
+  for (var i = 0; i < mapa.lista.length; i++) {
+    if (_levenshtein_(normCid, mapa.lista[i].norm) <= 1) return mapa.lista[i].nombre;
+  }
+  return '';
+}
+
 /** Elimina acentos, pasa a minúsculas y colapsa espacios para comparar textos. */
 function _normalizarTexto_(s) {
   if (!s) return '';
@@ -5127,43 +5181,17 @@ function autocompletarConCreamos() {
   }
 
   // ── Satisfacción Empleo: Creamos ID = col A (idx 0), Nombre = col B (idx 1) ──
-  // Completa "Nombre completo" usando la hoja Graduados como fuente.
-  // Búsqueda: exacta primero, luego normalizada (sin acentos/mayúsculas) y luego
-  // fuzzy para tolerar typos de 1 carácter.
+  // Busca en BD Salesforce + Graduados + hojas + Conexiones (exacto/normalizado/fuzzy)
   (function() {
     var hSatEmp = ss.getSheetByName('Satisfacción Empleo');
     if (!hSatEmp || hSatEmp.getLastRow() < 2) return;
-    // Construir mapa exacto y normalizado desde Graduados
-    var mapaNombres = {}, mapaNorm = {}, listaCids = [];
-    if (hojaGrad && hojaGrad.getLastRow() > 1) {
-      hojaGrad.getRange(2, 3, hojaGrad.getLastRow() - 1, 2).getValues().forEach(function(r) {
-        var cid = (r[0] || '').toString().trim();
-        var nom = (r[1] || '').toString().trim();
-        if (!cid || !nom) return;
-        mapaNombres[cid] = nom;
-        mapaNorm[_normalizarTexto_(cid)] = nom;
-        listaCids.push({ cid: cid, norm: _normalizarTexto_(cid), nom: nom });
-      });
-    }
+    var mapaCompleto = _construirMapaNombresCompleto_();
     var filSat = hSatEmp.getRange(2, 1, hSatEmp.getLastRow() - 1, 2).getValues();
     for (var i = 0; i < filSat.length; i++) {
       var cid = (filSat[i][0] || '').toString().trim();
       var nom = (filSat[i][1] || '').toString().trim();
       if (!cid || nom) continue;
-      // 1. Exacto
-      var encontrado = mapaNombres[cid];
-      // 2. Normalizado (sin acentos / mayúsculas)
-      if (!encontrado) encontrado = mapaNorm[_normalizarTexto_(cid)];
-      // 3. Fuzzy levenshtein ≤ 1 sobre el ID normalizado
-      if (!encontrado) {
-        var normCid = _normalizarTexto_(cid);
-        for (var j = 0; j < listaCids.length; j++) {
-          if (_levenshtein_(normCid, listaCids[j].norm) <= 1) {
-            encontrado = listaCids[j].nom;
-            break;
-          }
-        }
-      }
+      var encontrado = _buscarNombreEnMapa_(cid, mapaCompleto);
       if (encontrado) _llenar_(hSatEmp, i + 2, 2, encontrado);
     }
   })();
