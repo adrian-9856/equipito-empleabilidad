@@ -4340,6 +4340,12 @@ function generarReporte(año) {
   hoja.setColumnWidth(4, 100);
   hoja.setColumnWidth(5, 100);
   hoja.setColumnWidth(6, 100);
+  // Columnas del panel lateral de leyenda (H-K)
+  hoja.setColumnWidth(7, 18);   // G — separador visual
+  hoja.setColumnWidth(8, 170);  // H — nombre de la etapa (con color)
+  hoja.setColumnWidth(9, 30);   // I — espacio
+  hoja.setColumnWidth(10, 260); // J — descripción
+  hoja.setColumnWidth(11, 30);  // K — margen
 
   // ── Helpers internos ──────────────────────────────────────────────────────
 
@@ -4775,46 +4781,60 @@ function generarReporte(año) {
     }
   }
 
-  // ╔══════════════════════════════════════════╗
-  // ║  LEYENDA DE COLORES POR ETAPA           ║
-  // ╚══════════════════════════════════════════╝
-  f = titulo(f, '🎨  LEYENDA — SIGNIFICADO DE COLORES POR ETAPA', C.secBg, C.secFg);
-
-  var leyendaItems = [
-    { etapa: 'Paso a paso - Cierre',      accion: 'Proceso de cierre formal del acompañamiento.' },
-    { etapa: 'Paso a paso',               accion: 'Persona en acompañamiento activo paso a paso.' },
-    { etapa: 'Conexiones Laborales',      accion: 'Persona con conexión laboral activa (empleada).' },
-    { etapa: 'Aliados',                   accion: 'Persona postulando con empresa aliada.' },
-    { etapa: 'Plataforma',                accion: 'Persona registrada en plataforma de empleo.' },
-    { etapa: 'Derivaciones',              accion: 'Persona derivada a empresa para proceso.' },
-    { etapa: 'Activamente busca trabajo', accion: 'Persona buscando empleo activamente / formándose.' }
-  ];
-
-  var filaInicioLeyenda = f;
-  leyendaItems.forEach(function(item) {
-    var c = COLORES_DROPDOWN[item.etapa] || { bg: '#eeeeee', fg: '#000000' };
-    hoja.setRowHeight(f, 28);
-    // Celda de color (muestra el color de la etapa)
-    hoja.getRange(f, 1, 1, 1)
-        .setValue('  ' + item.etapa)
-        .setBackground(c.bg).setFontColor(c.fg)
-        .setFontWeight('bold').setFontSize(10)
-        .setVerticalAlignment('middle');
-    // Descripción de la acción
-    hoja.getRange(f, 2, 1, W - 1).merge()
-        .setValue(item.accion)
-        .setBackground('#fafafa').setFontSize(10)
-        .setVerticalAlignment('middle');
-    f++;
-  });
-  borde(filaInicioLeyenda, 1, leyendaItems.length, W);
-  f += 2;
-
   // ── Footer ────────────────────────────────────────────────────────────────
   hoja.getRange(f, 1, 1, W).merge()
       .setValue('Generado automáticamente · Sistema Empleabilidad Creamos')
       .setFontColor('#bdbdbd').setFontStyle('italic').setFontSize(9)
       .setHorizontalAlignment('center');
+
+  // ╔══════════════════════════════════════════╗
+  // ║  LEYENDA LATERAL (columnas H-K, fila 1) ║
+  // ╚══════════════════════════════════════════╝
+  var leyendaItems = [
+    { etapa: 'Paso a paso - Cierre',      accion: 'Proceso de cierre formal.' },
+    { etapa: 'Paso a paso',               accion: 'Acompañamiento activo paso a paso.' },
+    { etapa: 'Conexiones Laborales',      accion: 'Persona empleada (conexión activa).' },
+    { etapa: 'Aliados',                   accion: 'Postulando con empresa aliada.' },
+    { etapa: 'Plataforma',                accion: 'Registrada en plataforma de empleo.' },
+    { etapa: 'Derivaciones',              accion: 'Derivada a empresa para proceso.' },
+    { etapa: 'Activamente busca trabajo', accion: 'Buscando empleo / formándose.' }
+  ];
+
+  var COL_L = 8; // columna H (1-based)
+  // Título de la leyenda
+  hoja.setRowHeight(1, 46);
+  hoja.getRange(1, COL_L, 1, 3).merge()
+      .setValue('🎨  LEYENDA DE COLORES')
+      .setBackground(C.secBg).setFontColor(C.secFg)
+      .setFontWeight('bold').setFontSize(12)
+      .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  // Subtítulo
+  hoja.getRange(2, COL_L, 1, 3).merge()
+      .setValue('Color · Etapa · Acción')
+      .setBackground('#e8eaf6').setFontColor('#283593')
+      .setFontSize(9).setFontStyle('italic')
+      .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  hoja.setRowHeight(2, 18);
+
+  leyendaItems.forEach(function(item, idx) {
+    var fLey = 3 + idx;
+    var c = COLORES_DROPDOWN[item.etapa] || { bg: '#eeeeee', fg: '#000000' };
+    hoja.setRowHeight(fLey, 30);
+    // Celda con color de la etapa
+    hoja.getRange(fLey, COL_L)
+        .setValue('  ' + item.etapa)
+        .setBackground(c.bg).setFontColor(c.fg)
+        .setFontWeight('bold').setFontSize(10)
+        .setVerticalAlignment('middle');
+    // Descripción
+    hoja.getRange(fLey, COL_L + 1, 1, 2).merge()
+        .setValue(item.accion)
+        .setBackground(idx % 2 === 0 ? '#f5f5f5' : '#ffffff')
+        .setFontSize(10).setVerticalAlignment('middle');
+  });
+  // Borde de toda la leyenda lateral
+  hoja.getRange(1, COL_L, leyendaItems.length + 2, 3)
+      .setBorder(true, true, true, true, true, false, C.border, SpreadsheetApp.BorderStyle.SOLID);
 
   SpreadsheetApp.flush();
   Logger.log('Reporte generado exitosamente.');
