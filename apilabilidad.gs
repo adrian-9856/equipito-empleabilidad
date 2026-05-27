@@ -32,7 +32,10 @@ function onOpen(e) {
       .addItem('📋 Clasificación de Perfiles',               'importarClasificacionPerfiles')
       .addItem('😊 Satisfacción Empleo (IL-06)',             'importarSatisfaccionEmpleo')
       .addItem('🤝 Sesiones Acompañamiento (IL-08)',         'importarSesionesAcompanamiento')
+      .addSeparator()
+      .addItem('✨ Actualizar Sesiones completo (reimportar + completar BD)', 'actualizarSesionesCompleto')
       .addItem('🔄 Reimportar Sesiones desde cero',          'reimportarSesionesDesdeCero')
+      .addItem('🔍 Diagnosticar campos Sesiones (Kobo)',     'diagnosticarCamposSesiones')
       .addSeparator()
       .addItem('⏱ Activar Auto-import',                     'activarAutoImport')
       .addItem('⏹ Desactivar Auto-import',                  'desactivarAutoImport')
@@ -2164,14 +2167,36 @@ function _syncSesionesSoloNuevos() {
       'Tipo de servicio':           'Tipo servicio',
       'Comentario':                 'Comentario'
     };
-    // Nombres alternativos que Kobo puede usar para el mismo campo
+    // Nombres alternativos que Kobo puede usar (grupos intro/, datos/, variantes)
     var ALIAS = {
-      'Año que ingreso a Creamos': ['año_que_ingreso_a_creamos','Año que ingresó a Creamos',
-                                    'Año_que_ingreso_a_Creamos','anio_ingreso','Año ingreso'],
-      'En que año':               ['en_que_ano','En qué año','En que ano','en que año'],
-      'Edad_001':                 ['Edad','edad','age','Age'],
-      'Género':                   ['genero','Genero','género','Gender','gender'],
-      'Fecha de nacimiento':      ['fecha_nacimiento','Fecha nacimiento','fecha de nacimiento']
+      'Creamos ID':                 ['intro/Creamos_ID','Creamos_ID','creamos_id',
+                                     'ID_Creamos','intro/Creamos ID','Creamos ID del participante:'],
+      '_submission_time':           ['fecha_envio','Fecha envío'],
+      'start':                      ['inicio','Inicio','Hora inicio'],
+      'Proyecto':                   ['intro/Proyecto','datos/Proyecto','proyecto',
+                                     'Proyecto_001','Nombre del proyecto'],
+      'Nombre':                     ['intro/Nombre','datos/Nombre','nombre',
+                                     'Nombre_001','primer_nombre','Nombre del participante'],
+      'Apellidos':                  ['intro/Apellidos','datos/Apellidos','apellidos',
+                                     'Apellidos_001','apellido','Apellidos del participante'],
+      'Teléfono':                   ['intro/Telefono','datos/Teléfono','telefono',
+                                     'Teléfono_001','numero_telefono','Número de teléfono'],
+      'Año que ingreso a Creamos':  ['año_que_ingreso_a_creamos','Año que ingresó a Creamos',
+                                     'Año_que_ingreso_a_Creamos','anio_ingreso','Año ingreso',
+                                     'intro/Año que ingreso a Creamos'],
+      'En que año':                 ['en_que_ano','En qué año','En que ano','en que año',
+                                     'intro/En que año'],
+      'Edad_001':                   ['Edad','edad','age','Age','Edad_002',
+                                     'intro/Edad','datos/Edad'],
+      'Género':                     ['genero','Genero','género','Gender','gender',
+                                     'intro/Género','datos/Género'],
+      'Fecha de nacimiento':        ['fecha_nacimiento','Fecha nacimiento',
+                                     'intro/Fecha de nacimiento','datos/Fecha de nacimiento'],
+      'Grado académico':            ['grado_academico','Grado_academico','grado academico',
+                                     'intro/Grado académico','nivel_educativo'],
+      'Tipo de servicio':           ['tipo_servicio','Tipo_servicio','tipo de servicio',
+                                     'intro/Tipo de servicio'],
+      'Comentario':                 ['comentario','notas','Notas','intro/Comentario']
     };
 
     // Helper: obtiene el valor de d para un campo, probando el nombre original y sus alias
@@ -2310,7 +2335,7 @@ function reimportarSesionesDesdeCero() {
   if (confirmar !== ui.Button.YES) return;
   var hoja = ss.getSheetByName('Sesiones Acompañamiento');
   if (hoja) { hoja.clearContents(); hoja.clearFormats(); }
-  _resetearUltimaFecha(PROP_LAST_SESIONES); // reiniciar marca de tiempo para reimportar todo
+  _resetearUltimaFecha(PROP_LAST_SESIONES);
   ss.toast('Reimportando Sesiones Acompañamiento...', '🔄', -1);
   try {
     var res = _syncSesionesSoloNuevos();
@@ -2321,6 +2346,98 @@ function reimportarSesionesDesdeCero() {
   } catch (e) {
     ss.toast('', '', 1);
     ui.alert('❌ Error', e.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Todo en uno: reimporta Sesiones desde cero y luego autocompleta
+ * campos vacíos (Nombre, Apellidos, Género, Edad, Año ingreso, etc.)
+ * desde la hoja "Copy of CREAMOS ID nuevo".
+ */
+function actualizarSesionesCompleto() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+
+  // Paso 1: reimportar
+  ss.toast('Paso 1/2 — Reimportando desde KoboToolbox...', '🔄 Actualizando', -1);
+  var hoja = ss.getSheetByName('Sesiones Acompañamiento');
+  if (hoja) { hoja.clearContents(); hoja.clearFormats(); }
+  _resetearUltimaFecha(PROP_LAST_SESIONES);
+  var res;
+  try {
+    res = _syncSesionesSoloNuevos();
+  } catch (e) {
+    ss.toast('', '', 1);
+    ui.alert('❌ Error al importar', e.message, ui.ButtonSet.OK);
+    return;
+  }
+
+  // Paso 2: autocompletar campos desde BD
+  ss.toast('Paso 2/2 — Completando datos desde BD Salesforce...', '🔄 Actualizando', -1);
+  var llenados = 0;
+  try {
+    var mapaExt = _cargarMapaCreamos_();
+    hoja = ss.getSheetByName('Sesiones Acompañamiento');
+    if (hoja && hoja.getLastRow() > 1 && mapaExt.todos.length > 0) {
+      var filas = hoja.getRange(2, 1, hoja.getLastRow() - 1, 12).getValues();
+      for (var i = 0; i < filas.length; i++) {
+        var cid = (filas[i][0] || '').toString().trim();
+        if (!cid) continue;
+        var match = _buscarEnMapaFuzzy_(cid, mapaExt);
+        if (!match) continue;
+        var rec = match.rec;
+        var row = i + 2;
+        if (!filas[i][4] && rec.nombre) {
+          var pts = rec.nombre.split(' ');
+          if (!hoja.getRange(row, 5).getValue()) { hoja.getRange(row, 5).setValue(pts[0]); llenados++; }
+          if (pts.length > 1 && !hoja.getRange(row, 6).getValue()) {
+            hoja.getRange(row, 6).setValue(pts.slice(1).join(' ')); llenados++;
+          }
+        }
+        if (!filas[i][7]  && rec.fechaNac) { hoja.getRange(row, 8).setValue(rec.fechaNac);  llenados++; }
+        if (!filas[i][8]  && rec.edad)     { hoja.getRange(row, 9).setValue(rec.edad);       llenados++; }
+        if (!filas[i][9]  && rec.genero)   { hoja.getRange(row, 10).setValue(rec.genero);    llenados++; }
+        if (!filas[i][10] && rec.anio)     { hoja.getRange(row, 11).setValue(rec.anio);      llenados++; }
+        if (!filas[i][11] && rec.anio)     { hoja.getRange(row, 12).setValue(rec.anio);      llenados++; }
+      }
+    }
+  } catch (e) {
+    Logger.log('Error autocompleting Sesiones: ' + e.message);
+  }
+
+  ss.toast('', '', 1);
+  ui.alert(
+    '✅ Sesiones Acompañamiento actualizada',
+    'Registros importados: ' + res.nuevos +
+    '\nTotal en hoja: ' + res.total +
+    '\nCampos completados desde BD: ' + llenados,
+    ui.ButtonSet.OK
+  );
+}
+
+/**
+ * Descarga el CSV de Sesiones y muestra los nombres de campo reales
+ * que usa KoboToolbox — útil para diagnosticar columnas vacías.
+ */
+function diagnosticarCamposSesiones() {
+  var ui = SpreadsheetApp.getUi();
+  try {
+    var resp = UrlFetchApp.fetch(URL_SESIONES_ACOMPANAMIENTO, {
+      method: 'get',
+      headers: { 'Authorization': 'Token ' + KOBO_TOKEN, 'Accept': 'text/csv' },
+      muteHttpExceptions: true
+    });
+    if (resp.getResponseCode() !== 200) {
+      ui.alert('❌ Error HTTP ' + resp.getResponseCode()); return;
+    }
+    var lineas = resp.getContentText().split('\n');
+    if (lineas.length === 0) { ui.alert('CSV vacío'); return; }
+    var campos = lineas[0].split(',').map(function(c) { return c.replace(/"/g,'').trim(); });
+    // Mostrar solo los primeros 30 campos relevantes
+    var muestra = campos.slice(0, 40).join('\n');
+    ui.alert('Campos reales en CSV de Sesiones (primeros 40):', muestra, ui.ButtonSet.OK);
+  } catch (e) {
+    ui.alert('❌ Error: ' + e.message);
   }
 }
 
