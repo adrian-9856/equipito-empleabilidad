@@ -69,6 +69,8 @@ function onOpen(e) {
       .addItem('Reporte sin ID',           'reporteSinID');
 
     ui.createMenu('📊 Equipito Empleabilidad')
+      .addItem('🚀 IMPLEMENTAR CAMBIOS NUEVOS',  'implementarCambiosNuevos')
+      .addSeparator()
       .addSubMenu(submenuImport)
       .addSubMenu(submenuReportes)
       .addSubMenu(submenuPowerBI)
@@ -82,6 +84,96 @@ function onOpen(e) {
   } catch (error) {
     Logger.log('onOpen: no se pudo crear el menú — ' + error.message);
   }
+}
+
+/**
+ * Aplica todos los cambios nuevos de una sola vez:
+ *  1. Colores de fila por Etapa en Graduados
+ *  2. Nombre completo en Satisfacción Empleo (desde Graduados)
+ *  3. Regenera el Reporte con leyenda de colores
+ * Muestra un diálogo de progreso paso a paso.
+ */
+function implementarCambiosNuevos() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var pasos = [];
+
+  // ── Paso 1: Colores de fila en Graduados ──────────────────────────────────
+  try {
+    ss.toast('Paso 1/3 — Aplicando colores de fila en Graduados...', '🚀 Implementando', -1);
+    var hGrad = ss.getSheetByName('Graduados');
+    if (hGrad) {
+      var numCols = ESTRUCTURA_HOJAS['Graduados'].columnas.length;
+      _colorearFilasPorEtapa(hGrad, numCols, 15);
+      pasos.push('✅ Colores de fila aplicados en Graduados.');
+    } else {
+      pasos.push('⚠️ Hoja "Graduados" no encontrada — colores omitidos.');
+    }
+  } catch (e) {
+    pasos.push('❌ Error en colores de fila: ' + e.message);
+  }
+
+  // ── Paso 2: Nombre completo en Satisfacción Empleo ────────────────────────
+  try {
+    ss.toast('Paso 2/3 — Completando nombres en Satisfacción Empleo...', '🚀 Implementando', -1);
+    var hSat = ss.getSheetByName('Satisfacción Empleo');
+    if (hSat && hSat.getLastRow() > 1) {
+      // Verificar si ya tiene la columna "Nombre completo" (col 2)
+      var encabezado = hSat.getRange(1, 2).getValue().toString().trim();
+      if (encabezado !== 'Nombre completo') {
+        // Insertar columna en posición 2
+        hSat.insertColumnAfter(1);
+        hSat.getRange(1, 2).setValue('Nombre completo')
+            .setBackground('#00897b').setFontColor('#ffffff')
+            .setFontWeight('bold').setFontSize(11);
+        hSat.setColumnWidth(2, 200);
+      }
+      // Llenar nombres vacíos desde Graduados
+      var mapaNombres = {};
+      if (hGrad && hGrad.getLastRow() > 1) {
+        hGrad.getRange(2, 3, hGrad.getLastRow() - 1, 2).getValues().forEach(function(r) {
+          var cid = (r[0] || '').toString().trim();
+          var nom = (r[1] || '').toString().trim();
+          if (cid && nom) mapaNombres[cid] = nom;
+        });
+      }
+      var llenados = 0;
+      var datSat = hSat.getRange(2, 1, hSat.getLastRow() - 1, 2).getValues();
+      for (var i = 0; i < datSat.length; i++) {
+        var cid = (datSat[i][0] || '').toString().trim();
+        var nom = (datSat[i][1] || '').toString().trim();
+        if (cid && !nom && mapaNombres[cid]) {
+          hSat.getRange(i + 2, 2).setValue(mapaNombres[cid]);
+          llenados++;
+        }
+      }
+      pasos.push('✅ Nombres completados en Satisfacción Empleo: ' + llenados + ' filas actualizadas.');
+    } else {
+      pasos.push('⚠️ Hoja "Satisfacción Empleo" vacía o no encontrada.');
+    }
+  } catch (e) {
+    pasos.push('❌ Error en nombres Satisfacción Empleo: ' + e.message);
+  }
+
+  // ── Paso 3: Regenerar Reporte con leyenda ────────────────────────────────
+  try {
+    ss.toast('Paso 3/3 — Regenerando Reporte con leyenda de colores...', '🚀 Implementando', -1);
+    generarReporte();
+    pasos.push('✅ Reporte regenerado con leyenda de colores.');
+  } catch (e) {
+    pasos.push('❌ Error al generar reporte: ' + e.message);
+  }
+
+  ss.toast('', '', 1);
+
+  // ── Resultado final ───────────────────────────────────────────────────────
+  ui.alert(
+    '🚀 Implementación completada',
+    pasos.join('\n') +
+    '\n\n📧 Recuerda configurar correos de Conexiones Laborales:\n' +
+    '   ⚙️ Configuración → 📧 Configurar correos Conexiones Laborales',
+    ui.ButtonSet.OK
+  );
 }
 
 /**
