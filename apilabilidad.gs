@@ -32,6 +32,7 @@ function onOpen(e) {
       .addItem('📋 Clasificación de Perfiles',               'importarClasificacionPerfiles')
       .addItem('😊 Satisfacción Empleo (IL-06)',             'importarSatisfaccionEmpleo')
       .addItem('🤝 Sesiones Acompañamiento (IL-08)',         'importarSesionesAcompanamiento')
+      .addItem('🔄 Reimportar Sesiones desde cero',          'reimportarSesionesDesdeCero')
       .addSeparator()
       .addItem('⏱ Activar Auto-import',                     'activarAutoImport')
       .addItem('⏹ Desactivar Auto-import',                  'desactivarAutoImport')
@@ -2163,14 +2164,66 @@ function _syncSesionesSoloNuevos() {
       'Tipo de servicio':           'Tipo servicio',
       'Comentario':                 'Comentario'
     };
+    // Nombres alternativos que Kobo puede usar para el mismo campo
+    var ALIAS = {
+      'Año que ingreso a Creamos': ['año_que_ingreso_a_creamos','Año que ingresó a Creamos',
+                                    'Año_que_ingreso_a_Creamos','anio_ingreso','Año ingreso'],
+      'En que año':               ['en_que_ano','En qué año','En que ano','en que año'],
+      'Edad_001':                 ['Edad','edad','age','Age'],
+      'Género':                   ['genero','Genero','género','Gender','gender'],
+      'Fecha de nacimiento':      ['fecha_nacimiento','Fecha nacimiento','fecha de nacimiento']
+    };
+
+    // Helper: obtiene el valor de d para un campo, probando el nombre original y sus alias
+    function _obtenerCampo_(d, campo) {
+      var v = d[campo];
+      if (v !== undefined && v !== '') return v;
+      var alts = ALIAS[campo] || [];
+      for (var a = 0; a < alts.length; a++) {
+        if (d[alts[a]] !== undefined && d[alts[a]] !== '') return d[alts[a]];
+      }
+      return '';
+    }
+
     // Lista blanca: SOLO las columnas de NOMBRES, en ese orden exacto
     var ORDEN  = Object.keys(NOMBRES);
     var CAMPO_ID    = 'Creamos ID';
     var CAMPO_FECHA = '_submission_time';
 
+    // Mapa completo del BD para rellenar campos vacíos desde la fuente de verdad
+    var _mapaBD_ = _construirMapaNombresCompleto_();
+
     var hoja = obtenerHoja('Sesiones Acompañamiento');
 
     var ultimaFechaSesiones = _leerUltimaFecha(PROP_LAST_SESIONES);
+
+    // Construye la fila usando _obtenerCampo_ (alias) y rellena desde BD lo que venga vacío
+    function _armarFilaSesion_(d) {
+      var cid = (d[CAMPO_ID] || '').toString().trim();
+      var recBD = cid ? _buscarRegistroEnMapa_(cid, _mapaBD_) : null;
+      var ex = recBD ? (recBD.extra || {}) : {};
+      return ORDEN.map(function(k) {
+        var v = _obtenerCampo_(d, k);
+        // Si el valor viene vacío, intentar completar desde el BD
+        if (!v && recBD) {
+          if (k === 'Año que ingreso a Creamos') v = ex.anio || '';
+          else if (k === 'En que año')           v = ex.anio || '';
+          else if (k === 'Edad_001')             v = ex.edad || '';
+          else if (k === 'Género')               v = ex.genero || '';
+          else if (k === 'Fecha de nacimiento')  v = ex.fechaNac || '';
+          else if (k === 'Nombre' && recBD.nombre) {
+            // Primer token del nombre completo
+            v = recBD.nombre.split(' ')[0];
+          }
+          else if (k === 'Apellidos' && recBD.nombre) {
+            // Todo lo que viene después del primer token
+            var partes = recBD.nombre.split(' ');
+            v = partes.length > 1 ? partes.slice(1).join(' ') : '';
+          }
+        }
+        return v || '';
+      });
+    }
 
     // --- Primera importación (hoja vacía) ----------------------------------
     if (hoja.getLastRow() <= 1) {
@@ -2183,7 +2236,7 @@ function _syncSesionesSoloNuevos() {
       var nuevos = 0;
       var maxF = '';
       datos.forEach(function(d) {
-        hoja.appendRow(ORDEN.map(function(k) { return d[k] || ''; }));
+        hoja.appendRow(_armarFilaSesion_(d));
         nuevos++;
         var f = (d[CAMPO_FECHA] || '').toString().trim();
         if (f > maxF) maxF = f;
@@ -2192,17 +2245,16 @@ function _syncSesionesSoloNuevos() {
       return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
     }
 
-    // --- Importación incremental (solo registros más nuevos que la última fecha) ---
+    // --- Importación incremental ---
+    // Leemos Creamos ID (col1) y Fecha envío (col2) para deduplicar
     var existentes = {};
-    if (!ultimaFechaSesiones) {
-      var uf = hoja.getLastRow();
-      if (uf > 1) {
-        hoja.getRange(2, 1, uf - 1, 2).getValues().forEach(function(r) {
-          var id = (r[0] || '').toString().trim();
-          var f  = (r[1] || '').toString().trim();
-          if (id) existentes[id + '||' + f] = true;
-        });
-      }
+    var uf = hoja.getLastRow();
+    if (uf > 1) {
+      hoja.getRange(2, 1, uf - 1, 2).getValues().forEach(function(r) {
+        var id = (r[0] || '').toString().trim();
+        var f  = (r[1] || '').toString().trim();
+        existentes[(id || 'noId') + '||' + f] = true;
+      });
     }
     var nuevos = 0;
     var maxFecha = ultimaFechaSesiones;
@@ -2210,10 +2262,9 @@ function _syncSesionesSoloNuevos() {
       var id    = (d[CAMPO_ID] || '').toString().trim();
       var fecha = (d[CAMPO_FECHA] || '').toString().trim();
       if (ultimaFechaSesiones && fecha <= ultimaFechaSesiones) return;
-      // Use Creamos ID if available; otherwise fall back to date-only for deduplication
-      var key   = (id ? id + '||' : 'noId||') + fecha;
+      var key = (id || 'noId') + '||' + fecha;
       if (existentes[key]) return;
-      hoja.appendRow(ORDEN.map(function(k) { return d[k] || ''; }));
+      hoja.appendRow(_armarFilaSesion_(d));
       existentes[key] = true;
       nuevos++;
       if (fecha > maxFecha) maxFecha = fecha;
@@ -4891,7 +4942,8 @@ function _cargarMapaCreamos_() {
   if (!hoja || hoja.getLastRow() < 2) {
     return { porId: {}, porNorm: {}, porDpi: {}, todos: [] };
   }
-  var datos   = hoja.getRange(2, 1, hoja.getLastRow() - 1, 5).getValues();
+  // BD columns: A=Nombre completo | B=Creamos ID | C=Año que entró | D=Age | E=Gender | F=Fecha nacimiento | G=DPI
+  var datos   = hoja.getRange(2, 1, hoja.getLastRow() - 1, 7).getValues();
   var porId   = {};
   var porNorm = {};
   var porDpi  = {};
@@ -4899,16 +4951,18 @@ function _cargarMapaCreamos_() {
   datos.forEach(function(fila) {
     var cid    = (fila[1] || '').toString().trim(); // col B = Creamos ID
     var nombre = (fila[0] || '').toString().trim(); // col A = Nombre completo
-    var dpi    = (fila[4] || '').toString().trim(); // col E = DPI
+    var dpi    = (fila[6] || '').toString().trim(); // col G = DPI
     if (!cid && !nombre) return;
     var rec = {
-      cid:        cid,
-      nombre:     nombre,
-      normCid:    _normalizarTexto_(cid),
-      normNombre: _normalizarTexto_(nombre),
-      anio:       fila[2] || '',                    // col C = Año que entró
-      edad:       fila[3] || '',                    // col D = Age
-      dpi:        dpi
+      cid:          cid,
+      nombre:       nombre,
+      normCid:      _normalizarTexto_(cid),
+      normNombre:   _normalizarTexto_(nombre),
+      anio:         (fila[2] || '').toString().trim(), // col C = Año que entró Creamos
+      edad:         (fila[3] || '').toString().trim(), // col D = Age
+      genero:       (fila[4] || '').toString().trim(), // col E = Gender
+      fechaNac:     (fila[5] || '').toString().trim(), // col F = Fecha de nacimiento
+      dpi:          dpi
     };
     if (cid) { porId[cid] = rec; porNorm[rec.normCid] = rec; }
     if (dpi) porDpi[dpi] = rec;
@@ -4929,24 +4983,31 @@ function _construirMapaNombresCompleto_() {
   var norm   = {};
   var lista  = [];
 
-  function _agregar_(cid, nombre) {
-    if (!cid || !nombre) return;
+  function _agregar_(cid, nombre, extra) {
+    if (!cid) return;
     cid = cid.toString().trim();
-    nombre = nombre.toString().trim();
-    if (!cid || !nombre) return;
-    if (!exacto[cid]) {                        // no sobreescribir si ya existe
-      exacto[cid] = nombre;
+    nombre = (nombre || '').toString().trim();
+    if (!cid) return;
+    if (!exacto[cid]) {
+      exacto[cid] = { nombre: nombre, extra: extra || {} };
       var n = _normalizarTexto_(cid);
-      if (!norm[n]) norm[n] = nombre;
-      lista.push({ cid: cid, norm: n, nombre: nombre });
+      if (!norm[n]) norm[n] = exacto[cid];
+      lista.push({ cid: cid, norm: n, nombre: nombre, extra: extra || {} });
     }
   }
 
-  // 1. Fuente primaria: BD Salesforce (col B = Creamos ID, col A = Nombre)
+  // 1. Fuente primaria: BD Salesforce — lee todos los campos
+  // A=Nombre | B=Creamos ID | C=Año entró | D=Age | E=Gender | F=Fecha nac | G=DPI
   var hBD = ss.getSheetByName(HOJA_BD_CREAMOS);
   if (hBD && hBD.getLastRow() > 1) {
-    hBD.getRange(2, 1, hBD.getLastRow() - 1, 2).getValues().forEach(function(r) {
-      _agregar_(r[1], r[0]); // col B = cid, col A = nombre
+    hBD.getRange(2, 1, hBD.getLastRow() - 1, 7).getValues().forEach(function(r) {
+      _agregar_(r[1], r[0], {
+        anio:     (r[2] || '').toString().trim(),
+        edad:     (r[3] || '').toString().trim(),
+        genero:   (r[4] || '').toString().trim(),
+        fechaNac: (r[5] || '').toString().trim(),
+        dpi:      (r[6] || '').toString().trim()
+      });
     });
   }
 
@@ -4979,20 +5040,26 @@ function _construirMapaNombresCompleto_() {
 }
 
 /**
- * Busca el nombre para un Creamos ID usando el mapa completo.
+ * Busca el registro completo para un Creamos ID.
  * Estrategia: 1=exacto, 2=normalizado, 3=fuzzy Levenshtein≤1
+ * Devuelve { nombre, extra:{anio,edad,genero,fechaNac,dpi} } o null.
  */
-function _buscarNombreEnMapa_(cid, mapa) {
-  if (!cid) return '';
-  var encontrado = mapa.exacto[cid];
-  if (encontrado) return encontrado;
-  encontrado = mapa.norm[_normalizarTexto_(cid)];
-  if (encontrado) return encontrado;
+function _buscarRegistroEnMapa_(cid, mapa) {
+  if (!cid) return null;
+  var rec = mapa.exacto[cid] || mapa.norm[_normalizarTexto_(cid)];
+  if (rec) return rec;
   var normCid = _normalizarTexto_(cid);
   for (var i = 0; i < mapa.lista.length; i++) {
-    if (_levenshtein_(normCid, mapa.lista[i].norm) <= 1) return mapa.lista[i].nombre;
+    if (_levenshtein_(normCid, mapa.lista[i].norm) <= 1)
+      return { nombre: mapa.lista[i].nombre, extra: mapa.lista[i].extra };
   }
-  return '';
+  return null;
+}
+
+/** Compatibilidad: devuelve solo el nombre */
+function _buscarNombreEnMapa_(cid, mapa) {
+  var rec = _buscarRegistroEnMapa_(cid, mapa);
+  return rec ? rec.nombre : '';
 }
 
 /** Elimina acentos, pasa a minúsculas y colapsa espacios para comparar textos. */
@@ -5136,11 +5203,13 @@ function autocompletarConCreamos() {
         corregidos++;
       }
       if (!filas[i][3] && rec.nombre) _llenar_(hojaGrad, row, 4, rec.nombre);
+      if (!filas[i][4] && rec.genero) _llenar_(hojaGrad, row, 5, rec.genero);
       if (!filas[i][5] && rec.edad)   _llenar_(hojaGrad, row, 6, rec.edad);
     }
   }
 
-  // ── Hojas de clasificación: Creamos ID = col B (idx 2), Nombre = col C (idx 3), Edad = col F (idx 6) ──
+  // ── Hojas de clasificación (COLUMNAS_COMUNES):
+  //    col1=Fecha ingreso | col2=Creamos ID | col3=Nombre | col4=Teléfono | col5=Género | col6=Edad ──
   ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'].forEach(function(nomHoja) {
     var h = ss.getSheetByName(nomHoja);
     if (!h || h.getLastRow() < 2) return;
@@ -5162,6 +5231,7 @@ function autocompletarConCreamos() {
         corregidos++;
       }
       if (!filas[i][2] && rec.nombre) _llenar_(h, row, 3, rec.nombre);
+      if (!filas[i][4] && rec.genero) _llenar_(h, row, 5, rec.genero);
       if (!filas[i][5] && rec.edad)   _llenar_(h, row, 6, rec.edad);
     }
   });
@@ -5180,8 +5250,34 @@ function autocompletarConCreamos() {
     }
   }
 
+  // ── Sesiones Acompañamiento: rellena campos vacíos desde el BD ──
+  // Cols: 1=Creamos ID | 5=Nombre | 6=Apellidos | 8=Fecha nac | 9=Edad | 10=Género | 11=Año ingreso | 12=En qué año
+  (function() {
+    var hSes = ss.getSheetByName('Sesiones Acompañamiento');
+    if (!hSes || hSes.getLastRow() < 2) return;
+    var filSes = hSes.getRange(2, 1, hSes.getLastRow() - 1, 12).getValues();
+    for (var i = 0; i < filSes.length; i++) {
+      var cid = (filSes[i][0] || '').toString().trim();
+      if (!cid) continue;
+      var match = _buscarEnMapaFuzzy_(cid, mapaExt);
+      if (!match) continue;
+      var rec = match.rec;
+      var row = i + 2;
+      // Nombre (col 5) y Apellidos (col 6) desde nombre completo
+      if (!filSes[i][4] && rec.nombre) {
+        var partes2 = rec.nombre.split(' ');
+        _llenar_(hSes, row, 5, partes2[0]);
+        if (partes2.length > 1) _llenar_(hSes, row, 6, partes2.slice(1).join(' '));
+      }
+      if (!filSes[i][7]  && rec.fechaNac) _llenar_(hSes, row, 8,  rec.fechaNac);
+      if (!filSes[i][8]  && rec.edad)     _llenar_(hSes, row, 9,  rec.edad);
+      if (!filSes[i][9]  && rec.genero)   _llenar_(hSes, row, 10, rec.genero);
+      if (!filSes[i][10] && rec.anio)     _llenar_(hSes, row, 11, rec.anio);
+      if (!filSes[i][11] && rec.anio)     _llenar_(hSes, row, 12, rec.anio);
+    }
+  })();
+
   // ── Satisfacción Empleo: Creamos ID = col A (idx 0), Nombre = col B (idx 1) ──
-  // Busca en BD Salesforce + Graduados + hojas + Conexiones (exacto/normalizado/fuzzy)
   (function() {
     var hSatEmp = ss.getSheetByName('Satisfacción Empleo');
     if (!hSatEmp || hSatEmp.getLastRow() < 2) return;
