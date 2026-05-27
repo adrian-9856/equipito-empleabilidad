@@ -2235,21 +2235,17 @@ function _syncSesionesSoloNuevos() {
       var ex = recBD ? (recBD.extra || {}) : {};
       return ORDEN.map(function(k) {
         var v = _obtenerCampo_(d, k);
-        // Si el valor viene vacío, intentar completar desde el BD
         if (!v && recBD) {
-          if (k === 'Edad_001')             v = ex.edad || '';
+          if (k === 'Edad_001')                  v = ex.edad || '';
           else if (k === 'Género')               v = ex.genero || '';
           else if (k === 'Fecha de nacimiento')  v = ex.fechaNac || '';
-          else if (k === 'Nombre' && recBD.nombre) {
-            // Primer token del nombre completo
-            v = recBD.nombre.split(' ')[0];
-          }
+          else if (k === 'Nombre' && recBD.nombre)    v = recBD.nombre.split(' ')[0];
           else if (k === 'Apellidos' && recBD.nombre) {
-            // Todo lo que viene después del primer token
             var partes = recBD.nombre.split(' ');
             v = partes.length > 1 ? partes.slice(1).join(' ') : '';
           }
         }
+        if (k === 'Fecha de nacimiento') v = _normalizarFecha_(v);
         return v || '';
       });
     }
@@ -2398,7 +2394,7 @@ function actualizarSesionesCompleto() {
           if (!filas[i][4]) { hoja.getRange(row, 5).setValue(pts[0]); llenados++; }
           if (pts.length > 1 && !filas[i][5]) { hoja.getRange(row, 6).setValue(pts.slice(1).join(' ')); llenados++; }
         }
-        if (!filas[i][7] && rec.fechaNac) { hoja.getRange(row, 8).setValue(rec.fechaNac); llenados++; }
+        if (!filas[i][7] && rec.fechaNac) { hoja.getRange(row, 8).setValue(_normalizarFecha_(rec.fechaNac)); llenados++; }
         if (!filas[i][8] && rec.edad)     { hoja.getRange(row, 9).setValue(rec.edad);     llenados++; }
         if (!filas[i][9] && rec.genero)   { hoja.getRange(row, 10).setValue(rec.genero);  llenados++; }
       }
@@ -5108,7 +5104,7 @@ function _cargarMapaCreamos_() {
       anio:         (fila[2] || '').toString().trim(), // col C = Año que entró Creamos
       edad:         (fila[3] || '').toString().trim(), // col D = Age
       genero:       (fila[4] || '').toString().trim(), // col E = Gender
-      fechaNac:     (fila[5] || '').toString().trim(), // col F = Fecha de nacimiento
+      fechaNac:     _normalizarFecha_(fila[5]), // col F = Fecha de nacimiento
       dpi:          dpi
     };
     if (cid) { porId[cid] = rec; porNorm[rec.normCid] = rec; }
@@ -5152,7 +5148,7 @@ function _construirMapaNombresCompleto_() {
         anio:     (r[2] || '').toString().trim(),
         edad:     (r[3] || '').toString().trim(),
         genero:   (r[4] || '').toString().trim(),
-        fechaNac: (r[5] || '').toString().trim(),
+        fechaNac: _normalizarFecha_(r[5]),
         dpi:      (r[6] || '').toString().trim()
       });
     });
@@ -5215,6 +5211,32 @@ function _normalizarTexto_(s) {
   return s.toString().trim().toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/\s+/g, ' ');
+}
+
+/**
+ * Convierte cualquier representación de fecha a "DD/MM/YYYY".
+ * Acepta: Date objects, "Wed Jun 18 1980 ...", "1980-06-18", "18/06/1980", timestamps, etc.
+ * Devuelve '' si no puede parsear.
+ */
+function _normalizarFecha_(valor) {
+  if (!valor && valor !== 0) return '';
+  var d;
+  if (valor instanceof Date) {
+    d = valor;
+  } else {
+    var s = valor.toString().trim();
+    if (!s) return '';
+    // Ya está en DD/MM/YYYY
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) return s;
+    // Intentar parsear como Date
+    d = new Date(s);
+    if (isNaN(d.getTime())) return s; // no se pudo parsear, devolver tal cual
+  }
+  var dd = ('0' + d.getDate()).slice(-2);
+  var mm = ('0' + (d.getMonth() + 1)).slice(-2);
+  var yyyy = d.getFullYear();
+  if (yyyy < 1900 || yyyy > 2100) return '';
+  return dd + '/' + mm + '/' + yyyy;
 }
 
 /** Distancia Levenshtein entre dos strings. */
@@ -5398,11 +5420,11 @@ function autocompletarConCreamos() {
   }
 
   // ── Sesiones Acompañamiento: rellena campos vacíos desde el BD ──
-  // Cols: 1=Creamos ID | 5=Nombre | 6=Apellidos | 8=Fecha nac | 9=Edad | 10=Género | 11=Año ingreso | 12=En qué año
+  // Cols: 1=Creamos ID | 5=Nombre | 6=Apellidos | 8=Fecha nac | 9=Edad | 10=Género
   (function() {
     var hSes = ss.getSheetByName('Sesiones Acompañamiento');
     if (!hSes || hSes.getLastRow() < 2) return;
-    var filSes = hSes.getRange(2, 1, hSes.getLastRow() - 1, 12).getValues();
+    var filSes = hSes.getRange(2, 1, hSes.getLastRow() - 1, 10).getValues();
     for (var i = 0; i < filSes.length; i++) {
       var cid = (filSes[i][0] || '').toString().trim();
       if (!cid) continue;
@@ -5410,17 +5432,14 @@ function autocompletarConCreamos() {
       if (!match) continue;
       var rec = match.rec;
       var row = i + 2;
-      // Nombre (col 5) y Apellidos (col 6) desde nombre completo
       if (!filSes[i][4] && rec.nombre) {
         var partes2 = rec.nombre.split(' ');
         _llenar_(hSes, row, 5, partes2[0]);
         if (partes2.length > 1) _llenar_(hSes, row, 6, partes2.slice(1).join(' '));
       }
-      if (!filSes[i][7]  && rec.fechaNac) _llenar_(hSes, row, 8,  rec.fechaNac);
-      if (!filSes[i][8]  && rec.edad)     _llenar_(hSes, row, 9,  rec.edad);
-      if (!filSes[i][9]  && rec.genero)   _llenar_(hSes, row, 10, rec.genero);
-      if (!filSes[i][10] && rec.anio)     _llenar_(hSes, row, 11, rec.anio);
-      if (!filSes[i][11] && rec.anio)     _llenar_(hSes, row, 12, rec.anio);
+      if (!filSes[i][7] && rec.fechaNac) _llenar_(hSes, row, 8, _normalizarFecha_(rec.fechaNac));
+      if (!filSes[i][8] && rec.edad)     _llenar_(hSes, row, 9,  rec.edad);
+      if (!filSes[i][9] && rec.genero)   _llenar_(hSes, row, 10, rec.genero);
     }
   })();
 
