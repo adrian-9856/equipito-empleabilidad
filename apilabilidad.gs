@@ -2167,46 +2167,56 @@ function _syncSesionesSoloNuevos() {
       'Tipo de servicio':           'Tipo servicio',
       'Comentario':                 'Comentario'
     };
-    // Nombres alternativos que Kobo puede usar (grupos intro/, datos/, variantes)
-    var ALIAS = {
-      'Creamos ID':                 ['intro/Creamos_ID','Creamos_ID','creamos_id',
-                                     'ID_Creamos','intro/Creamos ID','Creamos ID del participante:'],
-      '_submission_time':           ['fecha_envio','Fecha envío'],
-      'start':                      ['inicio','Inicio','Hora inicio'],
-      'Proyecto':                   ['intro/Proyecto','datos/Proyecto','proyecto',
-                                     'Proyecto_001','Nombre del proyecto'],
-      'Nombre':                     ['intro/Nombre','datos/Nombre','nombre',
-                                     'Nombre_001','primer_nombre','Nombre del participante'],
-      'Apellidos':                  ['intro/Apellidos','datos/Apellidos','apellidos',
-                                     'Apellidos_001','apellido','Apellidos del participante'],
-      'Teléfono':                   ['intro/Telefono','datos/Teléfono','telefono',
-                                     'Teléfono_001','numero_telefono','Número de teléfono'],
-      'Año que ingreso a Creamos':  ['año_que_ingreso_a_creamos','Año que ingresó a Creamos',
-                                     'Año_que_ingreso_a_Creamos','anio_ingreso','Año ingreso',
-                                     'intro/Año que ingreso a Creamos'],
-      'En que año':                 ['en_que_ano','En qué año','En que ano','en que año',
-                                     'intro/En que año'],
-      'Edad_001':                   ['Edad','edad','age','Age','Edad_002',
-                                     'intro/Edad','datos/Edad'],
-      'Género':                     ['genero','Genero','género','Gender','gender',
-                                     'intro/Género','datos/Género'],
-      'Fecha de nacimiento':        ['fecha_nacimiento','Fecha nacimiento',
-                                     'intro/Fecha de nacimiento','datos/Fecha de nacimiento'],
-      'Grado académico':            ['grado_academico','Grado_academico','grado academico',
-                                     'intro/Grado académico','nivel_educativo'],
-      'Tipo de servicio':           ['tipo_servicio','Tipo_servicio','tipo de servicio',
-                                     'intro/Tipo de servicio'],
-      'Comentario':                 ['comentario','notas','Notas','intro/Comentario']
+
+    // Auto-detectar qué columna del CSV corresponde a cada campo esperado
+    // usando coincidencia por palabras clave (robusto ante variantes de nombre)
+    function _normKey_(s) {
+      return s.toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+    }
+    var DETECTORES = {
+      'Creamos ID':   function(n) { return (n.indexOf('creamos') !== -1 && n.indexOf('id') !== -1) || n === 'creamos_id'; },
+      '_submission_time': function(n) { return n === '_submission_time' || n.indexOf('submission') !== -1 || n.indexOf('envio') !== -1 || n.indexOf('fecha_envio') !== -1; },
+      'start':        function(n) { return n === 'start' || n.indexOf('inicio_sesion') !== -1 || n.indexOf('inicio_de_sesion') !== -1 || (n.indexOf('inicio') !== -1 && n.indexOf('hora') !== -1); },
+      'Proyecto':     function(n) { return n.indexOf('proyecto') !== -1 && n.indexOf('nombre') === -1; },
+      'Nombre':       function(n) { return n.indexOf('nombre') !== -1 && n.indexOf('apellido') === -1 && n.indexOf('completo') === -1 && n.indexOf('proyecto') === -1 && n.indexOf('tipo') === -1; },
+      'Apellidos':    function(n) { return n.indexOf('apellido') !== -1; },
+      'Teléfono':     function(n) { return n.indexOf('telefon') !== -1 || (n.indexOf('tel') !== -1 && n.length < 10); },
+      'Edad_001':     function(n) { return n === 'edad' || n === 'edad_001' || n === 'edad_002' || n === 'age'; },
+      'Género':       function(n) { return n.indexOf('genero') !== -1 || n.indexOf('gender') !== -1 || n === 'sexo'; },
+      'Año que ingreso a Creamos': function(n) { return (n.indexOf('ingreso') !== -1 || n.indexOf('ingres') !== -1) && (n.indexOf('creamos') !== -1 || n.indexOf('ano') !== -1 || n.indexOf('year') !== -1); },
+      'En que año':   function(n) { return (n.indexOf('en_que') !== -1 || n.indexOf('en_qu') !== -1) && n.indexOf('ano') !== -1; },
+      'Fecha de nacimiento': function(n) { return n.indexOf('nacimiento') !== -1 || n.indexOf('nacim') !== -1; },
+      'Grado académico': function(n) { return n.indexOf('grado') !== -1 || n.indexOf('academico') !== -1 || n.indexOf('educativ') !== -1; },
+      'Tipo de servicio': function(n) { return (n.indexOf('tipo') !== -1 && n.indexOf('servicio') !== -1); },
+      'Comentario':   function(n) { return n.indexOf('comentario') !== -1 || n.indexOf('notas') !== -1; }
     };
 
-    // Helper: obtiene el valor de d para un campo, probando el nombre original y sus alias
+    // Construir mapa campo→columna_real a partir de las claves del primer registro
+    var colMap = {};
+    if (datos.length > 0) {
+      var csvKeys = Object.keys(datos[0]);
+      Object.keys(DETECTORES).forEach(function(campo) {
+        // Primero: coincidencia exacta
+        if (datos[0][campo] !== undefined) { colMap[campo] = campo; return; }
+        // Luego: detector de palabras clave sobre nombre normalizado
+        var fn = DETECTORES[campo];
+        for (var ki = 0; ki < csvKeys.length; ki++) {
+          if (fn(_normKey_(csvKeys[ki]))) { colMap[campo] = csvKeys[ki]; return; }
+        }
+      });
+    }
+    Logger.log('Sesiones colMap: ' + JSON.stringify(colMap));
+
+    // Helper: obtiene el valor de d para un campo usando el mapa detectado, luego exacto
     function _obtenerCampo_(d, campo) {
+      var col = colMap[campo];
+      if (col && d[col] !== undefined && d[col] !== '') return d[col];
       var v = d[campo];
       if (v !== undefined && v !== '') return v;
-      var alts = ALIAS[campo] || [];
-      for (var a = 0; a < alts.length; a++) {
-        if (d[alts[a]] !== undefined && d[alts[a]] !== '') return d[alts[a]];
-      }
       return '';
     }
 
@@ -2222,9 +2232,9 @@ function _syncSesionesSoloNuevos() {
 
     var ultimaFechaSesiones = _leerUltimaFecha(PROP_LAST_SESIONES);
 
-    // Construye la fila usando _obtenerCampo_ (alias) y rellena desde BD lo que venga vacío
+    // Construye la fila usando _obtenerCampo_ y rellena desde BD lo que venga vacío
     function _armarFilaSesion_(d) {
-      var cid = (d[CAMPO_ID] || '').toString().trim();
+      var cid = _obtenerCampo_(d, CAMPO_ID).toString().trim();
       var recBD = cid ? _buscarRegistroEnMapa_(cid, _mapaBD_) : null;
       var ex = recBD ? (recBD.extra || {}) : {};
       return ORDEN.map(function(k) {
@@ -2263,7 +2273,7 @@ function _syncSesionesSoloNuevos() {
       datos.forEach(function(d) {
         hoja.appendRow(_armarFilaSesion_(d));
         nuevos++;
-        var f = (d[CAMPO_FECHA] || '').toString().trim();
+        var f = _obtenerCampo_(d, CAMPO_FECHA).toString().trim();
         if (f > maxF) maxF = f;
       });
       _guardarUltimaFecha(PROP_LAST_SESIONES, maxF);
@@ -2284,8 +2294,8 @@ function _syncSesionesSoloNuevos() {
     var nuevos = 0;
     var maxFecha = ultimaFechaSesiones;
     datos.forEach(function(d) {
-      var id    = (d[CAMPO_ID] || '').toString().trim();
-      var fecha = (d[CAMPO_FECHA] || '').toString().trim();
+      var id    = _obtenerCampo_(d, CAMPO_ID).toString().trim();
+      var fecha = _obtenerCampo_(d, CAMPO_FECHA).toString().trim();
       if (ultimaFechaSesiones && fecha <= ultimaFechaSesiones) return;
       var key = (id || 'noId') + '||' + fecha;
       if (existentes[key]) return;
@@ -2428,16 +2438,44 @@ function diagnosticarCamposSesiones() {
       muteHttpExceptions: true
     });
     if (resp.getResponseCode() !== 200) {
-      ui.alert('❌ Error HTTP ' + resp.getResponseCode()); return;
+      ui.alert('Error HTTP ' + resp.getResponseCode()); return;
     }
-    var lineas = resp.getContentText().split('\n');
-    if (lineas.length === 0) { ui.alert('CSV vacío'); return; }
-    var campos = lineas[0].split(',').map(function(c) { return c.replace(/"/g,'').trim(); });
-    // Mostrar solo los primeros 30 campos relevantes
-    var muestra = campos.slice(0, 40).join('\n');
-    ui.alert('Campos reales en CSV de Sesiones (primeros 40):', muestra, ui.ButtonSet.OK);
+    var body = resp.getContentText();
+    var datos = parsearCSV(body);
+    if (!datos || datos.length === 0) { ui.alert('CSV vacío o sin filas de datos'); return; }
+
+    var csvKeys = Object.keys(datos[0]);
+
+    // Mismo detector que usa _syncSesionesSoloNuevos
+    function normK(s) {
+      return s.toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    }
+    var DETECTORES = {
+      'Creamos ID':   function(n) { return (n.indexOf('creamos') !== -1 && n.indexOf('id') !== -1) || n === 'creamos_id'; },
+      'Fecha envío (_submission_time)': function(n) { return n === '_submission_time' || n.indexOf('submission') !== -1 || n.indexOf('envio') !== -1; },
+      'Inicio sesión (start)': function(n) { return n === 'start' || n.indexOf('inicio_sesion') !== -1 || (n.indexOf('inicio') !== -1 && n.indexOf('hora') !== -1); },
+      'Proyecto':     function(n) { return n.indexOf('proyecto') !== -1 && n.indexOf('nombre') === -1; },
+      'Nombre':       function(n) { return n.indexOf('nombre') !== -1 && n.indexOf('apellido') === -1 && n.indexOf('completo') === -1 && n.indexOf('proyecto') === -1 && n.indexOf('tipo') === -1; },
+      'Apellidos':    function(n) { return n.indexOf('apellido') !== -1; }
+    };
+
+    var lineas = ['=== COLUMNAS CSV (primeras 40) ==='];
+    csvKeys.slice(0, 40).forEach(function(k) { lineas.push('  ' + k); });
+    lineas.push('');
+    lineas.push('=== DETECCION AUTOMATICA ===');
+    Object.keys(DETECTORES).forEach(function(campo) {
+      var found = '';
+      for (var ki = 0; ki < csvKeys.length; ki++) {
+        if (DETECTORES[campo](normK(csvKeys[ki]))) { found = csvKeys[ki]; break; }
+      }
+      lineas.push(campo + ' → ' + (found || 'NO ENCONTRADO'));
+    });
+
+    ui.alert('Diagnóstico Sesiones Acompañamiento', lineas.join('\n'), ui.ButtonSet.OK);
   } catch (e) {
-    ui.alert('❌ Error: ' + e.message);
+    ui.alert('Error: ' + e.message);
   }
 }
 
