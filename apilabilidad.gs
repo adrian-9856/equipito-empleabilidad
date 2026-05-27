@@ -128,13 +128,15 @@ function implementarCambiosNuevos() {
             .setFontWeight('bold').setFontSize(11);
         hSat.setColumnWidth(2, 200);
       }
-      // Llenar nombres vacíos desde Graduados
-      var mapaNombres = {};
+      // Llenar nombres vacíos desde Graduados (búsqueda exacta + normalizada)
+      var mapaNombres = {}, mapaNombresNorm = {};
       if (hGrad && hGrad.getLastRow() > 1) {
         hGrad.getRange(2, 3, hGrad.getLastRow() - 1, 2).getValues().forEach(function(r) {
           var cid = (r[0] || '').toString().trim();
           var nom = (r[1] || '').toString().trim();
-          if (cid && nom) mapaNombres[cid] = nom;
+          if (!cid || !nom) return;
+          mapaNombres[cid] = nom;
+          mapaNombresNorm[_normalizarTexto_(cid)] = nom;
         });
       }
       var llenados = 0;
@@ -142,9 +144,12 @@ function implementarCambiosNuevos() {
       for (var i = 0; i < datSat.length; i++) {
         var cid = (datSat[i][0] || '').toString().trim();
         var nom = (datSat[i][1] || '').toString().trim();
-        if (cid && !nom && mapaNombres[cid]) {
-          hSat.getRange(i + 2, 2).setValue(mapaNombres[cid]);
-          llenados++;
+        if (cid && !nom) {
+          var encontrado = mapaNombres[cid] || mapaNombresNorm[_normalizarTexto_(cid)] || '';
+          if (encontrado) {
+            hSat.getRange(i + 2, 2).setValue(encontrado);
+            llenados++;
+          }
         }
       }
       pasos.push('✅ Nombres completados en Satisfacción Empleo: ' + llenados + ' filas actualizadas.');
@@ -1986,16 +1991,26 @@ function _syncSatisfaccionSoloNuevos() {
     var CAMPO_FECHA = '_submission_time';
 
     // Mapa Creamos ID → Nombre completo desde la hoja Graduados
+    // Se construye con clave exacta Y clave normalizada para tolerar acentos/mayúsculas
     var mapaNombres = {};
+    var mapaNombresNorm = {};
     (function() {
       var hGrad = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Graduados');
       if (!hGrad || hGrad.getLastRow() < 2) return;
       hGrad.getRange(2, 3, hGrad.getLastRow() - 1, 2).getValues().forEach(function(r) {
         var cid    = (r[0] || '').toString().trim();
         var nombre = (r[1] || '').toString().trim();
-        if (cid && nombre) mapaNombres[cid] = nombre;
+        if (!cid || !nombre) return;
+        mapaNombres[cid] = nombre;
+        mapaNombresNorm[_normalizarTexto_(cid)] = nombre;
       });
     })();
+
+    // Busca nombre por ID exacto, luego normalizado
+    function _buscarNombre_(cid) {
+      if (!cid) return '';
+      return mapaNombres[cid] || mapaNombresNorm[_normalizarTexto_(cid)] || '';
+    }
 
     // Helper: calcular promedio de las 5 preguntas (ignorando vacíos)
     function calcularPromedio(d) {
@@ -2010,7 +2025,7 @@ function _syncSatisfaccionSoloNuevos() {
     // Helper: arma la fila completa (Creamos ID | Nombre completo | resto de NOMBRES | Promedio)
     function armarFila(d) {
       var cid    = (d[CAMPO_ID] || '').toString().trim();
-      var nombre = mapaNombres[cid] || '';
+      var nombre = _buscarNombre_(cid);
       var row    = [cid, nombre];
       ORDEN.slice(1).forEach(function(k) { row.push(d[k] || ''); }); // desde Fecha envío en adelante
       row.push(calcularPromedio(d));
@@ -5093,25 +5108,43 @@ function autocompletarConCreamos() {
 
   // ── Satisfacción Empleo: Creamos ID = col A (idx 0), Nombre = col B (idx 1) ──
   // Completa "Nombre completo" usando la hoja Graduados como fuente.
+  // Búsqueda: exacta primero, luego normalizada (sin acentos/mayúsculas) y luego
+  // fuzzy para tolerar typos de 1 carácter.
   (function() {
     var hSatEmp = ss.getSheetByName('Satisfacción Empleo');
     if (!hSatEmp || hSatEmp.getLastRow() < 2) return;
-    // Construir mapa desde Graduados: creamosId → nombreCompleto
-    var mapaNombres = {};
+    // Construir mapa exacto y normalizado desde Graduados
+    var mapaNombres = {}, mapaNorm = {}, listaCids = [];
     if (hojaGrad && hojaGrad.getLastRow() > 1) {
       hojaGrad.getRange(2, 3, hojaGrad.getLastRow() - 1, 2).getValues().forEach(function(r) {
         var cid = (r[0] || '').toString().trim();
         var nom = (r[1] || '').toString().trim();
-        if (cid && nom) mapaNombres[cid] = nom;
+        if (!cid || !nom) return;
+        mapaNombres[cid] = nom;
+        mapaNorm[_normalizarTexto_(cid)] = nom;
+        listaCids.push({ cid: cid, norm: _normalizarTexto_(cid), nom: nom });
       });
     }
     var filSat = hSatEmp.getRange(2, 1, hSatEmp.getLastRow() - 1, 2).getValues();
     for (var i = 0; i < filSat.length; i++) {
       var cid = (filSat[i][0] || '').toString().trim();
       var nom = (filSat[i][1] || '').toString().trim();
-      if (cid && !nom && mapaNombres[cid]) {
-        _llenar_(hSatEmp, i + 2, 2, mapaNombres[cid]);
+      if (!cid || nom) continue;
+      // 1. Exacto
+      var encontrado = mapaNombres[cid];
+      // 2. Normalizado (sin acentos / mayúsculas)
+      if (!encontrado) encontrado = mapaNorm[_normalizarTexto_(cid)];
+      // 3. Fuzzy levenshtein ≤ 1 sobre el ID normalizado
+      if (!encontrado) {
+        var normCid = _normalizarTexto_(cid);
+        for (var j = 0; j < listaCids.length; j++) {
+          if (_levenshtein_(normCid, listaCids[j].norm) <= 1) {
+            encontrado = listaCids[j].nom;
+            break;
+          }
+        }
       }
+      if (encontrado) _llenar_(hSatEmp, i + 2, 2, encontrado);
     }
   })();
 
