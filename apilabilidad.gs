@@ -64,6 +64,7 @@ function onOpen(e) {
       .addSeparator()
       .addItem('⚙️ Instalar triggers',                       'configurarEditTrigger')
       .addItem('💼 Enviar a Conexiones Laborales',           'enviarAConexionesLaborales')
+      .addItem('🔧 Reparar Etapas Conexiones Laborales',     'repararEtapasConexionesLaborales')
       .addSeparator()
       .addItem('📧 Configurar correos Conexiones Laborales', 'configurarEmailsConexionesLaborales');
 
@@ -3696,6 +3697,56 @@ function guardarConexionLaboral(datos) {
 
 // ---------------------------------------------------------------------------
 // EMAIL PARA CONEXIONES LABORALES
+// ---------------------------------------------------------------------------
+
+/**
+ * Compara la hoja "Conexiones Laborales" con "Graduados" y escribe
+ * "Conexiones Laborales" en la columna Etapa de toda fila de Graduados
+ * cuyo Creamos ID aparece en Conexiones Laborales pero tiene Etapa vacía.
+ * Útil para reparar filas enviadas antes de la corrección del bug.
+ */
+function repararEtapasConexionesLaborales() {
+  var ss  = SpreadsheetApp.getActiveSpreadsheet();
+  var ui  = SpreadsheetApp.getUi();
+
+  var hCon = ss.getSheetByName('Conexiones Laborales');
+  var hGrad = ss.getSheetByName('Graduados');
+  if (!hCon || !hGrad) { ui.alert('No se encontraron las hojas necesarias.'); return; }
+
+  // Construir set de Creamos IDs presentes en Conexiones Laborales (col A)
+  var conLastRow = hCon.getLastRow();
+  if (conLastRow < 2) { ui.alert('La hoja Conexiones Laborales está vacía.'); return; }
+  var conIds = hCon.getRange(2, 1, conLastRow - 1, 1).getValues();
+  var idSet = {};
+  conIds.forEach(function(r) {
+    var id = (r[0] || '').toString().trim();
+    if (id) idSet[id] = true;
+  });
+
+  // Recorrer Graduados: col C (idx 2) = Creamos ID, col O (col 15) = Etapa
+  var gradLastRow = hGrad.getLastRow();
+  if (gradLastRow < 2) { ui.alert('La hoja Graduados está vacía.'); return; }
+  var gradData = hGrad.getRange(2, 1, gradLastRow - 1, 15).getValues();
+
+  var reparadas = 0;
+  for (var i = 0; i < gradData.length; i++) {
+    var cid   = (gradData[i][2] || '').toString().trim(); // col C
+    var etapa = (gradData[i][14] || '').toString().trim(); // col O
+    if (cid && idSet[cid] && !etapa) {
+      hGrad.getRange(i + 2, 15).setValue('Conexiones Laborales');
+      reparadas++;
+    }
+  }
+
+  ui.alert(
+    'Reparación completada',
+    reparadas > 0
+      ? reparadas + ' fila(s) actualizadas a "Conexiones Laborales".'
+      : 'No se encontraron filas con Etapa vacía para reparar.\n(Puede que ya estén correctas o que el Creamos ID no coincida.)',
+    ui.ButtonSet.OK
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 const PROP_EMAILS_CONEXIONES = 'EMAILS_CONEXIONES_LABORALES';
