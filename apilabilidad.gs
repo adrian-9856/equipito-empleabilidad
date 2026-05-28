@@ -3665,6 +3665,22 @@ function guardarConexionLaboral(datos) {
     obtenerHoja('Conexiones Laborales').appendRow(fila);
     Logger.log('Conexión laboral registrada: ' + nombreCompleto + ' en ' + datos.empresa);
 
+    // Actualizar la celda Etapa en la hoja de origen para reflejar el cambio de estado
+    try {
+      var filaNum = parseInt(datos.filaGraduado, 10);
+      var hojaOrigen = datos.hojaOrigen || 'Graduados';
+      if (filaNum > 1) {
+        var hOrigen = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(hojaOrigen);
+        if (hOrigen) {
+          // Col 15 = Etapa en Graduados; en Sesiones Acompañamiento la acción es col 16
+          var colEtapa = (hojaOrigen === 'Graduados') ? 15 : 16;
+          hOrigen.getRange(filaNum, colEtapa).setValue('Conexiones Laborales');
+        }
+      }
+    } catch (eEtapa) {
+      Logger.log('No se pudo actualizar Etapa: ' + eEtapa.message);
+    }
+
     // Crear fila en Seguimiento Bot para n8n/WhatsApp
     crearFilaSeguimientoBot(datos, fechaInicio);
 
