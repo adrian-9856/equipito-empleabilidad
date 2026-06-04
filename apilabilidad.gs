@@ -331,6 +331,9 @@ function onEditInstalable(e) {
     if (nombreHoja === 'Graduados' && col === 15) {
       if (e.value !== 'Conexiones Laborales') return;
 
+      // Diagnóstico: si aparece este toast, el trigger SÍ está corriendo.
+      SpreadsheetApp.getActiveSpreadsheet().toast('Trigger activo, abriendo formulario...', 'Conexiones Laborales', 5);
+
       const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
       const creamosId = (datosGrad[2] || '').toString().trim();
       const nombre    = (datosGrad[3] || '').toString().trim();
