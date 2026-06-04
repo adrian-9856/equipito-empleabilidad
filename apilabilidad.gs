@@ -218,17 +218,22 @@ function onEdit(e) {
     if (nombreHoja === 'Graduados' && col === 15) {
       const nuevaEtapa = e.value;
 
-      // Conexiones Laborales y Paso a paso - Cierre requieren el trigger INSTALABLE.
-      // Si el formulario no aparece en 2-3 segundos, ejecutar:
-      //   Configuración → ⚙️ Instalar triggers
-      if (nuevaEtapa === 'Conexiones Laborales' || nuevaEtapa === 'Paso a paso - Cierre') {
+      if (!nuevaEtapa || nuevaEtapa === 'En empleo') return;
+
+      // "Conexiones Laborales": limpiar celda y guiar al usuario al menú.
+      // Los diálogos solo abren desde menú o trigger instalable; el menú siempre funciona.
+      if (nuevaEtapa === 'Conexiones Laborales') {
+        e.range.setValue('');          // dejar celda lista para nueva selección
+        // Guardar fila para que enviarAConexionesLaborales() la use aunque el cursor se mueva
+        PropertiesService.getScriptProperties().setProperty(
+          'PENDING_CONEXION_FILA', JSON.stringify({ fila: fila, hoja: nombreHoja })
+        );
         SpreadsheetApp.getActiveSpreadsheet().toast(
-          'Si el formulario no aparece, ve a: Configuración → ⚙️ Instalar triggers',
-          'Abriendo formulario...', 4
+          'Haz clic en el menú:  Configuración → 💼 Enviar a Conexiones Laborales',
+          'Conexiones Laborales — fila ' + fila, 10
         );
         return;
       }
-      if (!nuevaEtapa || nuevaEtapa === 'En empleo') return;
 
       const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
       const nombre    = datosGrad[3];
@@ -3278,9 +3283,28 @@ function obtenerHoja(nombreHoja) {
  * El usuario debe tener seleccionada una fila en la hoja "Graduados".
  */
 function enviarAConexionesLaborales() {
-  const ui   = SpreadsheetApp.getUi();
-  const hoja = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  const nombreHoja = hoja.getName();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+
+  // Si el usuario llegó aquí desde el dropdown (onEdit guardó la fila pendiente),
+  // usar esa fila directamente aunque el cursor se haya movido.
+  var pendingRaw = PropertiesService.getScriptProperties().getProperty('PENDING_CONEXION_FILA');
+  var pending = null;
+  if (pendingRaw) {
+    try { pending = JSON.parse(pendingRaw); } catch(e) {}
+    PropertiesService.getScriptProperties().deleteProperty('PENDING_CONEXION_FILA');
+  }
+
+  var hoja, nombreHoja, filaActiva;
+  if (pending && pending.fila && pending.hoja) {
+    hoja       = ss.getSheetByName(pending.hoja) || ss.getActiveSheet();
+    nombreHoja = hoja.getName();
+    filaActiva = pending.fila;
+  } else {
+    hoja       = ss.getActiveSheet();
+    nombreHoja = hoja.getName();
+    filaActiva = hoja.getActiveRange() ? hoja.getActiveRange().getRow() : 0;
+  }
 
   // Hojas válidas para enviar a Conexiones Laborales
   const hojasValidas = [
@@ -3295,7 +3319,6 @@ function enviarAConexionesLaborales() {
     return;
   }
 
-  const filaActiva = hoja.getActiveRange().getRow();
   if (filaActiva <= 1) {
     ui.alert('⚠️ Selección inválida',
              'Selecciona la fila de un participante (no la fila de encabezados).',
