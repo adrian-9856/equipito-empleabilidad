@@ -199,7 +199,7 @@ function onEdit(e) {
     // ── Hoja Graduados: columna Etapa (col 15) ─────────────────────────────
     if (nombreHoja === 'Graduados' && col === 15) {
       const nuevaEtapa = e.value;
-      if (!nuevaEtapa || nuevaEtapa === 'Conexiones Laborales' || nuevaEtapa === 'Paso a paso - Cierre') return;
+      if (!nuevaEtapa || nuevaEtapa === 'Conexiones Laborales' || nuevaEtapa === 'En empleo' || nuevaEtapa === 'Paso a paso - Cierre') return;
 
       const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
       const nombre    = datosGrad[3];
@@ -631,7 +631,8 @@ const ETAPAS_FLUJO = [
   'Activamente busca trabajo',
   'Paso a paso',
   'Paso a paso - Cierre',
-  'Conexiones Laborales'
+  'Conexiones Laborales',
+  'En empleo'
 ];
 
 // Niveles educativos — opciones del dropdown "Nivel educativo" en Graduados
@@ -663,6 +664,7 @@ const COLORES_DROPDOWN = {
   'Paso a paso':                 { bg: '#fb8c00', fg: '#ffffff' },
   'Paso a paso - Cierre':        { bg: '#e53935', fg: '#ffffff' },
   'Conexiones Laborales':        { bg: '#43a047', fg: '#ffffff' },
+  'En empleo':                   { bg: '#2e7d32', fg: '#ffffff' },
   // Empleado (siNo)
   'Si':                          { bg: '#66bb6a', fg: '#ffffff' },
   'No':                          { bg: '#ef5350', fg: '#ffffff' },
@@ -3674,8 +3676,10 @@ function guardarConexionLaboral(datos) {
         var hOrigen = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(hojaOrigen);
         if (hOrigen) {
           // Col 15 = Etapa en Graduados; en Sesiones Acompañamiento la acción es col 16
+          // Escribir "En empleo" (no "Conexiones Laborales") para que el dropdown
+          // siga disponible como trigger al registrar futuros empleos del mismo graduado.
           var colEtapa = (hojaOrigen === 'Graduados') ? 15 : 16;
-          hOrigen.getRange(filaNum, colEtapa).setValue('Conexiones Laborales');
+          hOrigen.getRange(filaNum, colEtapa).setValue('En empleo');
         }
       }
     } catch (eEtapa) {
@@ -3700,40 +3704,39 @@ function guardarConexionLaboral(datos) {
 // ---------------------------------------------------------------------------
 
 /**
- * Compara la hoja "Conexiones Laborales" con "Graduados" y escribe
- * "Conexiones Laborales" en la columna Etapa de toda fila de Graduados
- * cuyo Creamos ID aparece en Conexiones Laborales pero tiene Etapa vacía.
- * Útil para reparar filas enviadas antes de la corrección del bug.
+ * Compara la hoja "Conexiones Laborales" con "Graduados" y:
+ * - Escribe "En empleo" en filas con Etapa vacía (nunca se actualizó).
+ * - Corrige filas que quedaron con "Conexiones Laborales" (valor que bloquea
+ *   el dropdown-trigger), cambiándolas a "En empleo".
  */
 function repararEtapasConexionesLaborales() {
   var ss  = SpreadsheetApp.getActiveSpreadsheet();
   var ui  = SpreadsheetApp.getUi();
 
-  var hCon = ss.getSheetByName('Conexiones Laborales');
+  var hCon  = ss.getSheetByName('Conexiones Laborales');
   var hGrad = ss.getSheetByName('Graduados');
   if (!hCon || !hGrad) { ui.alert('No se encontraron las hojas necesarias.'); return; }
 
-  // Construir set de Creamos IDs presentes en Conexiones Laborales (col A)
   var conLastRow = hCon.getLastRow();
   if (conLastRow < 2) { ui.alert('La hoja Conexiones Laborales está vacía.'); return; }
-  var conIds = hCon.getRange(2, 1, conLastRow - 1, 1).getValues();
   var idSet = {};
-  conIds.forEach(function(r) {
+  hCon.getRange(2, 1, conLastRow - 1, 1).getValues().forEach(function(r) {
     var id = (r[0] || '').toString().trim();
     if (id) idSet[id] = true;
   });
 
-  // Recorrer Graduados: col C (idx 2) = Creamos ID, col O (col 15) = Etapa
   var gradLastRow = hGrad.getLastRow();
   if (gradLastRow < 2) { ui.alert('La hoja Graduados está vacía.'); return; }
   var gradData = hGrad.getRange(2, 1, gradLastRow - 1, 15).getValues();
 
   var reparadas = 0;
   for (var i = 0; i < gradData.length; i++) {
-    var cid   = (gradData[i][2] || '').toString().trim(); // col C
-    var etapa = (gradData[i][14] || '').toString().trim(); // col O
-    if (cid && idSet[cid] && !etapa) {
-      hGrad.getRange(i + 2, 15).setValue('Conexiones Laborales');
+    var cid   = (gradData[i][2]  || '').toString().trim(); // col C = Creamos ID
+    var etapa = (gradData[i][14] || '').toString().trim(); // col O = Etapa
+    // Filas con conexión registrada pero Etapa vacía O con "Conexiones Laborales"
+    // (valor que bloquea el dropdown)
+    if (cid && idSet[cid] && (etapa === '' || etapa === 'Conexiones Laborales')) {
+      hGrad.getRange(i + 2, 15).setValue('En empleo');
       reparadas++;
     }
   }
@@ -3741,8 +3744,8 @@ function repararEtapasConexionesLaborales() {
   ui.alert(
     'Reparación completada',
     reparadas > 0
-      ? reparadas + ' fila(s) actualizadas a "Conexiones Laborales".'
-      : 'No se encontraron filas con Etapa vacía para reparar.\n(Puede que ya estén correctas o que el Creamos ID no coincida.)',
+      ? reparadas + ' fila(s) actualizadas a "En empleo".\n\nAhora el dropdown "Conexiones Laborales" vuelve a funcionar para registrar nuevos empleos.'
+      : 'No se encontraron filas para reparar.',
     ui.ButtonSet.OK
   );
 }
