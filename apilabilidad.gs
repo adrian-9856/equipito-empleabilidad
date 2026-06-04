@@ -3866,7 +3866,6 @@ function crearFilaSeguimientoBot(datos, fechaEmpleo) {
              d.getFullYear();
     }
 
-    // Prefijo + para WhatsApp; apostrofe inicial fuerza texto en Sheets
     var telefono = (datos.telefono || '').toString().trim();
     if (telefono && !telefono.startsWith('+')) telefono = '+' + telefono;
 
@@ -6435,10 +6434,10 @@ function generarExportPowerBI() {
     var lastColBot = Math.min(hBot.getLastColumn(), 20);
     var datosBot = hBot.getRange(2, 1, hBot.getLastRow() - 1, lastColBot).getValues();
     datosBot.forEach(function(r) {
-      if (!r[0] && !r[1]) return;
+      if (!_v_(r[0]) && !_v_(r[1])) return;
       filas.push(_filaPowerBI(ahora, 'Seguimiento Bot', {
         creamosId: r[0], nombre: r[1],
-        telefono: _v_(r[2]),   // sanear: puede contener #ERROR! si el número es inválido
+        telefono:  r[2],
         etapa: 'Seguimiento Bot',
         empresa: r[3], cargo: r[4],
         tipoSeguimiento: r[18] !== undefined ? r[18] : '',
@@ -6450,6 +6449,26 @@ function generarExportPowerBI() {
   // Escribir todas las filas de una vez (más eficiente que appendRow)
   if (filas.length > 0) {
     hojaExport.getRange(2, 1, filas.length, HEADERS_POWERBI.length).setValues(filas);
+  }
+
+  // ── Limpiar errores residuales ─────────────────────────────────────────────
+  // getValues() en GAS V8 puede devolver error-objects que setValues() propaga.
+  // Leemos de vuelta y reemplazamos cualquier celda que siga con error.
+  if (filas.length > 0) {
+    SpreadsheetApp.flush(); // asegurar que setValues ya escribió
+    var rango = hojaExport.getRange(2, 1, filas.length, HEADERS_POWERBI.length);
+    var vals  = rango.getValues();
+    var cambiado = false;
+    for (var ri = 0; ri < vals.length; ri++) {
+      for (var ci = 0; ci < vals[ri].length; ci++) {
+        var cel = vals[ri][ci];
+        var esError = (cel instanceof Error) ||
+                      (typeof cel === 'object' && cel !== null && String(cel).charAt(0) === '#') ||
+                      (typeof cel === 'string' && /^#[A-Z\/!?]{2,}/.test(cel));
+        if (esError) { vals[ri][ci] = ''; cambiado = true; }
+      }
+    }
+    if (cambiado) rango.setValues(vals);
   }
 
   // Formato final
@@ -6472,13 +6491,10 @@ function generarExportPowerBI() {
  */
 function _v_(val) {
   if (val === null || val === undefined) return '';
-  // GAS devuelve objetos de error cuando la celda contiene #ERROR!, #VALUE!, etc.
-  // Su toString() empieza con '#' o son instancias de Error.
-  if (typeof val === 'object') {
-    if (val instanceof Error) return '';
-    var s = val.toString();
-    if (s.charAt(0) === '#') return '';
-  }
+  // GAS puede devolver errores como objetos (instanceof Error) o como strings "#ERROR!" etc.
+  if (val instanceof Error) return '';
+  var s = String(val);
+  if (s.charAt(0) === '#') return '';   // #ERROR!, #VALUE!, #REF!, #NAME?, etc.
   return val;
 }
 
