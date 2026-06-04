@@ -20,6 +20,24 @@
  * Crea el menú personalizado en la interfaz
  */
 function onOpen(e) {
+  // Verificar y auto-instalar el trigger instalable de onEdit si no existe.
+  // onOpen instalable tiene permisos para crear triggers; el simple no.
+  try {
+    var tieneEditTrigger = ScriptApp.getProjectTriggers().some(function(t) {
+      return t.getHandlerFunction() === 'onEditInstalable';
+    });
+    if (!tieneEditTrigger) {
+      ScriptApp.newTrigger('onEditInstalable')
+        .forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())
+        .onEdit()
+        .create();
+      Logger.log('onOpen: trigger onEditInstalable auto-instalado.');
+    }
+  } catch (eTrigger) {
+    // Si falla (p. ej. onOpen simple sin permisos), se ignora silenciosamente.
+    Logger.log('onOpen: no se pudo auto-instalar trigger — ' + eTrigger.message);
+  }
+
   try {
     const ui = SpreadsheetApp.getUi();
 
@@ -199,7 +217,18 @@ function onEdit(e) {
     // ── Hoja Graduados: columna Etapa (col 15) ─────────────────────────────
     if (nombreHoja === 'Graduados' && col === 15) {
       const nuevaEtapa = e.value;
-      if (!nuevaEtapa || nuevaEtapa === 'Conexiones Laborales' || nuevaEtapa === 'En empleo' || nuevaEtapa === 'Paso a paso - Cierre') return;
+
+      // Conexiones Laborales y Paso a paso - Cierre requieren el trigger INSTALABLE.
+      // Si el formulario no aparece en 2-3 segundos, ejecutar:
+      //   Configuración → ⚙️ Instalar triggers
+      if (nuevaEtapa === 'Conexiones Laborales' || nuevaEtapa === 'Paso a paso - Cierre') {
+        SpreadsheetApp.getActiveSpreadsheet().toast(
+          'Si el formulario no aparece, ve a: Configuración → ⚙️ Instalar triggers',
+          'Abriendo formulario...', 4
+        );
+        return;
+      }
+      if (!nuevaEtapa || nuevaEtapa === 'En empleo') return;
 
       const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
       const nombre    = datosGrad[3];
@@ -379,14 +408,24 @@ function onEditInstalable(e) {
  */
 function configurarEditTrigger() {
   // Eliminar triggers anteriores de onEditInstalable
+  var eliminados = 0;
   ScriptApp.getProjectTriggers().forEach(function(t) {
-    if (t.getHandlerFunction() === 'onEditInstalable') ScriptApp.deleteTrigger(t);
+    if (t.getHandlerFunction() === 'onEditInstalable') {
+      ScriptApp.deleteTrigger(t);
+      eliminados++;
+    }
   });
   ScriptApp.newTrigger('onEditInstalable')
     .forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())
     .onEdit()
     .create();
-  Logger.log('Trigger instalable de onEditInstalable configurado');
+  Logger.log('Trigger instalable de onEditInstalable configurado (eliminados: ' + eliminados + ')');
+  SpreadsheetApp.getUi().alert(
+    'Trigger instalado',
+    'El trigger de Conexiones Laborales fue instalado correctamente.\n\n' +
+    'Ahora al seleccionar "Conexiones Laborales" del dropdown el formulario se abrirá automáticamente.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
 }
 
 /**
