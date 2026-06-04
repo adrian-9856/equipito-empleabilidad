@@ -215,7 +215,7 @@ function onEdit(e) {
     if (fila <= 1) return;
 
     // ── Hoja Graduados: columna Etapa (col 15) ─────────────────────────────
-    if (nombreHoja === 'Graduados' && col === 15) {
+    if (nombreHoja === 'Graduados' && col === 16) {
       const nuevaEtapa = e.value;
 
       if (!nuevaEtapa || nuevaEtapa === 'En empleo' || nuevaEtapa === 'Conexiones Laborales' || nuevaEtapa === 'Paso a paso - Cierre') return;
@@ -306,7 +306,7 @@ function onEditInstalable(e) {
     if (fila <= 1) return;
 
     // ── Graduados: Etapa = "Paso a paso - Cierre" ────────────────────────
-    if (nombreHoja === 'Graduados' && col === 15 && e.value === 'Paso a paso - Cierre') {
+    if (nombreHoja === 'Graduados' && col === 16 && e.value === 'Paso a paso - Cierre') {
       const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
       const nombre    = datosGrad[3] || '';
 
@@ -337,11 +337,10 @@ function onEditInstalable(e) {
     }
 
     // ── Graduados: Etapa = "Conexiones Laborales" ─────────────────────────
-    if (nombreHoja === 'Graduados' && col === 15) {
+    if (nombreHoja === 'Graduados' && col === 16) {
       if (e.value !== 'Conexiones Laborales') return;
 
-      // Diagnóstico: si aparece este toast, el trigger SÍ está corriendo.
-      SpreadsheetApp.getActiveSpreadsheet().toast('Trigger activo, abriendo formulario...', 'Conexiones Laborales', 5);
+      SpreadsheetApp.getActiveSpreadsheet().toast('Abriendo formulario...', 'Conexiones Laborales', 5);
 
       const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
       const creamosId = (datosGrad[2] || '').toString().trim();
@@ -3061,7 +3060,7 @@ function clasificarGraduado(graduadoId, clasificacion, datosAdicionales = {}) {
       hojaGraduados.getRange(i + 1, 12).setValue(
         clasificacion === 'Activamente busca trabajo' ? 'Sí' : 'No'
       );
-      hojaGraduados.getRange(i + 1, 15).setValue(clasificacion);             // Etapa
+      hojaGraduados.getRange(i + 1, 16).setValue(clasificacion);             // Etapa
       copiarAHojaClasificacion(datos[i], clasificacion, datosAdicionales);
       registrarMovimientoEtapa(datos[i][2], datos[i][3], clasificacion, datosAdicionales.nota || '');
       if (clasificacion === 'Activamente busca trabajo') {
@@ -3771,7 +3770,7 @@ function guardarConexionLaboral(datos) {
           // Col 15 = Etapa en Graduados; en Sesiones Acompañamiento la acción es col 16
           // Escribir "En empleo" (no "Conexiones Laborales") para que el dropdown
           // siga disponible como trigger al registrar futuros empleos del mismo graduado.
-          var colEtapa = (hojaOrigen === 'Graduados') ? 15 : 16;
+          var colEtapa = 16;
           hOrigen.getRange(filaNum, colEtapa).setValue('En empleo');
         }
       }
@@ -3820,16 +3819,16 @@ function repararEtapasConexionesLaborales() {
 
   var gradLastRow = hGrad.getLastRow();
   if (gradLastRow < 2) { ui.alert('La hoja Graduados está vacía.'); return; }
-  var gradData = hGrad.getRange(2, 1, gradLastRow - 1, 15).getValues();
+  var gradData = hGrad.getRange(2, 1, gradLastRow - 1, 16).getValues();
 
   var reparadas = 0;
   for (var i = 0; i < gradData.length; i++) {
     var cid   = (gradData[i][2]  || '').toString().trim(); // col C = Creamos ID
-    var etapa = (gradData[i][14] || '').toString().trim(); // col O = Etapa
+    var etapa = (gradData[i][15] || '').toString().trim(); // col P = Etapa
     // Filas con conexión registrada pero Etapa vacía O con "Conexiones Laborales"
     // (valor que bloquea el dropdown)
     if (cid && idSet[cid] && (etapa === '' || etapa === 'Conexiones Laborales')) {
-      hGrad.getRange(i + 2, 15).setValue('En empleo');
+      hGrad.getRange(i + 2, 16).setValue('En empleo');
       reparadas++;
     }
   }
