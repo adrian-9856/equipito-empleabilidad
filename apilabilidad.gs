@@ -420,12 +420,16 @@ function configurarEditTrigger() {
     .onEdit()
     .create();
   Logger.log('Trigger instalable de onEditInstalable configurado (eliminados: ' + eliminados + ')');
-  SpreadsheetApp.getUi().alert(
-    'Trigger instalado',
-    'El trigger de Conexiones Laborales fue instalado correctamente.\n\n' +
-    'Ahora al seleccionar "Conexiones Laborales" del dropdown el formulario se abrirá automáticamente.',
-    SpreadsheetApp.getUi().ButtonSet.OK
-  );
+  try {
+    SpreadsheetApp.getUi().alert(
+      'Trigger instalado',
+      'El trigger de Conexiones Laborales fue instalado correctamente.\n\n' +
+      'Ahora al seleccionar "Conexiones Laborales" del dropdown el formulario se abrirá automáticamente.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  } catch(eUi) {
+    Logger.log('Trigger instalado correctamente (UI no disponible en este contexto).');
+  }
 }
 
 /**
