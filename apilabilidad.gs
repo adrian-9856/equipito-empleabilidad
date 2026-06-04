@@ -218,22 +218,7 @@ function onEdit(e) {
     if (nombreHoja === 'Graduados' && col === 15) {
       const nuevaEtapa = e.value;
 
-      if (!nuevaEtapa || nuevaEtapa === 'En empleo') return;
-
-      // "Conexiones Laborales": limpiar celda y guiar al usuario al menú.
-      // Los diálogos solo abren desde menú o trigger instalable; el menú siempre funciona.
-      if (nuevaEtapa === 'Conexiones Laborales') {
-        e.range.setValue('');          // dejar celda lista para nueva selección
-        // Guardar fila para que enviarAConexionesLaborales() la use aunque el cursor se mueva
-        PropertiesService.getScriptProperties().setProperty(
-          'PENDING_CONEXION_FILA', JSON.stringify({ fila: fila, hoja: nombreHoja })
-        );
-        SpreadsheetApp.getActiveSpreadsheet().toast(
-          'Haz clic en el menú:  Configuración → 💼 Enviar a Conexiones Laborales',
-          'Conexiones Laborales — fila ' + fila, 10
-        );
-        return;
-      }
+      if (!nuevaEtapa || nuevaEtapa === 'En empleo' || nuevaEtapa === 'Conexiones Laborales' || nuevaEtapa === 'Paso a paso - Cierre') return;
 
       const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
       const nombre    = datosGrad[3];
@@ -347,8 +332,8 @@ function onEditInstalable(e) {
       if (e.value !== 'Conexiones Laborales') return;
 
       const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
-      const creamosId = datosGrad[2] || '';
-      const nombre    = datosGrad[3] || '';
+      const creamosId = (datosGrad[2] || '').toString().trim();
+      const nombre    = (datosGrad[3] || '').toString().trim();
 
       e.range.setValue('');
 
@@ -358,16 +343,23 @@ function onEditInstalable(e) {
       }
 
       const datosExtra = {
-        genero:         datosGrad[4] || '',
-        edad:           datosGrad[5] || '',
-        nivelEducativo: datosGrad[6] || '',
-        telefono:       datosGrad[7] || ''
+        genero:         (datosGrad[4] || '').toString(),
+        edad:           (datosGrad[5] || '').toString(),
+        nivelEducativo: (datosGrad[6] || '').toString(),
+        telefono:       (datosGrad[7] || '').toString()
       };
 
-      const html = HtmlService.createHtmlOutput(
-        _generarHTMLFormConexionLaboral(fila, creamosId, nombre, 'Graduados', datosExtra)
-      ).setWidth(560).setHeight(720).setTitle('Conexión Laboral');
-      SpreadsheetApp.getUi().showModalDialog(html, '💼 Conexión Laboral — ' + nombre);
+      try {
+        const htmlContent = _generarHTMLFormConexionLaboral(fila, creamosId, nombre, 'Graduados', datosExtra);
+        const html = HtmlService.createHtmlOutput(htmlContent).setWidth(560).setHeight(720);
+        SpreadsheetApp.getUi().showModalDialog(html, 'Conexion Laboral — ' + nombre);
+      } catch (eHtml) {
+        SpreadsheetApp.getActiveSpreadsheet().toast(
+          'Error al abrir formulario: ' + eHtml.message + '. Usa el menu: Configuracion > Enviar a Conexiones Laborales',
+          'Error', 15
+        );
+        Logger.log('onEditInstalable HTML error: ' + eHtml.stack);
+      }
       return;
     }
 
@@ -3437,6 +3429,16 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
   var edad           = datosExtra.edad           || '';
   var nivelEducativo = datosExtra.nivelEducativo || '';
 
+  // JSON.stringify escapa comillas, barras y caracteres especiales para que
+  // los valores queden seguros dentro de strings JavaScript en el HTML.
+  var jNombre        = JSON.stringify(nombre);
+  var jCreamosId     = JSON.stringify(creamosId);
+  var jHojaOrigen    = JSON.stringify(hojaOrigen);
+  var jTelefono      = JSON.stringify(telefono);
+  var jGenero        = JSON.stringify(genero);
+  var jEdad          = JSON.stringify(edad);
+  var jNivelEdu      = JSON.stringify(nivelEducativo);
+
   // Fecha de hoy en formato yyyy-mm-dd para el input date
   var hoy = new Date();
   var hoyStr = hoy.getFullYear() + '-' +
@@ -3628,13 +3630,13 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
 
         var datos = {
           filaGraduado:   ${filaGraduado},
-          hojaOrigen:     '${hojaOrigen}',
-          creamosId:      '${creamosId}',
-          nombreCompleto: '${nombre}',
-          telefono:       '${telefono}',
-          genero:         '${genero}',
-          edad:           '${edad}',
-          nivelEducativo: '${nivelEducativo}',
+          hojaOrigen:     ${jHojaOrigen},
+          creamosId:      ${jCreamosId},
+          nombreCompleto: ${jNombre},
+          telefono:       ${jTelefono},
+          genero:         ${jGenero},
+          edad:           ${jEdad},
+          nivelEducativo: ${jNivelEdu},
           tipo:           document.getElementById('tipo').value.trim(),
           programa:       document.getElementById('programa').value.trim(),
           proyecto:       document.getElementById('proyecto').value.trim(),
