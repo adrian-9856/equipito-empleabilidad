@@ -3866,10 +3866,9 @@ function crearFilaSeguimientoBot(datos, fechaEmpleo) {
              d.getFullYear();
     }
 
+    // Prefijo + para WhatsApp; apostrofe inicial fuerza texto en Sheets
     var telefono = (datos.telefono || '').toString().trim();
-    if (telefono && !telefono.startsWith('+')) {
-      telefono = '+' + telefono;
-    }
+    if (telefono && !telefono.startsWith('+')) telefono = '+' + telefono;
 
     const fila = [
       datos.creamosId      || '',   // 1  Creamos ID
@@ -6438,7 +6437,8 @@ function generarExportPowerBI() {
     datosBot.forEach(function(r) {
       if (!r[0] && !r[1]) return;
       filas.push(_filaPowerBI(ahora, 'Seguimiento Bot', {
-        creamosId: r[0], nombre: r[1], telefono: r[2],
+        creamosId: r[0], nombre: r[1],
+        telefono: _v_(r[2]),   // sanear: puede contener #ERROR! si el número es inválido
         etapa: 'Seguimiento Bot',
         empresa: r[3], cargo: r[4],
         tipoSeguimiento: r[18] !== undefined ? r[18] : '',
@@ -6466,6 +6466,23 @@ function generarExportPowerBI() {
 }
 
 /**
+ * Convierte cualquier valor de celda a string seguro para setValues().
+ * Los error-objects de Google Sheets (#ERROR!, #VALUE!, #REF!, etc.)
+ * se convierten a '' para que no propaguen el error al destino.
+ */
+function _v_(val) {
+  if (val === null || val === undefined) return '';
+  // GAS devuelve objetos de error cuando la celda contiene #ERROR!, #VALUE!, etc.
+  // Su toString() empieza con '#' o son instancias de Error.
+  if (typeof val === 'object') {
+    if (val instanceof Error) return '';
+    var s = val.toString();
+    if (s.charAt(0) === '#') return '';
+  }
+  return val;
+}
+
+/**
  * Construye una fila de la hoja Power BI Export con los campos en orden.
  * Cualquier campo no provisto queda como cadena vacía.
  */
@@ -6473,29 +6490,29 @@ function _filaPowerBI(ahora, fuente, d) {
   return [
     ahora,
     fuente,
-    d.creamosId            || '',
-    d.nombre               || '',
-    d.genero               || '',
-    d.edad                 || '',
-    d.nivelEdu             || '',
-    d.telefono             || '',
-    d.formacion            || '',
-    d.cohorte              || '',
-    d.fechaIngreso         || '',
-    d.empleado             || '',
-    d.etapa                || '',
-    d.activo               || '',
-    d.nota                 || '',
-    d.empresa              || '',
-    d.cargo                || '',
-    d.tipoContrato         || '',
-    d.fechaInicioEmpleo    || '',
-    d.salario              || '',
-    d.tipoSeguimiento      || '',
-    d.estadoSeguimiento    || '',
-    d.tipoServicioSesion   || '',
-    d.satisfaccionEmpleo   || '',
-    d.promedioSat          || ''
+    _v_(d.creamosId)         || '',
+    _v_(d.nombre)            || '',
+    _v_(d.genero)            || '',
+    _v_(d.edad)              || '',
+    _v_(d.nivelEdu)          || '',
+    _v_(d.telefono)          || '',
+    _v_(d.formacion)         || '',
+    _v_(d.cohorte)           || '',
+    _v_(d.fechaIngreso)      || '',
+    _v_(d.empleado)          || '',
+    _v_(d.etapa)             || '',
+    _v_(d.activo)            || '',
+    _v_(d.nota)              || '',
+    _v_(d.empresa)           || '',
+    _v_(d.cargo)             || '',
+    _v_(d.tipoContrato)      || '',
+    _v_(d.fechaInicioEmpleo) || '',
+    _v_(d.salario)           || '',
+    _v_(d.tipoSeguimiento)   || '',
+    _v_(d.estadoSeguimiento) || '',
+    _v_(d.tipoServicioSesion)|| '',
+    _v_(d.satisfaccionEmpleo)|| '',
+    _v_(d.promedioSat)       || ''
   ];
 }
 
