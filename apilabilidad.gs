@@ -294,6 +294,15 @@ function onEditInstalable(e) {
     const nombreHoja = hoja.getName();
     const col        = e.range.getColumn();
     const fila       = e.range.getRow();
+
+    // ── DIAGNÓSTICO: registrar CADA disparo del trigger ──────────────────
+    var _diagMsg = 'hoja=' + nombreHoja + ' col=' + col + ' fila=' + fila +
+                   ' valor=' + JSON.stringify(e.value || '') +
+                   ' @' + new Date().toISOString();
+    PropertiesService.getScriptProperties().setProperty('DIAG_LAST_EDIT', _diagMsg);
+    Logger.log('onEditInstalable disparado: ' + _diagMsg);
+    // ─────────────────────────────────────────────────────────────────────
+
     if (fila <= 1) return;
 
     // ── Graduados: Etapa = "Paso a paso - Cierre" ────────────────────────
@@ -400,6 +409,19 @@ function onEditInstalable(e) {
   } catch (error) {
     Logger.log('onEditInstalable: ' + error);
   }
+}
+
+/**
+ * Diagnóstico: muestra el último evento recibido por onEditInstalable.
+ * Ejecutar desde el editor DESPUÉS de probar el dropdown.
+ */
+function verDiagnosticoTrigger() {
+  var info = PropertiesService.getScriptProperties().getProperty('DIAG_LAST_EDIT');
+  var msg = info ? info : '(El trigger NUNCA ha disparado)';
+  Logger.log('DIAG_LAST_EDIT: ' + msg);
+  try {
+    SpreadsheetApp.getUi().alert('Diagnóstico onEditInstalable', msg, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch(eUi) {}
 }
 
 /**
