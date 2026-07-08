@@ -84,6 +84,10 @@ function onOpen(e) {
       .addItem('💼 Enviar a Conexiones Laborales',           'enviarAConexionesLaborales')
       .addItem('🔧 Reparar Etapas Conexiones Laborales',     'repararEtapasConexionesLaborales')
       .addSeparator()
+      .addItem('🎨 Refrescar colores (todas las hojas)',     'refrescarColoresTodasLasHojas')
+      .addItem('🔁 Normalizar Activo Sí/No',                 'normalizarActivoSiNo')
+      .addItem('🔒 Cerrar etapas de personas ya avanzadas',  'cerrarEtapasHistoricas')
+      .addSeparator()
       .addItem('📧 Configurar correos Conexiones Laborales', 'configurarEmailsConexionesLaborales');
 
     const submenuVerificacion = ui.createMenu('🔍 Verificación de IDs')
@@ -4033,6 +4037,133 @@ function repararEtapasConexionesLaborales() {
     reparadas > 0
       ? reparadas + ' fila(s) actualizadas a "En empleo".\n\nAhora el dropdown "Conexiones Laborales" vuelve a funcionar para registrar nuevos empleos.'
       : 'No se encontraron filas para reparar.',
+    ui.ButtonSet.OK
+  );
+}
+
+/**
+ * Refresca el formato condicional de colores (dropdowns + fila por Etapa en
+ * Graduados) en TODAS las hojas de proceso, sin borrar ni tocar datos.
+ * Útil para aplicar de una vez cambios de color (como quitar el de Género)
+ * a hojas que ya tienen información cargada.
+ */
+function refrescarColoresTodasLasHojas() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  var actualizadas = [];
+
+  Object.keys(ESTRUCTURA_HOJAS).forEach(function(nombreHoja) {
+    var hoja = ss.getSheetByName(nombreHoja);
+    if (!hoja) return;
+    _aplicarColoresDropdowns(hoja, ESTRUCTURA_HOJAS[nombreHoja].columnas);
+    actualizadas.push(nombreHoja);
+  });
+
+  var hGrad = ss.getSheetByName('Graduados');
+  if (hGrad) {
+    var colEtapa = _colPorEncabezado(hGrad, 'Etapa');
+    if (colEtapa > 0) _colorearFilasPorEtapa(hGrad, hGrad.getLastColumn(), colEtapa);
+  }
+
+  ui.alert(
+    '✅ Colores actualizados',
+    'Se refrescaron los colores en: ' + (actualizadas.join(', ') || '(ninguna hoja encontrada)'),
+    ui.ButtonSet.OK
+  );
+}
+
+/**
+ * Corrige celdas históricas de "Activo" (en Aliados, Plataforma, Derivaciones,
+ * Paso a paso, Activamente busca trabajo) y "Empleado" (en Graduados) que
+ * quedaron escritas como "Sí" (con tilde) en vez de "Si", para que coincidan
+ * con la validación y los colores del dropdown.
+ */
+function normalizarActivoSiNo() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  var hojasActivo = ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'];
+  var totalCambios = 0;
+
+  function normalizarColumna(hoja, colNum) {
+    var lastRow = hoja.getLastRow();
+    if (lastRow < 2 || colNum < 1) return;
+    var rango = hoja.getRange(2, colNum, lastRow - 1, 1);
+    var valores = rango.getValues();
+    var cambios = false;
+    for (var i = 0; i < valores.length; i++) {
+      var v = (valores[i][0] || '').toString().trim();
+      if (v === 'Sí') { valores[i][0] = 'Si'; cambios = true; totalCambios++; }
+    }
+    if (cambios) rango.setValues(valores);
+  }
+
+  hojasActivo.forEach(function(nombreHoja) {
+    var hoja = ss.getSheetByName(nombreHoja);
+    if (!hoja) return;
+    normalizarColumna(hoja, _colPorEncabezado(hoja, 'Activo'));
+  });
+
+  var hGrad = ss.getSheetByName('Graduados');
+  if (hGrad) normalizarColumna(hGrad, _colPorEncabezado(hGrad, 'Empleado'));
+
+  ui.alert(
+    '✅ Normalización completa',
+    totalCambios + ' celda(s) con "Sí" fueron corregidas a "Si".',
+    ui.ButtonSet.OK
+  );
+}
+
+/**
+ * Para las personas que YA están en "Conexiones Laborales" o "Paso a paso"
+ * (antes de este cambio), cierra (Activo = No) su fila en las demás hojas de
+ * proceso donde tengan registro. No pide notas (para no abrir decenas de
+ * diálogos): si quieres agregar notas a esas hojas, hazlo manualmente.
+ */
+function cerrarEtapasHistoricas() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  var todasLasEtapas = ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'];
+  var personasProcesadas = 0;
+  var cierresTotales = 0;
+
+  function procesarHoja(nombreHoja, hojasACerrar) {
+    var hoja = ss.getSheetByName(nombreHoja);
+    var estructura = ESTRUCTURA_HOJAS[nombreHoja];
+    if (!hoja || !estructura) return;
+    var numCols = estructura.columnas.length;
+    var lastRow = hoja.getLastRow();
+    if (lastRow < 2) return;
+    var datos = hoja.getRange(2, 1, lastRow - 1, numCols).getValues();
+    datos.forEach(function(fila) {
+      var creamosId = (fila[1] || '').toString().trim();
+      var nombreCompleto = (fila[2] || '').toString().trim();
+      if (!creamosId && !nombreCompleto) return;
+      personasProcesadas++;
+      var cerradas = _cerrarEtapasDePersona(creamosId, nombreCompleto, hojasACerrar, false);
+      cierresTotales += cerradas.length;
+    });
+  }
+
+  // Conexiones Laborales: Creamos ID = col 1, Nombre = col 2 (estructura propia, no COLUMNAS_COMUNES)
+  var hCon = ss.getSheetByName('Conexiones Laborales');
+  if (hCon && hCon.getLastRow() >= 2) {
+    var datosCon = hCon.getRange(2, 1, hCon.getLastRow() - 1, 2).getValues();
+    datosCon.forEach(function(fila) {
+      var creamosId = (fila[0] || '').toString().trim();
+      var nombreCompleto = (fila[1] || '').toString().trim();
+      if (!creamosId && !nombreCompleto) return;
+      personasProcesadas++;
+      var cerradas = _cerrarEtapasDePersona(creamosId, nombreCompleto, todasLasEtapas, false);
+      cierresTotales += cerradas.length;
+    });
+  }
+
+  // Paso a paso: cierra sus posibles filas en las OTRAS etapas (no en sí misma)
+  procesarHoja('Paso a paso', ['Aliados', 'Plataforma', 'Derivaciones', 'Activamente busca trabajo']);
+
+  ui.alert(
+    '✅ Cierre histórico completado',
+    'Se revisaron ' + personasProcesadas + ' fila(s) y se cerraron ' + cierresTotales + ' etapa(s) anteriores (Activo = No).',
     ui.ButtonSet.OK
   );
 }
