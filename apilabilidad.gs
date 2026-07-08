@@ -126,9 +126,14 @@ function implementarCambiosNuevos() {
     ss.toast('Paso 1/3 — Aplicando colores de fila en Graduados...', '🚀 Implementando', -1);
     var hGrad = ss.getSheetByName('Graduados');
     if (hGrad) {
-      var numCols = ESTRUCTURA_HOJAS['Graduados'].columnas.length;
-      _colorearFilasPorEtapa(hGrad, numCols, 15);
-      pasos.push('✅ Colores de fila aplicados en Graduados.');
+      var numCols  = hGrad.getLastColumn();
+      var colEtapa = _colPorEncabezado(hGrad, 'Etapa');
+      if (colEtapa > 0) {
+        _colorearFilasPorEtapa(hGrad, numCols, colEtapa);
+        pasos.push('✅ Colores de fila aplicados en Graduados.');
+      } else {
+        pasos.push('⚠️ No se encontró la columna "Etapa" en Graduados — colores omitidos.');
+      }
     } else {
       pasos.push('⚠️ Hoja "Graduados" no encontrada — colores omitidos.');
     }
@@ -214,11 +219,15 @@ function onEdit(e) {
     const fila       = e.range.getRow();
     if (fila <= 1) return;
 
-    // ── Hoja Graduados: columna Etapa (col 15) ─────────────────────────────
-    if (nombreHoja === 'Graduados' && col === 16) {
+    // ── Hoja Graduados: columna Etapa ───────────────────────────────────────
+    if (nombreHoja === 'Graduados' && col === _colPorEncabezado(hoja, 'Etapa')) {
       const nuevaEtapa = e.value;
 
-      if (!nuevaEtapa || nuevaEtapa === 'En empleo' || nuevaEtapa === 'Conexiones Laborales' || nuevaEtapa === 'Paso a paso - Cierre') return;
+      // "Conexiones Laborales" y "Paso a paso - Cierre" necesitan abrir diálogos
+      // (formulario / prompt), y "Paso a paso" necesita verificar notas y cerrar
+      // etapas anteriores — todo eso solo lo puede hacer el trigger instalable.
+      if (!nuevaEtapa || nuevaEtapa === 'En empleo' || nuevaEtapa === 'Conexiones Laborales' ||
+          nuevaEtapa === 'Paso a paso - Cierre' || nuevaEtapa === 'Paso a paso') return;
 
       const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
       const nombre    = datosGrad[3];
@@ -305,8 +314,47 @@ function onEditInstalable(e) {
 
     if (fila <= 1) return;
 
+    var colEtapaGrad = (nombreHoja === 'Graduados') ? _colPorEncabezado(hoja, 'Etapa') : -1;
+
+    // ── Graduados: Etapa = "Paso a paso" ─────────────────────────────────
+    // Antes de mover a la persona: revisa Aliados/Plataforma/Derivaciones/
+    // Activamente busca trabajo por una fila suya; si le falta la Nota la
+    // pide, y cierra (Activo = No) esa etapa. Evita duplicar en "Paso a paso".
+    if (nombreHoja === 'Graduados' && col === colEtapaGrad && e.value === 'Paso a paso') {
+      const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
+      const creamosId = (datosGrad[2] || '').toString().trim();
+      const nombre    = (datosGrad[3] || '').toString().trim();
+
+      if (!nombre) {
+        SpreadsheetApp.getActiveSpreadsheet().toast('La fila no tiene nombre.', '⚠️ Sin datos', 3);
+        e.range.setValue('');
+        return;
+      }
+
+      if (_existeEnHoja('Paso a paso', creamosId, nombre)) {
+        SpreadsheetApp.getActiveSpreadsheet().toast(
+          nombre + ' ya está en "Paso a paso" — no se duplicó.', '⚠️ Ya existe', 5
+        );
+        e.range.setValue('Paso a paso');
+        return;
+      }
+
+      _cerrarEtapasDePersona(
+        creamosId, nombre,
+        ['Aliados', 'Plataforma', 'Derivaciones', 'Activamente busca trabajo'],
+        true
+      );
+
+      copiarAHojaClasificacion(datosGrad, 'Paso a paso', {});
+      generarReporte();
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        nombre + ' enviado a: Paso a paso', '✅ Clasificado', 3
+      );
+      return;
+    }
+
     // ── Graduados: Etapa = "Paso a paso - Cierre" ────────────────────────
-    if (nombreHoja === 'Graduados' && col === 16 && e.value === 'Paso a paso - Cierre') {
+    if (nombreHoja === 'Graduados' && col === colEtapaGrad && e.value === 'Paso a paso - Cierre') {
       const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
       const nombre    = datosGrad[3] || '';
 
@@ -337,7 +385,7 @@ function onEditInstalable(e) {
     }
 
     // ── Graduados: Etapa = "Conexiones Laborales" ─────────────────────────
-    if (nombreHoja === 'Graduados' && col === 16) {
+    if (nombreHoja === 'Graduados' && col === colEtapaGrad) {
       if (e.value !== 'Conexiones Laborales') return;
 
       SpreadsheetApp.getActiveSpreadsheet().toast('Abriendo formulario...', 'Conexiones Laborales', 5);
@@ -732,12 +780,7 @@ const COLORES_DROPDOWN = {
   // Empleado (siNo)
   'Si':                          { bg: '#66bb6a', fg: '#ffffff' },
   'No':                          { bg: '#ef5350', fg: '#ffffff' },
-  // Género
-  'Hombre':                      { bg: '#bbdefb', fg: '#0d47a1' },
-  'Mujer':                       { bg: '#f8bbd0', fg: '#880e4f' },
-  'Trans hombre':                { bg: '#c5cae9', fg: '#1a237e' },
-  'No binario':                  { bg: '#d1c4e9', fg: '#311b92' },
-  'Otro':                        { bg: '#e0e0e0', fg: '#424242' },
+  // Género: sin color (se dejó de pintar a pedido, el dropdown sigue igual)
   // Nivel educativo (gradiente claro de menor a mayor)
   'Sin escolaridad':             { bg: '#eeeeee', fg: '#424242' },
   'Primero primaria':            { bg: '#ffebee', fg: '#b71c1c' },
@@ -1278,7 +1321,8 @@ function _construirHoja(hoja, nombreHoja) {
 
   // -- Coloreado de fila completa por Etapa (solo en Graduados) --------------
   if (nombreHoja === 'Graduados') {
-    _colorearFilasPorEtapa(hoja, columnas.length, 15);
+    var idxEtapa = columnas.findIndex(function(c) { return c.nombre === 'Etapa'; }) + 1;
+    if (idxEtapa > 0) _colorearFilasPorEtapa(hoja, columnas.length, idxEtapa);
   }
 
   Logger.log('Hoja construida: ' + nombreHoja);
@@ -1390,14 +1434,131 @@ function _colorearFilasPorEtapa(hoja, numCols, etapaCol) {
 }
 
 /**
+ * Busca el número de columna (1-based) cuyo encabezado (fila 1) coincide
+ * exactamente con nombreEncabezado. Devuelve -1 si no lo encuentra.
+ * Se usa para ubicar columnas como "Etapa" sin depender de un número fijo,
+ * que se desalinea si alguien inserta/borra una columna en la hoja real.
+ * @param {Sheet}  hoja
+ * @param {string} nombreEncabezado
+ * @return {number}
+ */
+function _colPorEncabezado(hoja, nombreEncabezado) {
+  var ultimaCol = hoja.getLastColumn();
+  if (ultimaCol < 1) return -1;
+  var headers = hoja.getRange(1, 1, 1, ultimaCol).getValues()[0];
+  for (var i = 0; i < headers.length; i++) {
+    if ((headers[i] || '').toString().trim() === nombreEncabezado) return i + 1;
+  }
+  return -1;
+}
+
+/**
+ * Busca si una persona (por Creamos ID o Nombre completo) ya tiene una fila
+ * en la hoja indicada. Asume el layout de COLUMNAS_COMUNES: Creamos ID = col 2,
+ * Nombre completo = col 3.
+ * @param {string} nombreHoja
+ * @param {string} creamosId
+ * @param {string} nombreCompleto
+ * @return {boolean}
+ */
+function _existeEnHoja(nombreHoja, creamosId, nombreCompleto) {
+  var estructura = ESTRUCTURA_HOJAS[nombreHoja];
+  var hoja = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(nombreHoja);
+  if (!hoja || !estructura) return false;
+  var numCols = estructura.columnas.length;
+  var lastRow = hoja.getLastRow();
+  if (lastRow < 2) return false;
+
+  var datos = hoja.getRange(2, 1, lastRow - 1, numCols).getValues();
+  var idBuscado = (creamosId || '').toString().trim();
+  var normNombre = _normalizarTexto_(nombreCompleto || '');
+
+  for (var i = 0; i < datos.length; i++) {
+    var idFila = (datos[i][1] || '').toString().trim();
+    var nombreFila = _normalizarTexto_((datos[i][2] || '').toString());
+    if ((idBuscado && idFila && idFila === idBuscado) || (normNombre && nombreFila === normNombre)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Cierra (Activo = No) la fila de una persona en cada una de las hojas
+ * indicadas, si existe. Opcionalmente pide una nota (con ui.prompt) antes de
+ * cerrar, si la hoja no tiene ya una nota escrita. Las columnas "Nota"/"Notas"
+ * y "Activo" se ubican por su encabezado (no por posición fija), porque su
+ * posición varía entre hojas (p. ej. en "Activamente busca trabajo" hay
+ * columnas después de "Nota").
+ * @param {string}  creamosId
+ * @param {string}  nombreCompleto
+ * @param {Array}   nombresHojas
+ * @param {boolean} pedirNota
+ * @return {Array} nombres de las hojas donde se encontró y cerró a la persona
+ */
+function _cerrarEtapasDePersona(creamosId, nombreCompleto, nombresHojas, pedirNota) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var idBuscado = (creamosId || '').toString().trim();
+  var normNombre = _normalizarTexto_(nombreCompleto || '');
+  var cerradas = [];
+
+  nombresHojas.forEach(function(nombreHoja) {
+    var estructura = ESTRUCTURA_HOJAS[nombreHoja];
+    var hoja = ss.getSheetByName(nombreHoja);
+    if (!hoja || !estructura) return;
+
+    var numCols = estructura.columnas.length;
+    var notaCol = _colPorEncabezado(hoja, 'Nota');
+    if (notaCol < 1) notaCol = _colPorEncabezado(hoja, 'Notas');
+    var activoCol = _colPorEncabezado(hoja, 'Activo');
+    if (activoCol < 1) return; // hoja sin columna Activo — nada que cerrar
+    var lastRow = hoja.getLastRow();
+    if (lastRow < 2) return;
+
+    var datos = hoja.getRange(2, 1, lastRow - 1, numCols).getValues();
+    for (var i = 0; i < datos.length; i++) {
+      var idFila = (datos[i][1] || '').toString().trim();
+      var nombreFila = _normalizarTexto_((datos[i][2] || '').toString());
+      if (!((idBuscado && idFila && idFila === idBuscado) || (normNombre && nombreFila === normNombre))) continue;
+
+      var filaReal = i + 2;
+
+      if (pedirNota && notaCol > 0) {
+        var notaActual = (datos[i][notaCol - 1] || '').toString().trim();
+        if (!notaActual) {
+          var ui = SpreadsheetApp.getUi();
+          var resp = ui.prompt(
+            '📋 Nota — ' + nombreHoja,
+            'Escribe una nota para "' + (nombreCompleto || '') + '" antes de cerrar su etapa en "' + nombreHoja + '"\n(deja vacío y presiona Aceptar para omitir):',
+            ui.ButtonSet.OK_CANCEL
+          );
+          if (resp.getSelectedButton() === ui.Button.OK) {
+            var texto = resp.getResponseText().trim();
+            if (texto) hoja.getRange(filaReal, notaCol).setValue(texto);
+          }
+        }
+      }
+
+      hoja.getRange(filaReal, activoCol).setValue('No');
+      cerradas.push(nombreHoja);
+      break; // una sola coincidencia por hoja
+    }
+  });
+
+  return cerradas;
+}
+
+/**
  * Aplica colores de fila por Etapa en la hoja Graduados (menú / llamada manual).
  */
 function aplicarColoresFilasGraduados() {
   var ss   = SpreadsheetApp.getActiveSpreadsheet();
   var hoja = ss.getSheetByName('Graduados');
   if (!hoja) { SpreadsheetApp.getUi().alert('No se encontró la hoja "Graduados".'); return; }
-  var numCols = ESTRUCTURA_HOJAS['Graduados'].columnas.length;
-  _colorearFilasPorEtapa(hoja, numCols, 15); // col 15 = Etapa
+  var numCols  = hoja.getLastColumn();
+  var colEtapa = _colPorEncabezado(hoja, 'Etapa');
+  if (colEtapa < 1) { SpreadsheetApp.getUi().alert('No se encontró la columna "Etapa" en Graduados.'); return; }
+  _colorearFilasPorEtapa(hoja, numCols, colEtapa);
   SpreadsheetApp.getUi().alert('✅ Colores de fila aplicados en Graduados.');
 }
 
@@ -1467,10 +1628,11 @@ function obtenerGraduadosSinClasificar() {
     const hoja  = obtenerHoja('Graduados');
     const datos = hoja.getDataRange().getValues();
     if (datos.length <= 1) return [];
+    const colEtapaIdx = _colPorEncabezado(hoja, 'Etapa') - 1;
 
     const sin = [];
     for (let i = 1; i < datos.length; i++) {
-      const etapa = datos[i][14]; // col 15 = Etapa
+      const etapa = colEtapaIdx >= 0 ? datos[i][colEtapaIdx] : '';
       if (!etapa || etapa.toString().trim() === '') {
         sin.push({ id: datos[i][0], nombre: datos[i][3] }); // [3] = Nombre completo
       }
@@ -3056,11 +3218,12 @@ function clasificarGraduado(graduadoId, clasificacion, datosAdicionales = {}) {
 
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduadoId) {
-      // Columnas: 12=Empleado | 15=Etapa
+      // Columnas: 12=Empleado | Etapa detectada por encabezado
       hojaGraduados.getRange(i + 1, 12).setValue(
-        clasificacion === 'Activamente busca trabajo' ? 'Sí' : 'No'
+        clasificacion === 'Activamente busca trabajo' ? 'Si' : 'No'
       );
-      hojaGraduados.getRange(i + 1, 16).setValue(clasificacion);             // Etapa
+      var colEtapaGrad = _colPorEncabezado(hojaGraduados, 'Etapa');
+      if (colEtapaGrad > 0) hojaGraduados.getRange(i + 1, colEtapaGrad).setValue(clasificacion); // Etapa
       copiarAHojaClasificacion(datos[i], clasificacion, datosAdicionales);
       registrarMovimientoEtapa(datos[i][2], datos[i][3], clasificacion, datosAdicionales.nota || '');
       if (clasificacion === 'Activamente busca trabajo') {
@@ -3185,7 +3348,7 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
         datosAdicionales.diaDePrueba           || '',
         datosAdicionales.confirmacionRecepcion || '',
         datosAdicionales.notas                 || '',
-        datosAdicionales.activo                || 'Sí'
+        datosAdicionales.activo                || 'Si'
       ]);
 
     case 'Plataforma':
@@ -3198,7 +3361,7 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
         datosAdicionales.confirmacion          || '',
         datosAdicionales.recepcion             || '',
         datosAdicionales.nota                  || '',
-        datosAdicionales.activo                || 'Sí'
+        datosAdicionales.activo                || 'Si'
       ]);
 
     case 'Derivaciones':
@@ -3210,7 +3373,7 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
         datosAdicionales.envio3   || '',
         datosAdicionales.llamada3 || '',
         datosAdicionales.notas    || '',
-        datosAdicionales.activo   || 'Sí'
+        datosAdicionales.activo   || 'Si'
       ]);
 
     case 'Por su cuenta':
@@ -3222,7 +3385,7 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
         datosAdicionales.nota    || '',
         '',                           // Entrevista
         '',                           // Trámites
-        datosAdicionales.activo  || 'Sí'
+        datosAdicionales.activo  || 'Si'
       ]);
 
     case 'Paso a paso':
@@ -3254,7 +3417,7 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
         '',                           // Nota
         datosAdicionales.entrevista || '',
         datosAdicionales.tramites   || '',
-        datosAdicionales.activo     || 'Sí'
+        datosAdicionales.activo     || 'Si'
       ]);
 
     case 'Conexiones Laborales':
@@ -3760,22 +3923,51 @@ function guardarConexionLaboral(datos) {
     obtenerHoja('Conexiones Laborales').appendRow(fila);
     Logger.log('Conexión laboral registrada: ' + nombreCompleto + ' en ' + datos.empresa);
 
-    // Actualizar la celda Etapa en la hoja de origen para reflejar el cambio de estado
+    // Actualizar la Etapa en Graduados a "En empleo" (no "Conexiones Laborales") para
+    // que el dropdown siga disponible como trigger al registrar futuros empleos.
+    // La fila del graduado se busca por Creamos ID (o Nombre) en Graduados, sin importar
+    // desde qué hoja se haya abierto el formulario — así siempre queda la fila correcta.
     try {
-      var filaNum = parseInt(datos.filaGraduado, 10);
-      var hojaOrigen = datos.hojaOrigen || 'Graduados';
-      if (filaNum > 1) {
-        var hOrigen = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(hojaOrigen);
-        if (hOrigen) {
-          // Col 15 = Etapa en Graduados; en Sesiones Acompañamiento la acción es col 16
-          // Escribir "En empleo" (no "Conexiones Laborales") para que el dropdown
-          // siga disponible como trigger al registrar futuros empleos del mismo graduado.
-          var colEtapa = 16;
-          hOrigen.getRange(filaNum, colEtapa).setValue('En empleo');
+      var hGradMaster = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Graduados');
+      if (hGradMaster) {
+        var colEtapaMaster = _colPorEncabezado(hGradMaster, 'Etapa');
+        var hojaOrigen      = datos.hojaOrigen || 'Graduados';
+        var filaNum         = parseInt(datos.filaGraduado, 10);
+        var filaGradMaster  = -1;
+
+        if (hojaOrigen === 'Graduados' && filaNum > 1) {
+          filaGradMaster = filaNum;
+        } else {
+          var gradLastRow = hGradMaster.getLastRow();
+          if (gradLastRow > 1) {
+            var idsGrad = hGradMaster.getRange(2, 3, gradLastRow - 1, 1).getValues(); // col C = Creamos ID
+            var normNombreGrad = _normalizarTexto_(nombreCompleto);
+            var nombresGrad = hGradMaster.getRange(2, 4, gradLastRow - 1, 1).getValues(); // col D = Nombre completo
+            for (var g = 0; g < idsGrad.length; g++) {
+              var idCoincide = creamosId && (idsGrad[g][0] || '').toString().trim() === creamosId.toString().trim();
+              var nombreCoincide = normNombreGrad && _normalizarTexto_(nombresGrad[g][0]) === normNombreGrad;
+              if (idCoincide || nombreCoincide) { filaGradMaster = g + 2; break; }
+            }
+          }
+        }
+
+        if (filaGradMaster > 1 && colEtapaMaster > 0) {
+          hGradMaster.getRange(filaGradMaster, colEtapaMaster).setValue('En empleo');
         }
       }
     } catch (eEtapa) {
       Logger.log('No se pudo actualizar Etapa: ' + eEtapa.message);
+    }
+
+    // Cerrar (Activo = No) a la persona en todas las etapas donde tenga registro
+    try {
+      _cerrarEtapasDePersona(
+        creamosId, nombreCompleto,
+        ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'],
+        false
+      );
+    } catch (eCierre) {
+      Logger.log('No se pudieron cerrar las etapas anteriores: ' + eCierre.message);
     }
 
     // Crear fila en Seguimiento Bot para n8n/WhatsApp
@@ -3817,18 +4009,21 @@ function repararEtapasConexionesLaborales() {
     if (id) idSet[id] = true;
   });
 
+  var colEtapa = _colPorEncabezado(hGrad, 'Etapa');
+  if (colEtapa < 1) { ui.alert('No se encontró la columna "Etapa" en Graduados.'); return; }
+
   var gradLastRow = hGrad.getLastRow();
   if (gradLastRow < 2) { ui.alert('La hoja Graduados está vacía.'); return; }
-  var gradData = hGrad.getRange(2, 1, gradLastRow - 1, 16).getValues();
+  var gradData = hGrad.getRange(2, 1, gradLastRow - 1, Math.max(colEtapa, 3)).getValues();
 
   var reparadas = 0;
   for (var i = 0; i < gradData.length; i++) {
-    var cid   = (gradData[i][2]  || '').toString().trim(); // col C = Creamos ID
-    var etapa = (gradData[i][15] || '').toString().trim(); // col P = Etapa
+    var cid   = (gradData[i][2] || '').toString().trim();          // col C = Creamos ID
+    var etapa = (gradData[i][colEtapa - 1] || '').toString().trim();
     // Filas con conexión registrada pero Etapa vacía O con "Conexiones Laborales"
     // (valor que bloquea el dropdown)
     if (cid && idSet[cid] && (etapa === '' || etapa === 'Conexiones Laborales')) {
-      hGrad.getRange(i + 2, 16).setValue('En empleo');
+      hGrad.getRange(i + 2, colEtapa).setValue('En empleo');
       reparadas++;
     }
   }
@@ -5182,8 +5377,9 @@ function obtenerEstadisticasGenerales() {
   if (hojaGraduados) {
     stats.totalGraduados = hojaGraduados.getLastRow() - 1;
     const datos = hojaGraduados.getDataRange().getValues();
+    const colEtapaIdx = _colPorEncabezado(hojaGraduados, 'Etapa') - 1;
     for (let i = 1; i < datos.length; i++) {
-      const c = datos[i][14]; // col 15 = Etapa
+      const c = colEtapaIdx >= 0 ? datos[i][colEtapaIdx] : '';
       if (c) stats.porClasificacion[c] = (stats.porClasificacion[c] || 0) + 1;
     }
   }
