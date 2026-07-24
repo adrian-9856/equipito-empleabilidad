@@ -525,6 +525,41 @@ function onEditInstalable(e) {
         _generarHTMLFormConexionLaboral(fila, creamosId, nombreComp, 'Sesiones Acompañamiento', datosExtra)
       ).setWidth(560).setHeight(720).setTitle('Conexión Laboral');
       SpreadsheetApp.getUi().showModalDialog(html, '💼 Conexión Laboral — ' + nombreComp);
+      return;
+    }
+
+    // ── Sesiones Acompañamiento: columna "Derivación a Conexiones Laborales" = Si ──
+    // A diferencia de "Acción", esta columna NO se limpia después de usarse
+    // (queda marcada como "Si" para llevar control de a quién ya se derivó).
+    if (nombreHoja === 'Sesiones Acompañamiento') {
+      var colDerivSes = _colPorEncabezado(hoja, 'Derivación a Conexiones Laborales');
+      if (colDerivSes > 0 && col === colDerivSes) {
+        if ((e.value || '').toString().trim() !== 'Si') return;
+
+        const datosDeriv     = hoja.getRange(fila, 1, 1, 15).getValues()[0];
+        const creamosIdDeriv = (datosDeriv[0] || '').toString().trim();
+        const nombreDeriv    = (datosDeriv[4] || '').toString().trim();
+        const apellidosDeriv = (datosDeriv[5] || '').toString().trim();
+        const nombreCompDeriv = (nombreDeriv + ' ' + apellidosDeriv).trim();
+
+        if (!nombreCompDeriv) {
+          SpreadsheetApp.getActiveSpreadsheet().toast('La fila no tiene nombre.', '⚠️ Sin datos', 3);
+          return;
+        }
+
+        const datosExtraDeriv = {
+          telefono:       (datosDeriv[6] || '').toString().trim(),
+          edad:           (datosDeriv[8] || '').toString().trim(),
+          genero:         (datosDeriv[9] || '').toString().trim(),
+          nivelEducativo: ''
+        };
+
+        const htmlDeriv = HtmlService.createHtmlOutput(
+          _generarHTMLFormConexionLaboral(fila, creamosIdDeriv, nombreCompDeriv, 'Sesiones Acompañamiento', datosExtraDeriv)
+        ).setWidth(560).setHeight(720).setTitle('Conexión Laboral');
+        SpreadsheetApp.getUi().showModalDialog(htmlDeriv, '💼 Conexión Laboral — ' + nombreCompDeriv);
+        return;
+      }
     }
 
   } catch (error) {
