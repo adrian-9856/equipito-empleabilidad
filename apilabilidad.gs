@@ -4587,7 +4587,8 @@ function _reorganizarConexionesLaboralesLogica_() {
   var headersActuales = hoja.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) {
     return (h || '').toString().trim();
   });
-  var nuevoOrden = ESTRUCTURA_HOJAS['Conexiones Laborales'].columnas.map(function(c) { return c.nombre; });
+  var columnasNuevas = ESTRUCTURA_HOJAS['Conexiones Laborales'].columnas;
+  var nuevoOrden = columnasNuevas.map(function(c) { return c.nombre; });
 
   var yaOrdenado = nuevoOrden.length === headersActuales.length &&
     nuevoOrden.every(function(nombre, i) { return headersActuales[i] === nombre; });
@@ -4595,30 +4596,63 @@ function _reorganizarConexionesLaboralesLogica_() {
     return 'INFO: "Conexiones Laborales" ya estaba en el orden correcto — no se cambió nada.';
   }
 
+  // IMPORTANTE: cualquier columna que ya exista en la hoja real pero que el
+  // código no reconozca (nombre distinto, columna agregada a mano, etc.) se
+  // CONSERVA tal cual al final — nunca se descarta un dato solo porque su
+  // encabezado no coincide exactamente con lo esperado.
+  var columnasDesconocidas = [];
+  headersActuales.forEach(function(nombre, idx) {
+    if (nombre && nuevoOrden.indexOf(nombre) === -1) columnasDesconocidas.push({ nombre: nombre, idx: idx });
+  });
+
   var datosViejos = lastRow >= 2 ? hoja.getRange(2, 1, lastRow - 1, lastCol).getValues() : [];
 
   // Para cada columna del orden nuevo, ubicar su índice en el orden ACTUAL (-1 = no existía)
   var indicesOrigen = nuevoOrden.map(function(nombre) { return headersActuales.indexOf(nombre); });
 
+  var headersFinal = nuevoOrden.concat(columnasDesconocidas.map(function(c) { return c.nombre; }));
   var datosReordenados = datosViejos.map(function(filaVieja) {
-    return indicesOrigen.map(function(idx) { return idx >= 0 ? filaVieja[idx] : ''; });
+    var filaNueva = indicesOrigen.map(function(idx) { return idx >= 0 ? filaVieja[idx] : ''; });
+    columnasDesconocidas.forEach(function(c) { filaNueva.push(filaVieja[c.idx]); });
+    return filaNueva;
   });
 
   hoja.clearContents();
   hoja.clearFormats();
-  var rangoHeaders = hoja.getRange(1, 1, 1, nuevoOrden.length);
-  rangoHeaders.setValues([nuevoOrden]);
+  // clearFormats() NO quita las validaciones de datos (los desplegables) —
+  // hay que quitarlas explícitamente para que ninguna quede pegada en la
+  // columna equivocada después de mover todo.
+  hoja.getRange(1, 1, hoja.getMaxRows(), Math.max(hoja.getMaxColumns(), headersFinal.length)).clearDataValidations();
+
+  var rangoHeaders = hoja.getRange(1, 1, 1, headersFinal.length);
+  rangoHeaders.setValues([headersFinal]);
   rangoHeaders.setBackground('#e65100').setFontColor('#ffffff').setFontWeight('bold').setFontSize(11);
   hoja.setFrozenRows(1);
 
   if (datosReordenados.length > 0) {
-    hoja.getRange(2, 1, datosReordenados.length, nuevoOrden.length).setValues(datosReordenados);
+    hoja.getRange(2, 1, datosReordenados.length, headersFinal.length).setValues(datosReordenados);
   }
 
-  ESTRUCTURA_HOJAS['Conexiones Laborales'].columnas.forEach(function(col, i) {
+  columnasNuevas.forEach(function(col, i) {
     hoja.setColumnWidth(i + 1, col.ancho);
   });
-  _aplicarColoresDropdowns(hoja, ESTRUCTURA_HOJAS['Conexiones Laborales'].columnas);
+
+  // Volver a aplicar los desplegables (validación de datos) en su columna nueva
+  var maxFilasValid = Math.max(hoja.getMaxRows() - 1, 1);
+  columnasNuevas.forEach(function(col, i) {
+    var rango = hoja.getRange(2, i + 1, maxFilasValid);
+    if (col.tipo === 'siNo') {
+      rango.setDataValidation(
+        SpreadsheetApp.newDataValidation().requireValueInList(['Si', 'No'], true).setAllowInvalid(false).build()
+      );
+    } else if (col.tipo === 'dropdown' && col.opciones && col.opciones.length) {
+      rango.setDataValidation(
+        SpreadsheetApp.newDataValidation().requireValueInList(col.opciones, true).setAllowInvalid(false).build()
+      );
+    }
+  });
+
+  _aplicarColoresDropdowns(hoja, columnasNuevas);
 
   // Completar Cohorte donde falte, buscando en Graduados por Creamos ID
   var colCohorte = _colPorEncabezado(hoja, 'Cohorte');
@@ -4639,8 +4673,13 @@ function _reorganizarConexionesLaboralesLogica_() {
     }
   }
 
-  return 'OK: columnas reorganizadas (' + datosReordenados.length + ' fila(s) conservadas). ' +
-    'Cohorte completada para ' + rellenadas + ' fila(s) adicionales.';
+  var mensajeDesconocidas = columnasDesconocidas.length > 0
+    ? ' Se conservaron ' + columnasDesconocidas.length + ' columna(s) que el código no reconocía, al final: ' +
+      columnasDesconocidas.map(function(c) { return c.nombre; }).join(', ') + '.'
+    : '';
+
+  return 'OK: columnas reorganizadas (' + datosReordenados.length + ' fila(s) conservadas).' + mensajeDesconocidas +
+    ' Cohorte completada para ' + rellenadas + ' fila(s) adicionales.';
 }
 
 /**
