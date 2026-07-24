@@ -116,40 +116,90 @@ function onOpen(e) {
 }
 
 /**
- * Aplica todos los cambios nuevos de una sola vez:
- *  1. Colores de fila por Etapa en Graduados
- *  2. Nombre completo en Satisfacción Empleo (desde Graduados)
- *  3. Regenera el Reporte con leyenda de colores
- * Muestra un diálogo de progreso paso a paso.
+ * Botón único: aplica TODOS los cambios/actualizaciones pendientes de una
+ * sola vez, sin borrar ni perder ningún dato existente:
+ *  1. Verifica/reinstala el trigger de Conexiones Laborales
+ *  2. Refresca colores en todas las hojas (incluye quitar el de Género)
+ *  3. Repara Etapas de Conexiones Laborales (En empleo)
+ *  4. Normaliza "Activo"/"Empleado" a Sí/No sin tilde
+ *  5. Cierra (Activo = No) etapas de personas ya avanzadas
+ *  6. Agrega columnas nuevas: Cohorte / Fecha de envío / Derivación
+ *  7. Importa Estipendios (Empleabilidad) desde KoboToolbox
+ *  8. Completa Nombre completo en Satisfacción Empleo
+ *  9. Regenera el Reporte con leyenda de colores
+ * Muestra un solo resumen final con el resultado de cada paso.
  */
 function implementarCambiosNuevos() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var pasos = [];
+  var TOTAL_PASOS = 9;
 
-  // ── Paso 1: Colores de fila en Graduados ──────────────────────────────────
+  // ── Paso 1: Trigger de Conexiones Laborales ───────────────────────────────
   try {
-    ss.toast('Paso 1/3 — Aplicando colores de fila en Graduados...', '🚀 Implementando', -1);
-    var hGrad = ss.getSheetByName('Graduados');
-    if (hGrad) {
-      var numCols  = hGrad.getLastColumn();
-      var colEtapa = _colPorEncabezado(hGrad, 'Etapa');
-      if (colEtapa > 0) {
-        _colorearFilasPorEtapa(hGrad, numCols, colEtapa);
-        pasos.push('✅ Colores de fila aplicados en Graduados.');
-      } else {
-        pasos.push('⚠️ No se encontró la columna "Etapa" en Graduados — colores omitidos.');
-      }
-    } else {
-      pasos.push('⚠️ Hoja "Graduados" no encontrada — colores omitidos.');
-    }
+    ss.toast('Paso 1/' + TOTAL_PASOS + ' — Verificando trigger de Conexiones Laborales...', '🚀 Implementando', -1);
+    var eliminados = 0;
+    ScriptApp.getProjectTriggers().forEach(function(t) {
+      if (t.getHandlerFunction() === 'onEditInstalable') { ScriptApp.deleteTrigger(t); eliminados++; }
+    });
+    ScriptApp.newTrigger('onEditInstalable').forSpreadsheet(ss).onEdit().create();
+    pasos.push('✅ Trigger de Conexiones Laborales verificado/reinstalado.');
   } catch (e) {
-    pasos.push('❌ Error en colores de fila: ' + e.message);
+    pasos.push('❌ Error instalando trigger: ' + e.message);
   }
 
-  // ── Paso 2: Nombre completo en Satisfacción Empleo ────────────────────────
+  // ── Paso 2: Refrescar colores en todas las hojas ──────────────────────────
   try {
-    ss.toast('Paso 2/3 — Completando nombres en Satisfacción Empleo...', '🚀 Implementando', -1);
+    ss.toast('Paso 2/' + TOTAL_PASOS + ' — Refrescando colores (quita el de Género)...', '🚀 Implementando', -1);
+    pasos.push('✅ ' + _refrescarColoresTodasLasHojasLogica_());
+  } catch (e) {
+    pasos.push('❌ Error en colores: ' + e.message);
+  }
+
+  // ── Paso 3: Reparar Etapas de Conexiones Laborales ────────────────────────
+  try {
+    ss.toast('Paso 3/' + TOTAL_PASOS + ' — Reparando Etapas de Conexiones Laborales...', '🚀 Implementando', -1);
+    pasos.push('✅ ' + _repararEtapasConexionesLaboralesLogica_());
+  } catch (e) {
+    pasos.push('❌ Error reparando Etapas: ' + e.message);
+  }
+
+  // ── Paso 4: Normalizar Activo/Empleado Sí/No ──────────────────────────────
+  try {
+    ss.toast('Paso 4/' + TOTAL_PASOS + ' — Normalizando "Activo" Sí/No...', '🚀 Implementando', -1);
+    pasos.push('✅ ' + _normalizarActivoSiNoLogica_());
+  } catch (e) {
+    pasos.push('❌ Error normalizando Activo: ' + e.message);
+  }
+
+  // ── Paso 5: Cerrar etapas de personas ya avanzadas ────────────────────────
+  try {
+    ss.toast('Paso 5/' + TOTAL_PASOS + ' — Cerrando etapas de personas ya avanzadas...', '🚀 Implementando', -1);
+    pasos.push('✅ ' + _cerrarEtapasHistoricasLogica_());
+  } catch (e) {
+    pasos.push('❌ Error cerrando etapas: ' + e.message);
+  }
+
+  // ── Paso 6: Agregar columnas nuevas (Cohorte / Fecha envío / Derivación) ──
+  try {
+    ss.toast('Paso 6/' + TOTAL_PASOS + ' — Agregando columnas nuevas...', '🚀 Implementando', -1);
+    pasos.push(_agregarColumnasNuevasLogica_());
+  } catch (e) {
+    pasos.push('❌ Error agregando columnas nuevas: ' + e.message);
+  }
+
+  // ── Paso 7: Importar Estipendios (Empleabilidad) ──────────────────────────
+  try {
+    ss.toast('Paso 7/' + TOTAL_PASOS + ' — Importando Estipendios (Empleabilidad)...', '🚀 Implementando', -1);
+    var resEst = _syncEstipendiosSoloNuevos();
+    pasos.push('✅ Estipendios: ' + resEst.nuevos + ' nuevo(s) (total ' + resEst.total + ').');
+  } catch (e) {
+    pasos.push('⚠️ Estipendios: ' + e.message);
+  }
+
+  // ── Paso 8: Nombre completo en Satisfacción Empleo ────────────────────────
+  try {
+    ss.toast('Paso 8/' + TOTAL_PASOS + ' — Completando nombres en Satisfacción Empleo...', '🚀 Implementando', -1);
     var hSat = ss.getSheetByName('Satisfacción Empleo');
     if (hSat && hSat.getLastRow() > 1) {
       // Verificar si ya tiene la columna "Nombre completo" (col 2)
@@ -185,9 +235,9 @@ function implementarCambiosNuevos() {
     pasos.push('❌ Error en nombres Satisfacción Empleo: ' + e.message);
   }
 
-  // ── Paso 3: Regenerar Reporte con leyenda ────────────────────────────────
+  // ── Paso 9: Regenerar Reporte con leyenda ────────────────────────────────
   try {
-    ss.toast('Paso 3/3 — Regenerando Reporte con leyenda de colores...', '🚀 Implementando', -1);
+    ss.toast('Paso 9/' + TOTAL_PASOS + ' — Regenerando Reporte con leyenda de colores...', '🚀 Implementando', -1);
     generarReporte();
     pasos.push('✅ Reporte regenerado con leyenda de colores.');
   } catch (e) {
@@ -4222,15 +4272,20 @@ function guardarConexionLaboral(datos) {
  *   el dropdown-trigger), cambiándolas a "En empleo".
  */
 function repararEtapasConexionesLaborales() {
+  var mensaje = _repararEtapasConexionesLaboralesLogica_();
+  SpreadsheetApp.getUi().alert('Reparación completada', mensaje, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+/** Lógica de repararEtapasConexionesLaborales, sin UI — reutilizable desde implementarCambiosNuevos(). */
+function _repararEtapasConexionesLaboralesLogica_() {
   var ss  = SpreadsheetApp.getActiveSpreadsheet();
-  var ui  = SpreadsheetApp.getUi();
 
   var hCon  = ss.getSheetByName('Conexiones Laborales');
   var hGrad = ss.getSheetByName('Graduados');
-  if (!hCon || !hGrad) { ui.alert('No se encontraron las hojas necesarias.'); return; }
+  if (!hCon || !hGrad) return 'No se encontraron las hojas necesarias para reparar Etapas.';
 
   var conLastRow = hCon.getLastRow();
-  if (conLastRow < 2) { ui.alert('La hoja Conexiones Laborales está vacía.'); return; }
+  if (conLastRow < 2) return 'La hoja Conexiones Laborales está vacía — nada que reparar.';
   var idSet = {};
   hCon.getRange(2, 1, conLastRow - 1, 1).getValues().forEach(function(r) {
     var id = (r[0] || '').toString().trim();
@@ -4238,10 +4293,10 @@ function repararEtapasConexionesLaborales() {
   });
 
   var colEtapa = _colPorEncabezado(hGrad, 'Etapa');
-  if (colEtapa < 1) { ui.alert('No se encontró la columna "Etapa" en Graduados.'); return; }
+  if (colEtapa < 1) return 'No se encontró la columna "Etapa" en Graduados.';
 
   var gradLastRow = hGrad.getLastRow();
-  if (gradLastRow < 2) { ui.alert('La hoja Graduados está vacía.'); return; }
+  if (gradLastRow < 2) return 'La hoja Graduados está vacía.';
   var gradData = hGrad.getRange(2, 1, gradLastRow - 1, Math.max(colEtapa, 3)).getValues();
 
   var reparadas = 0;
@@ -4256,13 +4311,9 @@ function repararEtapasConexionesLaborales() {
     }
   }
 
-  ui.alert(
-    'Reparación completada',
-    reparadas > 0
-      ? reparadas + ' fila(s) actualizadas a "En empleo".\n\nAhora el dropdown "Conexiones Laborales" vuelve a funcionar para registrar nuevos empleos.'
-      : 'No se encontraron filas para reparar.',
-    ui.ButtonSet.OK
-  );
+  return reparadas > 0
+    ? reparadas + ' fila(s) de Graduados actualizadas a "En empleo" (Etapas de Conexiones Laborales reparadas).'
+    : 'Etapas de Conexiones Laborales: no había filas para reparar.';
 }
 
 /**
@@ -4272,8 +4323,13 @@ function repararEtapasConexionesLaborales() {
  * a hojas que ya tienen información cargada.
  */
 function refrescarColoresTodasLasHojas() {
+  var mensaje = _refrescarColoresTodasLasHojasLogica_();
+  SpreadsheetApp.getUi().alert('✅ Colores actualizados', mensaje, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+/** Lógica de refrescarColoresTodasLasHojas, sin UI — reutilizable desde implementarCambiosNuevos(). */
+function _refrescarColoresTodasLasHojasLogica_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = SpreadsheetApp.getUi();
   var actualizadas = [];
 
   Object.keys(ESTRUCTURA_HOJAS).forEach(function(nombreHoja) {
@@ -4289,11 +4345,7 @@ function refrescarColoresTodasLasHojas() {
     if (colEtapa > 0) _colorearFilasPorEtapa(hGrad, hGrad.getLastColumn(), colEtapa);
   }
 
-  ui.alert(
-    '✅ Colores actualizados',
-    'Se refrescaron los colores en: ' + (actualizadas.join(', ') || '(ninguna hoja encontrada)'),
-    ui.ButtonSet.OK
-  );
+  return 'Se refrescaron los colores en: ' + (actualizadas.join(', ') || '(ninguna hoja encontrada)');
 }
 
 /**
@@ -4303,8 +4355,13 @@ function refrescarColoresTodasLasHojas() {
  * colores del dropdown.
  */
 function normalizarActivoSiNo() {
+  var mensaje = _normalizarActivoSiNoLogica_();
+  SpreadsheetApp.getUi().alert('✅ Normalización completa', mensaje, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+/** Lógica de normalizarActivoSiNo, sin UI — reutilizable desde implementarCambiosNuevos(). */
+function _normalizarActivoSiNoLogica_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = SpreadsheetApp.getUi();
   var hojasActivo = ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso'];
   var totalCambios = 0;
 
@@ -4330,11 +4387,7 @@ function normalizarActivoSiNo() {
   var hGrad = ss.getSheetByName('Graduados');
   if (hGrad) normalizarColumna(hGrad, _colPorEncabezado(hGrad, 'Empleado'));
 
-  ui.alert(
-    '✅ Normalización completa',
-    totalCambios + ' celda(s) con "Sí" fueron corregidas a "Si".',
-    ui.ButtonSet.OK
-  );
+  return totalCambios + ' celda(s) con "Sí" fueron corregidas a "Si".';
 }
 
 /**
@@ -4344,8 +4397,13 @@ function normalizarActivoSiNo() {
  * diálogos): si quieres agregar notas a esas hojas, hazlo manualmente.
  */
 function cerrarEtapasHistoricas() {
+  var mensaje = _cerrarEtapasHistoricasLogica_();
+  SpreadsheetApp.getUi().alert('✅ Cierre histórico completado', mensaje, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+/** Lógica de cerrarEtapasHistoricas, sin UI — reutilizable desde implementarCambiosNuevos(). */
+function _cerrarEtapasHistoricasLogica_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = SpreadsheetApp.getUi();
   var todasLasEtapas = ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso'];
   var personasProcesadas = 0;
   var cierresTotales = 0;
@@ -4385,11 +4443,7 @@ function cerrarEtapasHistoricas() {
   // Paso a paso: cierra sus posibles filas en las OTRAS etapas (no en sí misma)
   procesarHoja('Paso a paso', ['Aliados', 'Plataforma', 'Derivaciones']);
 
-  ui.alert(
-    '✅ Cierre histórico completado',
-    'Se revisaron ' + personasProcesadas + ' fila(s) y se cerraron ' + cierresTotales + ' etapa(s) anteriores (Activo = No).',
-    ui.ButtonSet.OK
-  );
+  return 'Se revisaron ' + personasProcesadas + ' fila(s) y se cerraron ' + cierresTotales + ' etapa(s) anteriores (Activo = No).';
 }
 
 /**
@@ -4404,8 +4458,13 @@ function cerrarEtapasHistoricas() {
  *    automáticamente, hay que marcarlas a mano si corresponde.
  */
 function agregarColumnasNuevas() {
+  var mensaje = _agregarColumnasNuevasLogica_();
+  SpreadsheetApp.getUi().alert('Columnas nuevas actualizadas', mensaje, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+/** Lógica de agregarColumnasNuevas, sin UI — reutilizable desde implementarCambiosNuevos(). */
+function _agregarColumnasNuevasLogica_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = SpreadsheetApp.getUi();
   var resumen = [];
 
   // ── Conexiones Laborales: Cohorte + Fecha de envío ────────────────────────
@@ -4475,7 +4534,7 @@ function agregarColumnasNuevas() {
     resumen.push('AVISO: no se encontró la hoja "Sesiones Acompañamiento".');
   }
 
-  ui.alert('Columnas nuevas actualizadas', resumen.join('\n'), ui.ButtonSet.OK);
+  return resumen.join('\n');
 }
 
 // ---------------------------------------------------------------------------
