@@ -6984,13 +6984,14 @@ function importarGraduadosDesdeExterno() {
 
         if (!creamosId && !nombre) continue; // fila vacía
 
-        if (creamosId) {
-          if (existentesId[creamosId]) continue;
-          existentesId[creamosId] = true;
-        } else {
-          if (existentesNombre[nombre]) continue;
-          existentesNombre[nombre] = true;
-        }
+        // Duplicado si coincide el ID O el nombre (antes solo se revisaba el ID
+        // cuando venía presente, así que un typo en el ID del archivo externo
+        // hacía que la misma persona se importara de nuevo como "nueva" en
+        // cada sincronización).
+        if (creamosId && existentesId[creamosId]) continue;
+        if (nombre && existentesNombre[nombre]) continue;
+
+        if (creamosId) existentesId[creamosId] = true;
         if (nombre) existentesNombre[nombre] = true;
 
         nuevas.push(_mapearFilaAGraduados_(headers, fila, cfg.FORMACION));
