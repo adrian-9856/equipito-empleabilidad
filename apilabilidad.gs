@@ -999,6 +999,7 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Empleado',             ancho: 90,  tipo: 'siNo'   },
       { nombre: 'Próxima llamada',      ancho: 180, tipo: 'texto'  },
       { nombre: 'Notas',                ancho: 300, tipo: 'texto'  },
+      { nombre: 'Próximos pasos',       ancho: 250, tipo: 'texto'  },
       { nombre: 'Etapa',                ancho: 200, tipo: 'dropdown', opciones: ETAPAS_FLUJO }
     ]
   },
@@ -3572,7 +3573,8 @@ function agregarGraduado(graduado) {
     'No',                                   // 12 Empleado
     '',                                     // 13 Próxima llamada
     '',                                     // 14 Notas
-    ''                                      // 15 Etapa (dropdown)
+    '',                                     // 15 Próximos pasos
+    ''                                      // 16 Etapa (dropdown)
   ];
   hoja.appendRow(fila);
   Logger.log(`Graduado agregado: ${graduado.nombre} (${graduado.id})`);
