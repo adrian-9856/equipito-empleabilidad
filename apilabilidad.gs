@@ -1509,16 +1509,17 @@ function _aplicarColoresDropdowns(hoja, columnas) {
   });
   if (colsObjetivo.length === 0) return;
 
-  // Conservar reglas existentes que no toquen nuestras columnas objetivo
+  // Quitar cualquier regla anterior que sea "nuestra" (es decir, que coloree
+  // uno de los valores que manejamos en COLORES_DROPDOWN), sin importar en
+  // qué columna haya quedado. Esto evita que se acumulen reglas viejas y
+  // "huérfanas" cuando una columna cambia de posición (p. ej. si se agrega
+  // una columna nueva en medio de la hoja y "Etapa" pasa de la O a la P).
   const reglasPrevias = hoja.getConditionalFormatRules();
   const reglasConservadas = reglasPrevias.filter(function (regla) {
-    const rangos = regla.getRanges();
-    for (let r = 0; r < rangos.length; r++) {
-      const ini = rangos[r].getColumn();
-      const fin = ini + rangos[r].getNumColumns() - 1;
-      for (let c = 0; c < colsObjetivo.length; c++) {
-        if (colsObjetivo[c] >= ini && colsObjetivo[c] <= fin) return false;
-      }
+    const cond = regla.getBooleanCondition();
+    if (cond && cond.getCriteriaType() === SpreadsheetApp.BooleanCriteria.TEXT_EQUAL_TO) {
+      const valores = cond.getCriteriaValues();
+      if (valores && valores.length === 1 && COLORES_DROPDOWN[valores[0]]) return false;
     }
     return true;
   });
@@ -1568,12 +1569,17 @@ function _colorearFilasPorEtapa(hoja, numCols, etapaCol) {
   }
   var letra = colLetra(etapaCol);
 
-  // Eliminar reglas anteriores de coloreado de fila (las nuestras cubren col 1 con numCols de ancho)
+  // Quitar cualquier regla anterior de coloreado de fila por Etapa, sin
+  // importar en qué columna o con qué ancho haya quedado (evita que se
+  // acumulen reglas viejas "huérfanas" si Etapa cambió de columna).
   var reglasPrevias = hoja.getConditionalFormatRules();
   var reglasConservadas = reglasPrevias.filter(function(regla) {
-    var rangos = regla.getRanges();
-    for (var r = 0; r < rangos.length; r++) {
-      if (rangos[r].getColumn() === 1 && rangos[r].getNumColumns() >= numCols) return false;
+    var cond = regla.getBooleanCondition();
+    if (cond && cond.getCriteriaType() === SpreadsheetApp.BooleanCriteria.CUSTOM_FORMULA) {
+      var formula = (cond.getCriteriaValues() || [])[0] || '';
+      for (var e = 0; e < ETAPAS_FLUJO.length; e++) {
+        if (formula.indexOf('="' + ETAPAS_FLUJO[e] + '"') !== -1) return false;
+      }
     }
     return true;
   });
