@@ -78,7 +78,7 @@ function onOpen(e) {
     const submenuConfig = ui.createMenu('⚙️ Configuración')
       .addItem('🔄 Actualizar dropdown Etapa',               'actualizarDropdownEtapa')
       .addItem('🗑️ Eliminar hoja "Activamente busca trabajo"', 'eliminarHojaActivamenteBuscaTrabajo')
-      .addItem('🎨 Aplicar colores de fila (Graduados)',     'aplicarColoresFilasGraduados')
+      .addItem('🎨 Quitar colores de fila (Graduados)',      'quitarColoresFilaGraduados')
       .addItem('🔄 Autocompletar con Creamos ID',            'autocompletarConCreamos')
       .addItem('🔍 Verificar Creamos ID ahora',              'verificarYCompletarCreamos')
       .addSeparator()
@@ -1483,12 +1483,6 @@ function _construirHoja(hoja, nombreHoja) {
   // -- Colores por opción de dropdown (formato condicional) -----------------
   _aplicarColoresDropdowns(hoja, columnas);
 
-  // -- Coloreado de fila completa por Etapa (solo en Graduados) --------------
-  if (nombreHoja === 'Graduados') {
-    var idxEtapa = columnas.findIndex(function(c) { return c.nombre === 'Etapa'; }) + 1;
-    if (idxEtapa > 0) _colorearFilasPorEtapa(hoja, columnas.length, idxEtapa);
-  }
-
   Logger.log('Hoja construida: ' + nombreHoja);
 }
 
@@ -1548,32 +1542,18 @@ function _aplicarColoresDropdowns(hoja, columnas) {
 }
 
 /**
- * Colorea FILAS COMPLETAS en la hoja indicada según el valor de la columna
- * "Etapa" (columna etapaCol, 1-based). Usa formato condicional basado en
- * fórmula para que toda la fila refleje el color del estado.
- * Las reglas se insertan con PRIORIDAD MÁS ALTA (al inicio del array) para
- * que dominen sobre las reglas de dropdown de columnas individuales.
- *
- * @param {Sheet}  hoja
- * @param {number} numCols   - número de columnas a colorear (ancho de la fila)
- * @param {number} etapaCol  - columna (1-based) que contiene el valor de Etapa
+ * Quita cualquier regla de formato condicional que pinte la FILA COMPLETA
+ * según la Etapa (función antigua, ya no se usa: ahora solo se colorea
+ * cada celda de dropdown por separado — Etapa, Nivel educativo, Empleado —
+ * para que ninguna se tape con el color de otra). Detecta las reglas por su
+ * fórmula (no por la columna), así que las quita sin importar en qué
+ * posición hayan quedado. Devuelve cuántas reglas se quitaron.
+ * @param {Sheet} hoja
+ * @return {number}
  */
-function _colorearFilasPorEtapa(hoja, numCols, etapaCol) {
-  var maxFilas = Math.max(hoja.getMaxRows() - 1, 1);
-
-  // Convertir número de columna a letra(s) A1 notation
-  function colLetra(n) {
-    var s = '';
-    while (n > 0) { var r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); }
-    return s;
-  }
-  var letra = colLetra(etapaCol);
-
-  // Quitar cualquier regla anterior de coloreado de fila por Etapa, sin
-  // importar en qué columna o con qué ancho haya quedado (evita que se
-  // acumulen reglas viejas "huérfanas" si Etapa cambió de columna).
-  var reglasPrevias = hoja.getConditionalFormatRules();
-  var reglasConservadas = reglasPrevias.filter(function(regla) {
+function _quitarColoresFilaPorEtapa_(hoja) {
+  var reglas = hoja.getConditionalFormatRules();
+  var reglasFiltradas = reglas.filter(function(regla) {
     var cond = regla.getBooleanCondition();
     if (cond && cond.getCriteriaType() === SpreadsheetApp.BooleanCriteria.CUSTOM_FORMULA) {
       var formula = (cond.getCriteriaValues() || [])[0] || '';
@@ -1583,24 +1563,9 @@ function _colorearFilasPorEtapa(hoja, numCols, etapaCol) {
     }
     return true;
   });
-
-  // Crear nuevas reglas de fila para cada etapa
-  var nuevasReglas = [];
-  ETAPAS_FLUJO.forEach(function(etapa) {
-    var c = COLORES_DROPDOWN[etapa];
-    if (!c) return;
-    var rango = hoja.getRange(2, 1, maxFilas, numCols);
-    var regla = SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=$' + letra + '2="' + etapa + '"')
-      .setBackground(c.bg)
-      .setFontColor(c.fg)
-      .setRanges([rango])
-      .build();
-    nuevasReglas.push(regla);
-  });
-
-  // Insertar con mayor prioridad (al inicio)
-  hoja.setConditionalFormatRules(nuevasReglas.concat(reglasConservadas));
+  var quitadas = reglas.length - reglasFiltradas.length;
+  if (quitadas > 0) hoja.setConditionalFormatRules(reglasFiltradas);
+  return quitadas;
 }
 
 /**
@@ -1718,17 +1683,18 @@ function _cerrarEtapasDePersona(creamosId, nombreCompleto, nombresHojas, pedirNo
 }
 
 /**
- * Aplica colores de fila por Etapa en la hoja Graduados (menú / llamada manual).
+ * Quita el color de fila completa por Etapa en Graduados (si quedó de una
+ * versión anterior) y deja que cada celda (Etapa, Nivel educativo, Empleado)
+ * muestre solo su propio color. Menú / llamada manual.
  */
-function aplicarColoresFilasGraduados() {
+function quitarColoresFilaGraduados() {
   var ss   = SpreadsheetApp.getActiveSpreadsheet();
   var hoja = ss.getSheetByName('Graduados');
   if (!hoja) { SpreadsheetApp.getUi().alert('No se encontró la hoja "Graduados".'); return; }
-  var numCols  = hoja.getLastColumn();
-  var colEtapa = _colPorEncabezado(hoja, 'Etapa');
-  if (colEtapa < 1) { SpreadsheetApp.getUi().alert('No se encontró la columna "Etapa" en Graduados.'); return; }
-  _colorearFilasPorEtapa(hoja, numCols, colEtapa);
-  SpreadsheetApp.getUi().alert('✅ Colores de fila aplicados en Graduados.');
+  var quitadas = _quitarColoresFilaPorEtapa_(hoja);
+  SpreadsheetApp.getUi().alert(quitadas > 0
+    ? '✅ Se quitó el color de fila completa (' + quitadas + ' regla(s)). Ahora cada celda muestra su propio color.'
+    : 'No había color de fila completa que quitar — ya estaba correcto.');
 }
 
 /**
@@ -4461,11 +4427,10 @@ function _refrescarColoresTodasLasHojasLogica_() {
     actualizadas.push(nombreHoja);
   });
 
+  // Quitar cualquier color de fila completa por Etapa que haya quedado de
+  // una versión anterior (ahora solo se colorea cada celda por separado).
   var hGrad = ss.getSheetByName('Graduados');
-  if (hGrad) {
-    var colEtapa = _colPorEncabezado(hGrad, 'Etapa');
-    if (colEtapa > 0) _colorearFilasPorEtapa(hGrad, hGrad.getLastColumn(), colEtapa);
-  }
+  if (hGrad) _quitarColoresFilaPorEtapa_(hGrad);
 
   return 'Se refrescaron los colores en: ' + (actualizadas.join(', ') || '(ninguna hoja encontrada)');
 }
