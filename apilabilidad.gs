@@ -88,6 +88,7 @@ function onOpen(e) {
       .addItem('🎨 Refrescar colores (todas las hojas)',     'refrescarColoresTodasLasHojas')
       .addItem('🔁 Normalizar Activo Sí/No',                 'normalizarActivoSiNo')
       .addItem('🔒 Cerrar etapas de personas ya avanzadas',  'cerrarEtapasHistoricas')
+      .addItem('➕ Agregar columnas nuevas (Cohorte / Fecha envío / Derivación)', 'agregarColumnasNuevas')
       .addSeparator()
       .addItem('📧 Configurar correos Conexiones Laborales', 'configurarEmailsConexionesLaborales');
 
@@ -929,7 +930,9 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Fecha de inicio',               ancho: 140, tipo: 'fecha' },
       { nombre: 'Fecha de final',                ancho: 140, tipo: 'fecha' },
       { nombre: 'Duración (meses)',              ancho: 140, tipo: 'texto' },
-      { nombre: 'Salario mensual',               ancho: 150, tipo: 'texto' }
+      { nombre: 'Salario mensual',               ancho: 150, tipo: 'texto' },
+      { nombre: 'Cohorte',                       ancho: 130, tipo: 'texto' },
+      { nombre: 'Fecha de envío',                ancho: 140, tipo: 'fecha' }
     ]
   },
 
@@ -978,7 +981,8 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Tipo servicio',       ancho: 200, tipo: 'texto' },
       { nombre: 'Comentario',          ancho: 280, tipo: 'texto' },
       { nombre: 'Acción',              ancho: 220, tipo: 'dropdown',
-        opciones: ['→ Conexiones Laborales', '→ Seguimiento Bot'] }
+        opciones: ['→ Conexiones Laborales', '→ Seguimiento Bot'] },
+      { nombre: 'Derivación a Conexiones Laborales', ancho: 220, tipo: 'siNo' }
     ]
   },
 
@@ -3129,7 +3133,8 @@ function _buscarGraduadoPorCreamosId(creamosId) {
           genero:   datos[i][4] || '',
           edad:     datos[i][5] || '',
           nivelEdu: datos[i][6] || '',
-          telefono: datos[i][7] || ''
+          telefono: datos[i][7] || '',
+          cohorte:  datos[i][9] || ''
         };
       }
     }
@@ -3632,7 +3637,9 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
         datosAdicionales.empresa  || '',              // Empresa
         datosAdicionales.cargo    || '',              // Cargo
         '', '',                                       // Tipo duracion, Tipo contrato
-        '', '', '', ''                                // Fechas, Duracion, Salario
+        '', '', '', '',                               // Fechas, Duracion, Salario
+        datosGraduado[9] || '',                       // Cohorte
+        new Date()                                    // Fecha de envío
       ];
 
     default:
@@ -3817,6 +3824,8 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
   var genero         = datosExtra.genero         || '';
   var edad           = datosExtra.edad           || '';
   var nivelEducativo = datosExtra.nivelEducativo || '';
+  // Cohorte: si no viene en datosExtra, se busca en Graduados por Creamos ID
+  var cohorte        = datosExtra.cohorte || (creamosId ? _buscarGraduadoPorCreamosId(creamosId).cohorte : '') || '';
 
   // JSON.stringify escapa comillas, barras y caracteres especiales para que
   // los valores queden seguros dentro de strings JavaScript en el HTML.
@@ -3827,6 +3836,7 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
   var jGenero        = JSON.stringify(genero);
   var jEdad          = JSON.stringify(edad);
   var jNivelEdu      = JSON.stringify(nivelEducativo);
+  var jCohorte       = JSON.stringify(cohorte);
 
   // Fecha de hoy en formato yyyy-mm-dd para el input date
   var hoy = new Date();
@@ -3871,6 +3881,7 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
       <span class="info-dato"><strong>Genero:</strong> ${genero || '-'}</span>
       <span class="info-dato"><strong>Edad:</strong> ${edad || '-'}</span>
       <span class="info-dato"><strong>Nivel edu:</strong> ${nivelEducativo || '-'}</span>
+      <span class="info-dato"><strong>Cohorte:</strong> ${cohorte || '-'}</span>
     </div>
 
     <div class="seccion"><p class="seccion-titulo">Informacion del programa</p></div>
@@ -4026,6 +4037,7 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
           genero:         ${jGenero},
           edad:           ${jEdad},
           nivelEducativo: ${jNivelEdu},
+          cohorte:        ${jCohorte},
           tipo:           document.getElementById('tipo').value.trim(),
           programa:       document.getElementById('programa').value.trim(),
           proyecto:       document.getElementById('proyecto').value.trim(),
@@ -4071,11 +4083,12 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
 /**
  * Guarda los datos del formulario en la hoja "Conexiones Laborales".
  *
- * Columnas Conexiones Laborales (18):
+ * Columnas Conexiones Laborales (20):
  *  1=Creamos ID | 2=Nombre completo | 3=Teléfono | 4=Género | 5=Edad | 6=Nivel educativo |
  *  7=Tipo | 8=Programa | 9=Proyecto | 10=Especialidad | 11=Empresa |
  *  12=Cargo | 13=Tipo duracion contrato | 14=Tipo contrato |
- *  15=Fecha inicio | 16=Fecha final | 17=Duracion (meses) | 18=Salario mensual
+ *  15=Fecha inicio | 16=Fecha final | 17=Duracion (meses) | 18=Salario mensual |
+ *  19=Cohorte | 20=Fecha de envío
  *
  * @param {Object} datos - datos del formulario
  * @return {Object}
@@ -4115,7 +4128,9 @@ function guardarConexionLaboral(datos) {
       fechaInicio,                      // 15 Fecha de inicio
       fechaFinal,                       // 16 Fecha de final
       datos.duracion       || '',       // 17 Duracion (meses)
-      datos.salario        || ''        // 18 Salario mensual
+      datos.salario        || '',       // 18 Salario mensual
+      datos.cohorte        || '',       // 19 Cohorte
+      new Date()                        // 20 Fecha de envío
     ];
 
     obtenerHoja('Conexiones Laborales').appendRow(fila);
@@ -4166,6 +4181,21 @@ function guardarConexionLaboral(datos) {
       );
     } catch (eCierre) {
       Logger.log('No se pudieron cerrar las etapas anteriores: ' + eCierre.message);
+    }
+
+    // Marcar "Derivación a Conexiones Laborales" = Si en Sesiones Acompañamiento,
+    // si el formulario se abrió desde esa hoja
+    try {
+      var filaSesNum = parseInt(datos.filaGraduado, 10);
+      if (datos.hojaOrigen === 'Sesiones Acompañamiento' && filaSesNum > 1) {
+        var hSesOrigen = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Sesiones Acompañamiento');
+        if (hSesOrigen) {
+          var colDeriv = _colPorEncabezado(hSesOrigen, 'Derivación a Conexiones Laborales');
+          if (colDeriv > 0) hSesOrigen.getRange(filaSesNum, colDeriv).setValue('Si');
+        }
+      }
+    } catch (eDeriv) {
+      Logger.log('No se pudo marcar Derivación a Conexiones Laborales: ' + eDeriv.message);
     }
 
     // Crear fila en Seguimiento Bot para n8n/WhatsApp
@@ -4360,6 +4390,92 @@ function cerrarEtapasHistoricas() {
     'Se revisaron ' + personasProcesadas + ' fila(s) y se cerraron ' + cierresTotales + ' etapa(s) anteriores (Activo = No).',
     ui.ButtonSet.OK
   );
+}
+
+/**
+ * Agrega las columnas nuevas a hojas que ya existen, SIN borrar ni tocar
+ * ningún dato existente:
+ *  - "Conexiones Laborales": agrega "Cohorte" y "Fecha de envío" (si no
+ *    existen ya) y completa la Cohorte de las filas existentes buscando en
+ *    Graduados por Creamos ID. La Fecha de envío de filas viejas no se
+ *    puede recuperar y queda en blanco (solo se llena para registros nuevos).
+ *  - "Sesiones Acompañamiento": agrega "Derivación a Conexiones Laborales"
+ *    (Sí/No). Las filas existentes quedan en blanco — no se marcan
+ *    automáticamente, hay que marcarlas a mano si corresponde.
+ */
+function agregarColumnasNuevas() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  var resumen = [];
+
+  // ── Conexiones Laborales: Cohorte + Fecha de envío ────────────────────────
+  var hCon = ss.getSheetByName('Conexiones Laborales');
+  if (hCon) {
+    var colCohorte    = _colPorEncabezado(hCon, 'Cohorte');
+    var colFechaEnvio = _colPorEncabezado(hCon, 'Fecha de envío');
+
+    if (colCohorte < 1) {
+      colCohorte = hCon.getLastColumn() + 1;
+      hCon.getRange(1, colCohorte).setValue('Cohorte');
+      resumen.push('OK: columna "Cohorte" agregada en Conexiones Laborales.');
+    } else {
+      resumen.push('INFO: "Cohorte" ya existía en Conexiones Laborales.');
+    }
+
+    if (colFechaEnvio < 1) {
+      colFechaEnvio = hCon.getLastColumn() + 1;
+      hCon.getRange(1, colFechaEnvio).setValue('Fecha de envío');
+      resumen.push('OK: columna "Fecha de envío" agregada en Conexiones Laborales.');
+    } else {
+      resumen.push('INFO: "Fecha de envío" ya existía en Conexiones Laborales.');
+    }
+
+    hCon.getRange(1, 1, 1, hCon.getLastColumn())
+        .setBackground('#e65100').setFontColor('#ffffff').setFontWeight('bold').setFontSize(11);
+
+    // Completar Cohorte de las filas existentes, buscando en Graduados por Creamos ID
+    var lastRowCon = hCon.getLastRow();
+    if (lastRowCon >= 2) {
+      var idsCon = hCon.getRange(2, 1, lastRowCon - 1, 1).getValues();
+      var cohortesCon = hCon.getRange(2, colCohorte, lastRowCon - 1, 1).getValues();
+      var rellenadas = 0;
+      for (var i = 0; i < idsCon.length; i++) {
+        if ((cohortesCon[i][0] || '').toString().trim()) continue; // ya tiene valor
+        var cid = (idsCon[i][0] || '').toString().trim();
+        if (!cid) continue;
+        var datosGrad = _buscarGraduadoPorCreamosId(cid);
+        if (datosGrad && datosGrad.cohorte) {
+          hCon.getRange(i + 2, colCohorte).setValue(datosGrad.cohorte);
+          rellenadas++;
+        }
+      }
+      resumen.push('OK: Cohorte completada para ' + rellenadas + ' fila(s) existentes en Conexiones Laborales.');
+    }
+  } else {
+    resumen.push('AVISO: no se encontró la hoja "Conexiones Laborales".');
+  }
+
+  // ── Sesiones Acompañamiento: Derivación a Conexiones Laborales ────────────
+  var hSes = ss.getSheetByName('Sesiones Acompañamiento');
+  if (hSes) {
+    var colDeriv = _colPorEncabezado(hSes, 'Derivación a Conexiones Laborales');
+    if (colDeriv < 1) {
+      colDeriv = hSes.getLastColumn() + 1;
+      hSes.getRange(1, colDeriv).setValue('Derivación a Conexiones Laborales')
+          .setBackground('#5e35b1').setFontColor('#ffffff').setFontWeight('bold').setFontSize(11);
+      var maxFilasSes = Math.max(hSes.getMaxRows() - 1, 1);
+      hSes.getRange(2, colDeriv, maxFilasSes).setDataValidation(
+        SpreadsheetApp.newDataValidation().requireValueInList(['Si', 'No'], true).setAllowInvalid(false).build()
+      );
+      resumen.push('OK: columna "Derivación a Conexiones Laborales" agregada en Sesiones Acompañamiento (queda en blanco).');
+    } else {
+      resumen.push('INFO: "Derivación a Conexiones Laborales" ya existía en Sesiones Acompañamiento.');
+    }
+  } else {
+    resumen.push('AVISO: no se encontró la hoja "Sesiones Acompañamiento".');
+  }
+
+  ui.alert('Columnas nuevas actualizadas', resumen.join('\n'), ui.ButtonSet.OK);
 }
 
 // ---------------------------------------------------------------------------
