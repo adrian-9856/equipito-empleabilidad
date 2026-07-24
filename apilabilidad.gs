@@ -50,6 +50,7 @@ function onOpen(e) {
       .addItem('📋 Clasificación de Perfiles',               'importarClasificacionPerfiles')
       .addItem('😊 Satisfacción Empleo (IL-06)',             'importarSatisfaccionEmpleo')
       .addItem('🤝 Sesiones Acompañamiento (IL-08)',         'importarSesionesAcompanamiento')
+      .addItem('💵 Estipendios (Empleabilidad)',             'importarEstipendios')
       .addSeparator()
       .addItem('✨ Actualizar Sesiones completo (reimportar + completar BD)', 'actualizarSesionesCompleto')
       .addItem('🔄 Reimportar Sesiones desde cero',          'reimportarSesionesDesdeCero')
@@ -239,15 +240,6 @@ function onEdit(e) {
       copiarAHojaClasificacion(datosGrad, nuevaEtapa, {});
       generarReporte();
 
-      if (nuevaEtapa === 'Activamente busca trabajo') {
-        hoja.getRange(fila, 12).setValue('Si');
-        crearSeguimientoBusquedaActiva(
-          datosGrad[2],  // Creamos ID
-          datosGrad[3],  // Nombre completo
-          datosGrad[7]   // Teléfono
-        );
-      }
-
       SpreadsheetApp.getActiveSpreadsheet().toast(
         nombre + ' enviado a: ' + nuevaEtapa, '✅ Clasificado', 3
       );
@@ -321,9 +313,9 @@ function onEditInstalable(e) {
     var colEtapaGrad = (nombreHoja === 'Graduados') ? _colPorEncabezado(hoja, 'Etapa') : -1;
 
     // ── Graduados: Etapa = "Paso a paso" ─────────────────────────────────
-    // Antes de mover a la persona: revisa Aliados/Plataforma/Derivaciones/
-    // Activamente busca trabajo por una fila suya; si le falta la Nota la
-    // pide, y cierra (Activo = No) esa etapa. Evita duplicar en "Paso a paso".
+    // Antes de mover a la persona: revisa Aliados/Plataforma/Derivaciones
+    // por una fila suya; si le falta la Nota la pide, y cierra (Activo = No)
+    // esa etapa. Evita duplicar en "Paso a paso".
     if (nombreHoja === 'Graduados' && col === colEtapaGrad && e.value === 'Paso a paso') {
       const datosGrad = hoja.getRange(fila, 1, 1, 15).getValues()[0];
       const creamosId = (datosGrad[2] || '').toString().trim();
@@ -345,7 +337,7 @@ function onEditInstalable(e) {
 
       _cerrarEtapasDePersona(
         creamosId, nombre,
-        ['Aliados', 'Plataforma', 'Derivaciones', 'Activamente busca trabajo'],
+        ['Aliados', 'Plataforma', 'Derivaciones'],
         true
       );
 
@@ -625,6 +617,12 @@ function importarTodosLosDatos() {
     res.push('✅ Sesiones Acompañamiento: ' + se.nuevos + ' nuevos (total ' + se.total + ')');
   } catch (e) { res.push('⚠️ Sesiones: ' + e.message); }
 
+  // 6. Estipendios (solo Empleabilidad)
+  try {
+    var est = _syncEstipendiosSoloNuevos();
+    res.push('✅ Estipendios: ' + est.nuevos + ' nuevos (total ' + est.total + ')');
+  } catch (e) { res.push('⚠️ Estipendios: ' + e.message); }
+
   ss.toast('', '', 1);
   ui.alert('📥 Importación completada', res.join('\n'), ui.ButtonSet.OK);
 }
@@ -646,7 +644,6 @@ function mostrarFormularioClasificacion() {
     '  • Aliados\n' +
     '  • Plataforma\n' +
     '  • Derivaciones\n' +
-    '  • Activamente busca trabajo (incluye "Por su cuenta")\n' +
     '  • Paso a paso\n' +
     '  • Conexiones Laborales (abre formulario de conexión)',
     SpreadsheetApp.getUi().ButtonSet.OK
@@ -698,6 +695,8 @@ const URL_CLASIFICACION_FALLBACK  = 'https://kf.kobotoolbox.org/api/v2/assets/aS
 const URL_SATISFACCION_EMPLEO     = 'https://kf.kobotoolbox.org/api/v2/assets/aKPtMoCx6tFzagpLoWysuq/export-settings/esoDGnReKRANZHjqdVVZZm8/data.csv';
 // IL_08 — Sesiones Acompañamiento profesional
 const URL_SESIONES_ACOMPANAMIENTO = 'https://kf.kobotoolbox.org/api/v2/assets/azWEsFBnHSUvfVugsTcgTD/export-settings/esr7u8sHX95HjFXmUpjunam/data.csv';
+// Estipendios (Alimentos y Bebidas / Tecnología / Empleabilidad) — solo se importan los de Empleabilidad
+const URL_ESTIPENDIOS = 'https://kf.kobotoolbox.org/api/v2/assets/aKHz2RcV5eYtZ8oWpZVqq9/export-settings/esZKoT565PQhgKzWpk7HbM4/data.csv';
 
 // -----------------------------------------------------------------------------
 // CONSTANTES DE OPCIONES DE DROPDOWN
@@ -744,7 +743,6 @@ const ETAPAS_FLUJO = [
   'Aliados',
   'Plataforma',
   'Derivaciones',
-  'Activamente busca trabajo',
   'Paso a paso',
   'Paso a paso - Cierre',
   'Conexiones Laborales',
@@ -776,7 +774,6 @@ const COLORES_DROPDOWN = {
   'Aliados':                     { bg: '#1e88e5', fg: '#ffffff' },
   'Plataforma':                  { bg: '#9e9e9e', fg: '#ffffff' },
   'Derivaciones':                { bg: '#f48fb1', fg: '#880e4f' },
-  'Activamente busca trabajo':   { bg: '#ce93d8', fg: '#4a148c' },
   'Paso a paso':                 { bg: '#fb8c00', fg: '#ffffff' },
   'Paso a paso - Cierre':        { bg: '#e53935', fg: '#ffffff' },
   'Conexiones Laborales':        { bg: '#43a047', fg: '#ffffff' },
@@ -911,21 +908,6 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
-  // -- 6. ACTIVAMENTE BUSCA TRABAJO (fusionado con "Por su cuenta") ----------
-  'Activamente busca trabajo': {
-    color: '#0f9d58',
-    columnas: [
-      ...COLUMNAS_COMUNES,
-      { nombre: 'Tipo de búsqueda', ancho: 180, tipo: 'dropdown', opciones: ['Activamente busca trabajo', 'Por su cuenta'] },
-      { nombre: 'Mensaje',          ancho: 120, tipo: 'texto' },
-      { nombre: 'Llamada',          ancho: 120, tipo: 'texto' },
-      { nombre: 'Nota',             ancho: 300, tipo: 'texto' },
-      { nombre: 'Entrevista',       ancho: 130, tipo: 'texto' },
-      { nombre: 'Trámites',         ancho: 200, tipo: 'texto' },
-      { nombre: 'Activo',           ancho: 90,  tipo: 'siNo'  }
-    ]
-  },
-
   // -- CONEXIONES LABORALES --------------------------------------------------
   'Conexiones Laborales': {
     color: '#e65100',
@@ -1000,12 +982,29 @@ const ESTRUCTURA_HOJAS = {
     ]
   },
 
+  // -- ESTIPENDIOS (Kobo, solo participantes de Empleabilidad) ---------------
+  // Importación automática (solo agrega filas nuevas, historial de pagos).
+  // El formulario de Kobo trae "Alimentos y Bebidas"/"Tecnología"/"Empleabilidad";
+  // aquí solo se filtran e importan los registros de "Empleabilidad".
+  'Estipendios': {
+    color: '#6d4c41',
+    columnas: [
+      { nombre: 'Fecha de registro',       ancho: 140, tipo: 'texto' },
+      { nombre: 'Creamos ID',              ancho: 130, tipo: 'texto' },
+      { nombre: 'Nombre completo',         ancho: 200, tipo: 'texto' },
+      { nombre: 'Fase',                    ancho: 150, tipo: 'texto' },
+      { nombre: 'Monto base (Q)',          ancho: 120, tipo: 'texto' },
+      { nombre: 'Comentarios',             ancho: 280, tipo: 'texto' },
+      { nombre: 'Documentos requeridos',   ancho: 280, tipo: 'texto' }
+    ]
+  },
+
   // Hoja "Seguimientos" eliminada — reemplazada por "Seguimiento Bot"
 
   // -- SEGUIMIENTO BOT (para n8n + WhatsApp) --------------------------------
   // Hoja unificada para dos flujos:
   //   "Post-empleo"     → viene de Conexiones Laborales
-  //   "Búsqueda activa" → viene de Activamente busca trabajo
+  //   "Búsqueda activa" → viene de Sesiones Acompañamiento
   'Seguimiento Bot': {
     color: '#00897b',
     columnas: [
@@ -1141,7 +1140,7 @@ function _ejecutarInstalacion(borrarExistentes) {
         'Derivaciones',
         'Por su cuenta',
         'Paso a paso',
-        'Activamente busca trabajo',
+        'Estipendios',
         'Seguimientos',        // legacy — se elimina si existe
         'Seguimiento Bot',
         'Clasificación de Perfiles',
@@ -1151,6 +1150,7 @@ function _ejecutarInstalacion(borrarExistentes) {
         'Conexiones Laborales',
         'Configuración', // por si existe de versión anterior
         // Nombres legacy (por si acaso existen)
+        'Activamente busca trabajo', // reemplazada por "Estipendios"
         'Reportes mensuales',
         'Reportes Mensuales',
         'Por su Cuenta',
@@ -1181,12 +1181,12 @@ function _ejecutarInstalacion(borrarExistentes) {
       'Plataforma',
       'Derivaciones',
       'Paso a paso',
-      'Activamente busca trabajo',
       'Conexiones Laborales',
       'Seguimiento Bot',
       'Clasificación de Perfiles',
       'Satisfacción Empleo',
       'Sesiones Acompañamiento',
+      'Estipendios',
       'Reporte'
     ];
 
@@ -1492,8 +1492,7 @@ function _existeEnHoja(nombreHoja, creamosId, nombreCompleto) {
  * indicadas, si existe. Opcionalmente pide una nota (con ui.prompt) antes de
  * cerrar, si la hoja no tiene ya una nota escrita. Las columnas "Nota"/"Notas"
  * y "Activo" se ubican por su encabezado (no por posición fija), porque su
- * posición varía entre hojas (p. ej. en "Activamente busca trabajo" hay
- * columnas después de "Nota").
+ * posición varía entre hojas.
  * @param {string}  creamosId
  * @param {string}  nombreCompleto
  * @param {Array}   nombresHojas
@@ -1909,7 +1908,15 @@ function sincronizacionAutomatica() {
       Logger.log('Sync Sesiones omitido: ' + e.message);
     }
 
-    // 5. Importar Graduados desde archivo externo de Google Sheets
+    // 5. Sincronizar Estipendios (solo Empleabilidad)
+    try {
+      var resultEst = _syncEstipendiosSoloNuevos();
+      Logger.log('Estipendios: ' + resultEst.nuevos + ' nuevos, ' + resultEst.total + ' total');
+    } catch (e) {
+      Logger.log('Sync Estipendios omitido: ' + e.message);
+    }
+
+    // 6. Importar Graduados desde archivo externo de Google Sheets
     try {
       importarGraduadosDesdeExterno();
       Logger.log('Import Graduados externo ejecutado');
@@ -1992,6 +1999,7 @@ function configurarTriggerSincronizacion() {
 var PROP_LAST_CLASIF  = 'LAST_SYNC_CLASIF';
 var PROP_LAST_SATISF  = 'LAST_SYNC_SATISF';
 var PROP_LAST_SESIONES = 'LAST_SYNC_SESIONES';
+var PROP_LAST_ESTIPENDIOS = 'LAST_SYNC_ESTIPENDIOS';
 
 function _leerUltimaFecha(clave) {
   return PropertiesService.getScriptProperties().getProperty(clave) || '';
@@ -2736,6 +2744,11 @@ function autoImportarNuevos() {
       if (resSe.nuevos > 0) msgs.push('Sesiones: +' + resSe.nuevos);
     } catch(e) { Logger.log('Auto-import Sesiones omitido: ' + e.message); }
 
+    try {
+      var resEst = _syncEstipendiosSoloNuevos();
+      if (resEst.nuevos > 0) msgs.push('Estipendios: +' + resEst.nuevos);
+    } catch(e) { Logger.log('Auto-import Estipendios omitido: ' + e.message); }
+
     if (msgs.length > 0) {
       ss.toast(msgs.join(' | '), '✅ Nuevos registros importados', 10);
     }
@@ -3125,6 +3138,220 @@ function _buscarGraduadoPorCreamosId(creamosId) {
 }
 
 // ===========================================================================
+// SECCIÓN 2F: SYNC ESTIPENDIOS (Kobo) — solo participantes de Empleabilidad
+// ===========================================================================
+
+// El formulario de Kobo de Estipendios se comparte entre 3 proyectos
+// (Alimentos y Bebidas, Tecnología, Empleabilidad). Aquí solo se importan
+// los registros donde Proyecto = "Empleabilidad". Es una importación tipo
+// historial: cada entrega de estipendio agrega una fila nueva (no reemplaza).
+
+var FASE_EMP_LABELS = {
+  'te_rica':        'Teórica',
+  'pr_cticas':       'Práctica',
+  'formaci_n_dual': 'Formación Dual',
+  'tramites':       'Trámites'
+};
+
+var DOCUMENTOS_EMP_LABELS = {
+  'antecedentes_penales':               'Antecedentes Penales',
+  'antecedentes_policiacos':            'Antecedentes Policiacos',
+  'laboratorios_para_tarjeta_de_salud': 'Laboratorios para tarjeta de salud',
+  'tarjeta_de_pulmones':                'Tarjeta de pulmones',
+  'fotograf_as':                        'Fotografías',
+  'boleta_de_ornato':                   'Boleta de Ornato'
+};
+
+/** Traduce un valor crudo de opción única de Kobo a su etiqueta legible (o lo deja igual si no está en el mapa). */
+function _traducirOpcion_(valor, mapa) {
+  var v = (valor || '').toString().trim();
+  if (!v) return '';
+  return mapa[v] || v;
+}
+
+/** Traduce una lista de valores crudos de select_multiple de Kobo (separados por espacio) a etiquetas legibles. */
+function _traducirMultiple_(valor, mapa) {
+  var v = (valor || '').toString().trim();
+  if (!v) return '';
+  return v.split(/\s+/).map(function(tok) { return mapa[tok] || tok; }).join(', ');
+}
+
+/**
+ * Sincroniza la hoja "Estipendios" desde KoboToolbox, agregando SOLO filas
+ * nuevas (historial de pagos) y SOLO para participantes de "Empleabilidad".
+ * Clave de deduplicación: Creamos ID + Fecha de registro.
+ */
+function _syncEstipendiosSoloNuevos() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(0)) {
+    Logger.log('_syncEstipendiosSoloNuevos: otra instancia en ejecución, omitiendo.');
+    return { nuevos: 0, actualizados: 0, total: 0 };
+  }
+  try {
+    var opciones = {
+      method: 'get',
+      headers: { 'Authorization': 'Token ' + KOBO_TOKEN, 'Accept': 'text/csv' },
+      muteHttpExceptions: true
+    };
+    var resp = UrlFetchApp.fetch(URL_ESTIPENDIOS, opciones);
+    if (resp.getResponseCode() !== 200) throw new Error('HTTP ' + resp.getResponseCode());
+    var body = resp.getContentText();
+    if (body.trim().charAt(0) === '{' || body.trim().charAt(0) === '[') {
+      throw new Error('KoboToolbox devolvió JSON en vez de CSV.');
+    }
+    var datos = parsearCSV(body);
+    if (!datos || datos.length === 0) return { nuevos: 0, actualizados: 0, total: 0 };
+
+    function _normKey_(s) {
+      return s.toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+    }
+
+    // Nombres exactos esperados del formulario XLSForm (grupo "Empleabilidad")
+    var CAMPO_NOMBRE_EXACTO = {
+      'Proyecto':    'Proyecto',
+      'Fecha':       'Fecha',
+      'CreamosID':   'Creamos_ID_emp',
+      'Nombre':      'Nombre_s',
+      'Apellido':    'Apellido_s',
+      'Fase':        'Fase_emp',
+      'Monto':       'Monto_base_emp',
+      'Comentarios': 'Comentarios_emp',
+      'Documentos':  'Fase_001'
+    };
+
+    // Respaldo por palabras clave, por si el export-settings renombra columnas
+    // o las deja con el prefijo del grupo (p. ej. "group_empleabilidad/Fase_emp")
+    var DETECTORES = {
+      'Proyecto':    function(n) { return n === 'proyecto'; },
+      'Fecha':       function(n) { return n === 'fecha' || n.indexOf('fecha_de_registro') !== -1; },
+      'CreamosID':   function(n) { return n.indexOf('creamos') !== -1 && n.indexOf('id') !== -1; },
+      'Nombre':      function(n) { return n.indexOf('nombre_s') !== -1; },
+      'Apellido':    function(n) { return n.indexOf('apellido_s') !== -1; },
+      'Fase':        function(n) { return n.indexOf('fase_emp') !== -1; },
+      'Monto':       function(n) { return n.indexOf('monto_base_emp') !== -1; },
+      'Comentarios': function(n) { return n.indexOf('comentarios_emp') !== -1; },
+      'Documentos':  function(n) { return n.indexOf('fase_001') !== -1 || n.indexOf('documentos') !== -1; }
+    };
+
+    var csvKeys = Object.keys(datos[0]);
+    var colMap = {};
+    Object.keys(DETECTORES).forEach(function(campo) {
+      var exacto = CAMPO_NOMBRE_EXACTO[campo];
+      if (exacto && datos[0][exacto] !== undefined) { colMap[campo] = exacto; return; }
+      var fn = DETECTORES[campo];
+      for (var ki = 0; ki < csvKeys.length; ki++) {
+        if (fn(_normKey_(csvKeys[ki]))) { colMap[campo] = csvKeys[ki]; return; }
+      }
+    });
+    Logger.log('Estipendios colMap: ' + JSON.stringify(colMap));
+
+    function _obtenerCampo_(d, campo) {
+      var col = colMap[campo];
+      if (col && d[col] !== undefined) return d[col];
+      return '';
+    }
+
+    // Filtrar SOLO participantes de "Empleabilidad" (el formulario es compartido
+    // con Alimentos y Bebidas y Tecnología)
+    var datosEmpleabilidad = datos.filter(function(d) {
+      return (_obtenerCampo_(d, 'Proyecto') || '').toString().trim() === 'Empleabilidad';
+    });
+
+    var hoja = obtenerHoja('Estipendios');
+    if (datosEmpleabilidad.length === 0) {
+      return { nuevos: 0, actualizados: 0, total: Math.max(hoja.getLastRow() - 1, 0) };
+    }
+
+    function _armarFila_(d) {
+      var nombre   = (_obtenerCampo_(d, 'Nombre')   || '').toString().trim();
+      var apellido = (_obtenerCampo_(d, 'Apellido') || '').toString().trim();
+      return [
+        (_obtenerCampo_(d, 'Fecha')     || '').toString().trim(),
+        (_obtenerCampo_(d, 'CreamosID') || '').toString().trim(),
+        (nombre + ' ' + apellido).trim(),
+        _traducirOpcion_(_obtenerCampo_(d, 'Fase'), FASE_EMP_LABELS),
+        (_obtenerCampo_(d, 'Monto')       || '').toString().trim(),
+        (_obtenerCampo_(d, 'Comentarios') || '').toString().trim(),
+        _traducirMultiple_(_obtenerCampo_(d, 'Documentos'), DOCUMENTOS_EMP_LABELS)
+      ];
+    }
+
+    var ultimaFecha = _leerUltimaFecha(PROP_LAST_ESTIPENDIOS);
+
+    // --- Primera importación (hoja sin headers/datos) ------------------------
+    if (hoja.getLastRow() <= 1) {
+      var headers = ESTRUCTURA_HOJAS['Estipendios'].columnas.map(function(c) { return c.nombre; });
+      hoja.clearContents();
+      var hr = hoja.getRange(1, 1, 1, headers.length);
+      hr.setValues([headers]);
+      hr.setBackground('#6d4c41').setFontColor('#ffffff').setFontWeight('bold').setFontSize(11);
+      hoja.setFrozenRows(1);
+
+      var nuevos = 0;
+      var maxF = '';
+      datosEmpleabilidad.forEach(function(d) {
+        hoja.appendRow(_armarFila_(d));
+        nuevos++;
+        var f = (_obtenerCampo_(d, 'Fecha') || '').toString().trim();
+        if (f > maxF) maxF = f;
+      });
+      _guardarUltimaFecha(PROP_LAST_ESTIPENDIOS, maxF);
+      return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
+    }
+
+    // --- Importación incremental (dedup por Creamos ID + Fecha) ---------------
+    var existentes = {};
+    var uf = hoja.getLastRow();
+    if (uf > 1) {
+      hoja.getRange(2, 1, uf - 1, 2).getValues().forEach(function(r) {
+        var f  = (r[0] || '').toString().trim();
+        var id = (r[1] || '').toString().trim();
+        existentes[(id || 'noId') + '||' + f] = true;
+      });
+    }
+    var nuevos = 0;
+    var maxFecha = ultimaFecha;
+    datosEmpleabilidad.forEach(function(d) {
+      var id    = (_obtenerCampo_(d, 'CreamosID') || '').toString().trim();
+      var fecha = (_obtenerCampo_(d, 'Fecha')     || '').toString().trim();
+      if (ultimaFecha && fecha && fecha <= ultimaFecha) return;
+      var key = (id || 'noId') + '||' + fecha;
+      if (existentes[key]) return;
+      hoja.appendRow(_armarFila_(d));
+      existentes[key] = true;
+      nuevos++;
+      if (fecha > maxFecha) maxFecha = fecha;
+    });
+    _guardarUltimaFecha(PROP_LAST_ESTIPENDIOS, maxFecha);
+    return { nuevos: nuevos, actualizados: 0, total: hoja.getLastRow() - 1 };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Importa manualmente "Estipendios" desde el menú.
+ */
+function importarEstipendios() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  ss.toast('Descargando Estipendios (Empleabilidad)...', '🔄 Importando', -1);
+  try {
+    var res = _syncEstipendiosSoloNuevos();
+    ss.toast('', '', 1);
+    ui.alert('✅ Estipendios importados',
+      'Nuevos: ' + res.nuevos + '\nTotal en hoja: ' + res.total, ui.ButtonSet.OK);
+  } catch (e) {
+    ss.toast('', '', 1);
+    ui.alert('❌ Error', e.message, ui.ButtonSet.OK);
+  }
+}
+
+// ===========================================================================
 // SECCIÓN 3: GESTIÓN DE HOJAS Y DATOS
 // ===========================================================================
 
@@ -3223,16 +3450,11 @@ function clasificarGraduado(graduadoId, clasificacion, datosAdicionales = {}) {
   for (let i = 1; i < datos.length; i++) {
     if (datos[i][0] === graduadoId) {
       // Columnas: 12=Empleado | Etapa detectada por encabezado
-      hojaGraduados.getRange(i + 1, 12).setValue(
-        clasificacion === 'Activamente busca trabajo' ? 'Si' : 'No'
-      );
+      hojaGraduados.getRange(i + 1, 12).setValue('No');
       var colEtapaGrad = _colPorEncabezado(hojaGraduados, 'Etapa');
       if (colEtapaGrad > 0) hojaGraduados.getRange(i + 1, colEtapaGrad).setValue(clasificacion); // Etapa
       copiarAHojaClasificacion(datos[i], clasificacion, datosAdicionales);
       registrarMovimientoEtapa(datos[i][2], datos[i][3], clasificacion, datosAdicionales.nota || '');
-      if (clasificacion === 'Activamente busca trabajo') {
-        programarSeguimientos(graduadoId, datos[i][3]); // [3] = Nombre completo
-      }
       Logger.log(`Graduado ${datos[i][3]} clasificado como: ${clasificacion}`);
       break;
     }
@@ -3296,13 +3518,9 @@ function obtenerNombreHojaClasificacion(clasificacion) {
     'No busca trabajo':           'Paso a paso',
     'Fito':                       'Paso a paso',
     'No busca trabajo - Fito':    'Paso a paso',
-    'Activamente busca trabajo':  'Activamente busca trabajo',
     'Conexiones Laborales':       'Conexiones Laborales',
-    // legacy / fusionado
-    'Por su cuenta':              'Activamente busca trabajo',
-    'Por su Cuenta':              'Activamente busca trabajo',
-    'Busca Trabajo':              'Derivaciones',
-    'Empleado':                   'Activamente busca trabajo'
+    // legacy
+    'Busca Trabajo':              'Derivaciones'
   };
   return mapeo[clasificacion] || 'Graduados';
 }
@@ -3380,18 +3598,6 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
         datosAdicionales.activo   || 'Si'
       ]);
 
-    case 'Por su cuenta':
-    case 'Por su Cuenta':
-      return filaBase.concat([
-        'Por su cuenta',              // Tipo de búsqueda
-        datosAdicionales.mensaje || '',
-        datosAdicionales.llamada || '',
-        datosAdicionales.nota    || '',
-        '',                           // Entrevista
-        '',                           // Trámites
-        datosAdicionales.activo  || 'Si'
-      ]);
-
     case 'Paso a paso':
     case 'No busca trabajo':
     case 'Fito':
@@ -3410,18 +3616,6 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
         datosAdicionales.cohorte   || datosGraduado[9] || '',
         '[CIERRE FORMAL] ' + (datosAdicionales.nota || ''),
         'No'
-      ]);
-
-    case 'Activamente busca trabajo':
-    case 'Empleado':
-      return filaBase.concat([
-        'Activamente busca trabajo',  // Tipo de búsqueda
-        '',                           // Mensaje
-        '',                           // Llamada
-        '',                           // Nota
-        datosAdicionales.entrevista || '',
-        datosAdicionales.tramites   || '',
-        datosAdicionales.activo     || 'Si'
       ]);
 
     case 'Conexiones Laborales':
@@ -3496,7 +3690,7 @@ function enviarAConexionesLaborales() {
   // Hojas válidas para enviar a Conexiones Laborales
   const hojasValidas = [
     'Graduados', 'Aliados', 'Plataforma', 'Derivaciones',
-    'Paso a paso', 'Activamente busca trabajo', 'Sesiones Acompañamiento'
+    'Paso a paso', 'Sesiones Acompañamiento'
   ];
 
   if (hojasValidas.indexOf(nombreHoja) === -1) {
@@ -3967,7 +4161,7 @@ function guardarConexionLaboral(datos) {
     try {
       _cerrarEtapasDePersona(
         creamosId, nombreCompleto,
-        ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'],
+        ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso'],
         false
       );
     } catch (eCierre) {
@@ -4074,14 +4268,14 @@ function refrescarColoresTodasLasHojas() {
 
 /**
  * Corrige celdas históricas de "Activo" (en Aliados, Plataforma, Derivaciones,
- * Paso a paso, Activamente busca trabajo) y "Empleado" (en Graduados) que
- * quedaron escritas como "Sí" (con tilde) en vez de "Si", para que coincidan
- * con la validación y los colores del dropdown.
+ * Paso a paso) y "Empleado" (en Graduados) que quedaron escritas como "Sí"
+ * (con tilde) en vez de "Si", para que coincidan con la validación y los
+ * colores del dropdown.
  */
 function normalizarActivoSiNo() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = SpreadsheetApp.getUi();
-  var hojasActivo = ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'];
+  var hojasActivo = ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso'];
   var totalCambios = 0;
 
   function normalizarColumna(hoja, colNum) {
@@ -4122,7 +4316,7 @@ function normalizarActivoSiNo() {
 function cerrarEtapasHistoricas() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = SpreadsheetApp.getUi();
-  var todasLasEtapas = ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'];
+  var todasLasEtapas = ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso'];
   var personasProcesadas = 0;
   var cierresTotales = 0;
 
@@ -4159,7 +4353,7 @@ function cerrarEtapasHistoricas() {
   }
 
   // Paso a paso: cierra sus posibles filas en las OTRAS etapas (no en sí misma)
-  procesarHoja('Paso a paso', ['Aliados', 'Plataforma', 'Derivaciones', 'Activamente busca trabajo']);
+  procesarHoja('Paso a paso', ['Aliados', 'Plataforma', 'Derivaciones']);
 
   ui.alert(
     '✅ Cierre histórico completado',
@@ -4316,8 +4510,8 @@ function crearFilaSeguimientoBot(datos, fechaEmpleo) {
 }
 
 /**
- * Crea una fila en "Seguimiento Bot" cuando alguien entra a "Activamente busca trabajo".
- * Flujo: onEdit detecta Etapa → llama esta función.
+ * Crea una fila en "Seguimiento Bot" para dar seguimiento a alguien que está
+ * buscando trabajo activamente (disparado desde Sesiones Acompañamiento).
  *
  * Día 7  → WhatsApp Mensaje 1 (bot n8n)
  * Día 14 → WhatsApp Mensaje 2 (bot n8n)
@@ -4906,7 +5100,6 @@ function corregirFechasIngreso() {
     { nombre: 'Plataforma',                colFecha: 0, colCid: 1 },
     { nombre: 'Derivaciones',              colFecha: 0, colCid: 1 },
     { nombre: 'Paso a paso',               colFecha: 0, colCid: 1 },
-    { nombre: 'Activamente busca trabajo', colFecha: 0, colCid: 1 },
     { nombre: 'Conexiones Laborales',      colFecha: 0, colCid: 1 }
   ];
 
@@ -5297,7 +5490,6 @@ function generarReporte(año) {
   // ╚══════════════════════════════════════════╝
   if (meses.length > 0) {
     var etapasCortas = ETAPAS_FLUJO.map(function(e) {
-      if (e === 'Activamente busca trabajo') return 'Act.';
       if (e === 'Conexiones Laborales')      return 'Conex.';
       if (e === 'Derivaciones')              return 'Deriv.';
       if (e === 'Paso a paso')               return 'P.Paso';
@@ -5452,8 +5644,7 @@ function generarReporte(año) {
     { etapa: 'Conexiones Laborales',      accion: 'Persona empleada (conexión activa).' },
     { etapa: 'Aliados',                   accion: 'Postulando con empresa aliada.' },
     { etapa: 'Plataforma',                accion: 'Registrada en plataforma de empleo.' },
-    { etapa: 'Derivaciones',              accion: 'Derivada a empresa para proceso.' },
-    { etapa: 'Activamente busca trabajo', accion: 'Buscando empleo / formándose.' }
+    { etapa: 'Derivaciones',              accion: 'Derivada a empresa para proceso.' }
   ];
 
   var COL_L = 8; // columna H (1-based)
@@ -5650,7 +5841,7 @@ function _construirMapaNombresCompleto_() {
   }
 
   // 3. Hojas de clasificación (col B = Creamos ID, col C = Nombre)
-  ['Aliados','Plataforma','Derivaciones','Paso a paso','Activamente busca trabajo'].forEach(function(nom) {
+  ['Aliados','Plataforma','Derivaciones','Paso a paso'].forEach(function(nom) {
     var h = ss.getSheetByName(nom);
     if (!h || h.getLastRow() < 2) return;
     h.getRange(2, 2, h.getLastRow() - 1, 2).getValues().forEach(function(r) {
@@ -5866,7 +6057,7 @@ function autocompletarConCreamos() {
 
   // ── Hojas de clasificación (COLUMNAS_COMUNES):
   //    col1=Fecha ingreso | col2=Creamos ID | col3=Nombre | col4=Teléfono | col5=Género | col6=Edad ──
-  ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'].forEach(function(nomHoja) {
+  ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso'].forEach(function(nomHoja) {
     var h = ss.getSheetByName(nomHoja);
     if (!h || h.getLastRow() < 2) return;
     var filas = h.getRange(2, 1, h.getLastRow() - 1, 7).getValues();
@@ -6068,7 +6259,7 @@ function verificarYCompletarCreamos() {
   }
 
   // ── Hojas de clasificación: Creamos ID = col B (idx 1), Nombre = col C (idx 2), Edad = col F (idx 5) ──
-  ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'].forEach(function(nombre) {
+  ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso'].forEach(function(nombre) {
     var h = ss.getSheetByName(nombre);
     if (!h || h.getLastRow() < 2) return;
     var data = h.getRange(2, 1, h.getLastRow() - 1, 7).getValues();
@@ -6120,7 +6311,7 @@ function diagnosticarErroresCreamos() {
   }
 
   _diagnosticar_(ss.getSheetByName('Graduados'), 2);
-  ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso', 'Activamente busca trabajo'].forEach(function(n) {
+  ['Aliados', 'Plataforma', 'Derivaciones', 'Paso a paso'].forEach(function(n) {
     _diagnosticar_(ss.getSheetByName(n), 1);
   });
 
@@ -6763,23 +6954,6 @@ function generarExportPowerBI() {
         formacion: r[8], cohorte: r[9],
         etapa: esCierre ? 'Paso a paso - Cierre' : 'Paso a paso',
         activo: r[11], nota: r[10]
-      }));
-    });
-  }
-
-  // ── 6. ACTIVAMENTE BUSCA TRABAJO ──────────────────────────────────────────
-  // Cols: 0-6=COMUNES | 7=TipoBúsqueda | 8=Mensaje | 9=Llamada |
-  //       10=Nota | 11=Entrevista | 12=Trámites | 13=Activo
-  var hAbt = ss.getSheetByName('Activamente busca trabajo');
-  if (hAbt && hAbt.getLastRow() > 1) {
-    var datosAbt = hAbt.getRange(2, 1, hAbt.getLastRow() - 1, 14).getValues();
-    datosAbt.forEach(function(r) {
-      if (!r[1] && !r[2]) return;
-      filas.push(_filaPowerBI(ahora, 'Activamente busca trabajo', {
-        fechaIngreso: r[0], creamosId: r[1], nombre: r[2],
-        telefono: r[3], genero: r[4], edad: r[5], nivelEdu: r[6],
-        etapa: r[7] || 'Activamente busca trabajo',
-        activo: r[13], nota: r[10]
       }));
     });
   }
