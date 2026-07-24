@@ -77,6 +77,7 @@ function onOpen(e) {
     // ── Submenú: Configuración ────────────────────────────────────────────
     const submenuConfig = ui.createMenu('⚙️ Configuración')
       .addItem('🔄 Actualizar dropdown Etapa',               'actualizarDropdownEtapa')
+      .addItem('🗑️ Eliminar hoja "Activamente busca trabajo"', 'eliminarHojaActivamenteBuscaTrabajo')
       .addItem('🎨 Aplicar colores de fila (Graduados)',     'aplicarColoresFilasGraduados')
       .addItem('🔄 Autocompletar con Creamos ID',            'autocompletarConCreamos')
       .addItem('🔍 Verificar Creamos ID ahora',              'verificarYCompletarCreamos')
@@ -88,7 +89,8 @@ function onOpen(e) {
       .addItem('🎨 Refrescar colores (todas las hojas)',     'refrescarColoresTodasLasHojas')
       .addItem('🔁 Normalizar Activo Sí/No',                 'normalizarActivoSiNo')
       .addItem('🔒 Cerrar etapas de personas ya avanzadas',  'cerrarEtapasHistoricas')
-      .addItem('➕ Agregar columnas nuevas (Cohorte / Fecha envío / Derivación)', 'agregarColumnasNuevas')
+      .addItem('➕ Agregar columnas nuevas (Derivación)',    'agregarColumnasNuevas')
+      .addItem('🔀 Reorganizar columnas Conexiones Laborales', 'reorganizarConexionesLaborales')
       .addSeparator()
       .addItem('📧 Configurar correos Conexiones Laborales', 'configurarEmailsConexionesLaborales');
 
@@ -119,21 +121,29 @@ function onOpen(e) {
  * Botón único: aplica TODOS los cambios/actualizaciones pendientes de una
  * sola vez, sin borrar ni perder ningún dato existente:
  *  1. Verifica/reinstala el trigger de Conexiones Laborales
- *  2. Refresca colores en todas las hojas (incluye quitar el de Género)
- *  3. Repara Etapas de Conexiones Laborales (En empleo)
- *  4. Normaliza "Activo"/"Empleado" a Sí/No sin tilde
- *  5. Cierra (Activo = No) etapas de personas ya avanzadas
- *  6. Agrega columnas nuevas: Cohorte / Fecha de envío / Derivación
- *  7. Importa Estipendios (Empleabilidad) desde KoboToolbox
- *  8. Completa Nombre completo en Satisfacción Empleo
- *  9. Regenera el Reporte con leyenda de colores
+ *  2. Reorganiza columnas de Conexiones Laborales (Fecha de envío primero,
+ *     Cohorte junto a Tipo/Programa/Proyecto/Especialidad)
+ *  3. Agrega columnas nuevas (Derivación en Sesiones Acompañamiento)
+ *  4. Refresca colores en todas las hojas (incluye quitar el de Género)
+ *  5. Refresca el dropdown de Etapa en Graduados (quita opciones viejas
+ *     como "Activamente busca trabajo")
+ *  6. Repara Etapas de Conexiones Laborales (En empleo)
+ *  7. Normaliza "Activo"/"Empleado" a Sí/No sin tilde
+ *  8. Cierra (Activo = No) etapas de personas ya avanzadas
+ *  9. Importa Estipendios (Empleabilidad) desde KoboToolbox
+ * 10. Completa Nombre completo en Satisfacción Empleo
+ * 11. Regenera el Reporte con leyenda de colores
  * Muestra un solo resumen final con el resultado de cada paso.
+ *
+ * NOTA: esto NO borra la hoja "Activamente busca trabajo" si todavía existe
+ * (eso es una acción aparte, irreversible): menú ⚙️ Configuración →
+ * 🗑️ Eliminar hoja "Activamente busca trabajo".
  */
 function implementarCambiosNuevos() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var pasos = [];
-  var TOTAL_PASOS = 9;
+  var TOTAL_PASOS = 11;
 
   // ── Paso 1: Trigger de Conexiones Laborales ───────────────────────────────
   try {
@@ -148,58 +158,75 @@ function implementarCambiosNuevos() {
     pasos.push('❌ Error instalando trigger: ' + e.message);
   }
 
-  // ── Paso 2: Refrescar colores en todas las hojas ──────────────────────────
+  // ── Paso 2: Reorganizar columnas de Conexiones Laborales ──────────────────
   try {
-    ss.toast('Paso 2/' + TOTAL_PASOS + ' — Refrescando colores (quita el de Género)...', '🚀 Implementando', -1);
-    pasos.push('✅ ' + _refrescarColoresTodasLasHojasLogica_());
+    ss.toast('Paso 2/' + TOTAL_PASOS + ' — Reorganizando columnas de Conexiones Laborales...', '🚀 Implementando', -1);
+    pasos.push('✅ ' + _reorganizarConexionesLaboralesLogica_());
   } catch (e) {
-    pasos.push('❌ Error en colores: ' + e.message);
+    pasos.push('❌ Error reorganizando Conexiones Laborales: ' + e.message);
   }
 
-  // ── Paso 3: Reparar Etapas de Conexiones Laborales ────────────────────────
+  // ── Paso 3: Agregar columnas nuevas (Derivación) ──────────────────────────
   try {
-    ss.toast('Paso 3/' + TOTAL_PASOS + ' — Reparando Etapas de Conexiones Laborales...', '🚀 Implementando', -1);
-    pasos.push('✅ ' + _repararEtapasConexionesLaboralesLogica_());
-  } catch (e) {
-    pasos.push('❌ Error reparando Etapas: ' + e.message);
-  }
-
-  // ── Paso 4: Normalizar Activo/Empleado Sí/No ──────────────────────────────
-  try {
-    ss.toast('Paso 4/' + TOTAL_PASOS + ' — Normalizando "Activo" Sí/No...', '🚀 Implementando', -1);
-    pasos.push('✅ ' + _normalizarActivoSiNoLogica_());
-  } catch (e) {
-    pasos.push('❌ Error normalizando Activo: ' + e.message);
-  }
-
-  // ── Paso 5: Cerrar etapas de personas ya avanzadas ────────────────────────
-  try {
-    ss.toast('Paso 5/' + TOTAL_PASOS + ' — Cerrando etapas de personas ya avanzadas...', '🚀 Implementando', -1);
-    pasos.push('✅ ' + _cerrarEtapasHistoricasLogica_());
-  } catch (e) {
-    pasos.push('❌ Error cerrando etapas: ' + e.message);
-  }
-
-  // ── Paso 6: Agregar columnas nuevas (Cohorte / Fecha envío / Derivación) ──
-  try {
-    ss.toast('Paso 6/' + TOTAL_PASOS + ' — Agregando columnas nuevas...', '🚀 Implementando', -1);
+    ss.toast('Paso 3/' + TOTAL_PASOS + ' — Agregando columnas nuevas...', '🚀 Implementando', -1);
     pasos.push(_agregarColumnasNuevasLogica_());
   } catch (e) {
     pasos.push('❌ Error agregando columnas nuevas: ' + e.message);
   }
 
-  // ── Paso 7: Importar Estipendios (Empleabilidad) ──────────────────────────
+  // ── Paso 4: Refrescar colores en todas las hojas ──────────────────────────
   try {
-    ss.toast('Paso 7/' + TOTAL_PASOS + ' — Importando Estipendios (Empleabilidad)...', '🚀 Implementando', -1);
+    ss.toast('Paso 4/' + TOTAL_PASOS + ' — Refrescando colores (quita el de Género)...', '🚀 Implementando', -1);
+    pasos.push('✅ ' + _refrescarColoresTodasLasHojasLogica_());
+  } catch (e) {
+    pasos.push('❌ Error en colores: ' + e.message);
+  }
+
+  // ── Paso 5: Refrescar dropdown de Etapa en Graduados ──────────────────────
+  try {
+    ss.toast('Paso 5/' + TOTAL_PASOS + ' — Refrescando dropdown de Etapa...', '🚀 Implementando', -1);
+    actualizarDropdownEtapa();
+    pasos.push('✅ Dropdown de Etapa refrescado (' + ETAPAS_FLUJO.length + ' opciones vigentes).');
+  } catch (e) {
+    pasos.push('❌ Error refrescando dropdown de Etapa: ' + e.message);
+  }
+
+  // ── Paso 6: Reparar Etapas de Conexiones Laborales ────────────────────────
+  try {
+    ss.toast('Paso 6/' + TOTAL_PASOS + ' — Reparando Etapas de Conexiones Laborales...', '🚀 Implementando', -1);
+    pasos.push('✅ ' + _repararEtapasConexionesLaboralesLogica_());
+  } catch (e) {
+    pasos.push('❌ Error reparando Etapas: ' + e.message);
+  }
+
+  // ── Paso 7: Normalizar Activo/Empleado Sí/No ──────────────────────────────
+  try {
+    ss.toast('Paso 7/' + TOTAL_PASOS + ' — Normalizando "Activo" Sí/No...', '🚀 Implementando', -1);
+    pasos.push('✅ ' + _normalizarActivoSiNoLogica_());
+  } catch (e) {
+    pasos.push('❌ Error normalizando Activo: ' + e.message);
+  }
+
+  // ── Paso 8: Cerrar etapas de personas ya avanzadas ────────────────────────
+  try {
+    ss.toast('Paso 8/' + TOTAL_PASOS + ' — Cerrando etapas de personas ya avanzadas...', '🚀 Implementando', -1);
+    pasos.push('✅ ' + _cerrarEtapasHistoricasLogica_());
+  } catch (e) {
+    pasos.push('❌ Error cerrando etapas: ' + e.message);
+  }
+
+  // ── Paso 9: Importar Estipendios (Empleabilidad) ──────────────────────────
+  try {
+    ss.toast('Paso 9/' + TOTAL_PASOS + ' — Importando Estipendios (Empleabilidad)...', '🚀 Implementando', -1);
     var resEst = _syncEstipendiosSoloNuevos();
     pasos.push('✅ Estipendios: ' + resEst.nuevos + ' nuevo(s) (total ' + resEst.total + ').');
   } catch (e) {
     pasos.push('⚠️ Estipendios: ' + e.message);
   }
 
-  // ── Paso 8: Nombre completo en Satisfacción Empleo ────────────────────────
+  // ── Paso 10: Nombre completo en Satisfacción Empleo ───────────────────────
   try {
-    ss.toast('Paso 8/' + TOTAL_PASOS + ' — Completando nombres en Satisfacción Empleo...', '🚀 Implementando', -1);
+    ss.toast('Paso 10/' + TOTAL_PASOS + ' — Completando nombres en Satisfacción Empleo...', '🚀 Implementando', -1);
     var hSat = ss.getSheetByName('Satisfacción Empleo');
     if (hSat && hSat.getLastRow() > 1) {
       // Verificar si ya tiene la columna "Nombre completo" (col 2)
@@ -235,9 +262,9 @@ function implementarCambiosNuevos() {
     pasos.push('❌ Error en nombres Satisfacción Empleo: ' + e.message);
   }
 
-  // ── Paso 9: Regenerar Reporte con leyenda ────────────────────────────────
+  // ── Paso 11: Regenerar Reporte con leyenda ───────────────────────────────
   try {
-    ss.toast('Paso 9/' + TOTAL_PASOS + ' — Regenerando Reporte con leyenda de colores...', '🚀 Implementando', -1);
+    ss.toast('Paso 11/' + TOTAL_PASOS + ' — Regenerando Reporte con leyenda de colores...', '🚀 Implementando', -1);
     generarReporte();
     pasos.push('✅ Reporte regenerado con leyenda de colores.');
   } catch (e) {
@@ -569,7 +596,13 @@ function actualizarDropdownEtapa() {
     return;
   }
 
-  const rango = hoja.getRange(2, 15, ultimaFila - 1, 1);
+  const colEtapa = _colPorEncabezado(hoja, 'Etapa');
+  if (colEtapa < 1) {
+    ss.toast('No se encontró la columna "Etapa" en Graduados.', '⚠️ Error', 4);
+    return;
+  }
+
+  const rango = hoja.getRange(2, colEtapa, ultimaFila - 1, 1);
   const regla = SpreadsheetApp.newDataValidation()
     .requireValueInList(ETAPAS_FLUJO, true)
     .setAllowInvalid(false)
@@ -582,6 +615,43 @@ function actualizarDropdownEtapa() {
     5
   );
   Logger.log('actualizarDropdownEtapa completado. Opciones: ' + ETAPAS_FLUJO.join(', '));
+}
+
+/**
+ * Elimina físicamente la hoja "Activamente busca trabajo" (reemplazada por
+ * "Estipendios") y refresca el dropdown de Etapa en Graduados para que esa
+ * opción ya no pueda seleccionarse. Acción DEFINITIVA — pide confirmación
+ * antes de borrar. Ejecutar solo una vez, cuando ya no necesites esos datos.
+ */
+function eliminarHojaActivamenteBuscaTrabajo() {
+  var ss  = SpreadsheetApp.getActiveSpreadsheet();
+  var ui  = SpreadsheetApp.getUi();
+  var hoja = ss.getSheetByName('Activamente busca trabajo');
+
+  if (!hoja) {
+    actualizarDropdownEtapa();
+    ui.alert('ℹ️ Nada que borrar', 'La hoja "Activamente busca trabajo" ya no existe. El dropdown de Etapa se refrescó de todas formas.', ui.ButtonSet.OK);
+    return;
+  }
+
+  var filas = Math.max(hoja.getLastRow() - 1, 0);
+  var confirmar = ui.alert(
+    '⚠️ Eliminar "Activamente busca trabajo"',
+    'Esto borrará PERMANENTEMENTE la hoja "Activamente busca trabajo" (' + filas + ' fila(s) de datos).\n\n' +
+    'Ya fue reemplazada por "Estipendios" y no se usa en el flujo actual.\n\n' +
+    'Esta acción no se puede deshacer. ¿Continuar?',
+    ui.ButtonSet.YES_NO
+  );
+  if (confirmar !== ui.Button.YES) return;
+
+  ss.deleteSheet(hoja);
+  actualizarDropdownEtapa();
+
+  ui.alert(
+    '✅ Hoja eliminada',
+    'Se eliminó "Activamente busca trabajo" y se refrescó el dropdown de Etapa en Graduados (esa opción ya no aparece).',
+    ui.ButtonSet.OK
+  );
 }
 
 /**
@@ -963,6 +1033,7 @@ const ESTRUCTURA_HOJAS = {
   'Conexiones Laborales': {
     color: '#e65100',
     columnas: [
+      { nombre: 'Fecha de envío',                ancho: 140, tipo: 'fecha' },
       { nombre: 'Creamos ID',                    ancho: 130, tipo: 'texto' },
       { nombre: 'Nombre completo',               ancho: 200, tipo: 'texto' },
       { nombre: 'Número de teléfono',            ancho: 150, tipo: 'texto' },
@@ -973,6 +1044,7 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Programa',                      ancho: 160, tipo: 'texto' },
       { nombre: 'Proyecto',                      ancho: 160, tipo: 'texto' },
       { nombre: 'Especialidad',                  ancho: 180, tipo: 'texto' },
+      { nombre: 'Cohorte',                       ancho: 130, tipo: 'texto' },
       { nombre: 'Empresa',                       ancho: 200, tipo: 'texto' },
       { nombre: 'Cargo que desempeña',           ancho: 200, tipo: 'texto' },
       { nombre: 'Tipo de duración de contrato',  ancho: 220, tipo: 'texto' },
@@ -980,9 +1052,7 @@ const ESTRUCTURA_HOJAS = {
       { nombre: 'Fecha de inicio',               ancho: 140, tipo: 'fecha' },
       { nombre: 'Fecha de final',                ancho: 140, tipo: 'fecha' },
       { nombre: 'Duración (meses)',              ancho: 140, tipo: 'texto' },
-      { nombre: 'Salario mensual',               ancho: 150, tipo: 'texto' },
-      { nombre: 'Cohorte',                       ancho: 130, tipo: 'texto' },
-      { nombre: 'Fecha de envío',                ancho: 140, tipo: 'fecha' }
+      { nombre: 'Salario mensual',               ancho: 150, tipo: 'texto' }
     ]
   },
 
@@ -3255,7 +3325,22 @@ function _syncEstipendiosSoloNuevos() {
       throw new Error('KoboToolbox devolvió JSON en vez de CSV.');
     }
     var datos = parsearCSV(body);
-    if (!datos || datos.length === 0) return { nuevos: 0, actualizados: 0, total: 0 };
+
+    // Asegurar que la hoja exista y tenga encabezados, incluso si todavía no
+    // hay ningún registro de Empleabilidad (para que nunca quede en blanco).
+    var hoja = obtenerHoja('Estipendios');
+    if (hoja.getLastRow() < 1 || !hoja.getRange(1, 1).getValue()) {
+      var headersIniciales = ESTRUCTURA_HOJAS['Estipendios'].columnas.map(function(c) { return c.nombre; });
+      hoja.clearContents();
+      var hrIni = hoja.getRange(1, 1, 1, headersIniciales.length);
+      hrIni.setValues([headersIniciales]);
+      hrIni.setBackground('#6d4c41').setFontColor('#ffffff').setFontWeight('bold').setFontSize(11);
+      hoja.setFrozenRows(1);
+    }
+
+    if (!datos || datos.length === 0) {
+      return { nuevos: 0, actualizados: 0, total: Math.max(hoja.getLastRow() - 1, 0) };
+    }
 
     function _normKey_(s) {
       return s.toLowerCase()
@@ -3316,7 +3401,6 @@ function _syncEstipendiosSoloNuevos() {
       return (_obtenerCampo_(d, 'Proyecto') || '').toString().trim() === 'Empleabilidad';
     });
 
-    var hoja = obtenerHoja('Estipendios');
     if (datosEmpleabilidad.length === 0) {
       return { nuevos: 0, actualizados: 0, total: Math.max(hoja.getLastRow() - 1, 0) };
     }
@@ -3337,15 +3421,8 @@ function _syncEstipendiosSoloNuevos() {
 
     var ultimaFecha = _leerUltimaFecha(PROP_LAST_ESTIPENDIOS);
 
-    // --- Primera importación (hoja sin headers/datos) ------------------------
+    // --- Primera importación (hoja recién creada, sin filas de datos) --------
     if (hoja.getLastRow() <= 1) {
-      var headers = ESTRUCTURA_HOJAS['Estipendios'].columnas.map(function(c) { return c.nombre; });
-      hoja.clearContents();
-      var hr = hoja.getRange(1, 1, 1, headers.length);
-      hr.setValues([headers]);
-      hr.setBackground('#6d4c41').setFontColor('#ffffff').setFontWeight('bold').setFontSize(11);
-      hoja.setFrozenRows(1);
-
       var nuevos = 0;
       var maxF = '';
       datosEmpleabilidad.forEach(function(d) {
@@ -3674,22 +3751,24 @@ function prepararFilaClasificacion(datosGraduado, clasificacion, datosAdicionale
       ]);
 
     case 'Conexiones Laborales':
-      // Conexiones Laborales: Creamos ID | Nombre completo | Teléfono | Género | Edad | Nivel edu |
-      //   Tipo | Programa | Proyecto | Especialidad | Empresa | Cargo | ...
+      // Conexiones Laborales: Fecha de envío | Creamos ID | Nombre completo | Teléfono |
+      //   Género | Edad | Nivel edu | Tipo | Programa | Proyecto | Especialidad |
+      //   Cohorte | Empresa | Cargo | ...
       return [
+        new Date(),                                   // Fecha de envío
         datosGraduado[2] || '',                       // Creamos ID
         datosGraduado[3] || '',                       // Nombre completo
         datosGraduado[7] || datosAdicionales.telefono || '', // Número de teléfono
         datosGraduado[4] || datosAdicionales.genero   || '', // Género
         datosGraduado[5] || datosAdicionales.edad     || '', // Edad
         datosGraduado[6] || datosAdicionales.nivelEdu || '', // Nivel educativo
-        '', '', '', '',                               // Tipo, Programa, Proyecto, Especialidad
+        '', '', '',                                   // Tipo, Programa, Proyecto
+        datosAdicionales.especialidad || '',          // Especialidad
+        datosGraduado[9] || '',                       // Cohorte
         datosAdicionales.empresa  || '',              // Empresa
         datosAdicionales.cargo    || '',              // Cargo
         '', '',                                       // Tipo duracion, Tipo contrato
-        '', '', '', '',                               // Fechas, Duracion, Salario
-        datosGraduado[9] || '',                       // Cohorte
-        new Date()                                    // Fecha de envío
+        '', '', '', ''                                // Fechas, Duracion, Salario
       ];
 
     default:
@@ -4134,11 +4213,11 @@ function _generarHTMLFormConexionLaboral(filaGraduado, creamosId, nombre, hojaOr
  * Guarda los datos del formulario en la hoja "Conexiones Laborales".
  *
  * Columnas Conexiones Laborales (20):
- *  1=Creamos ID | 2=Nombre completo | 3=Teléfono | 4=Género | 5=Edad | 6=Nivel educativo |
- *  7=Tipo | 8=Programa | 9=Proyecto | 10=Especialidad | 11=Empresa |
- *  12=Cargo | 13=Tipo duracion contrato | 14=Tipo contrato |
- *  15=Fecha inicio | 16=Fecha final | 17=Duracion (meses) | 18=Salario mensual |
- *  19=Cohorte | 20=Fecha de envío
+ *  1=Fecha de envío | 2=Creamos ID | 3=Nombre completo | 4=Teléfono | 5=Género |
+ *  6=Edad | 7=Nivel educativo | 8=Tipo | 9=Programa | 10=Proyecto |
+ *  11=Especialidad | 12=Cohorte | 13=Empresa | 14=Cargo |
+ *  15=Tipo duracion contrato | 16=Tipo contrato | 17=Fecha inicio |
+ *  18=Fecha final | 19=Duracion (meses) | 20=Salario mensual
  *
  * @param {Object} datos - datos del formulario
  * @return {Object}
@@ -4161,26 +4240,26 @@ function guardarConexionLaboral(datos) {
     }
 
     const fila = [
-      creamosId,                        // 1  Creamos ID
-      nombreCompleto,                   // 2  Nombre completo
-      datos.telefono       || '',       // 3  Número de teléfono
-      datos.genero         || '',       // 4  Género
-      datos.edad           || '',       // 5  Edad
-      datos.nivelEducativo || '',       // 6  Nivel educativo
-      datos.tipo           || '',       // 7  Tipo
-      datos.programa       || '',       // 8  Programa
-      datos.proyecto       || '',       // 9  Proyecto
-      datos.especialidad   || '',       // 10 Especialidad
-      datos.empresa,                    // 11 Empresa
-      datos.cargo,                      // 12 Cargo que desempena
-      datos.tipoDuracion   || '',       // 13 Tipo de duracion de contrato
-      datos.tipoContrato   || '',       // 14 Tipo de contrato
-      fechaInicio,                      // 15 Fecha de inicio
-      fechaFinal,                       // 16 Fecha de final
-      datos.duracion       || '',       // 17 Duracion (meses)
-      datos.salario        || '',       // 18 Salario mensual
-      datos.cohorte        || '',       // 19 Cohorte
-      new Date()                        // 20 Fecha de envío
+      new Date(),                       // 1  Fecha de envío
+      creamosId,                        // 2  Creamos ID
+      nombreCompleto,                   // 3  Nombre completo
+      datos.telefono       || '',       // 4  Número de teléfono
+      datos.genero         || '',       // 5  Género
+      datos.edad           || '',       // 6  Edad
+      datos.nivelEducativo || '',       // 7  Nivel educativo
+      datos.tipo           || '',       // 8  Tipo
+      datos.programa       || '',       // 9  Programa
+      datos.proyecto       || '',       // 10 Proyecto
+      datos.especialidad   || '',       // 11 Especialidad
+      datos.cohorte        || '',       // 12 Cohorte
+      datos.empresa,                    // 13 Empresa
+      datos.cargo,                      // 14 Cargo que desempena
+      datos.tipoDuracion   || '',       // 15 Tipo de duracion de contrato
+      datos.tipoContrato   || '',       // 16 Tipo de contrato
+      fechaInicio,                      // 17 Fecha de inicio
+      fechaFinal,                       // 18 Fecha de final
+      datos.duracion       || '',       // 19 Duracion (meses)
+      datos.salario        || ''        // 20 Salario mensual
     ];
 
     obtenerHoja('Conexiones Laborales').appendRow(fila);
@@ -4447,15 +4526,96 @@ function _cerrarEtapasHistoricasLogica_() {
 }
 
 /**
+ * Reordena las columnas de "Conexiones Laborales" para que coincidan con el
+ * orden actual de ESTRUCTURA_HOJAS (Fecha de envío primero; Cohorte junto a
+ * Tipo/Programa/Proyecto/Especialidad), SIN perder ningún dato existente.
+ * Funciona sin importar en qué orden estén hoy las columnas: lee cada fila
+ * por el NOMBRE de su encabezado actual y la reescribe en el orden nuevo.
+ * Si "Cohorte" no tenía valor, la completa buscando en Graduados por
+ * Creamos ID. Si ya estaba en el orden correcto, no hace nada.
+ */
+function reorganizarConexionesLaborales() {
+  var mensaje = _reorganizarConexionesLaboralesLogica_();
+  SpreadsheetApp.getUi().alert('Conexiones Laborales reorganizada', mensaje, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+/** Lógica de reorganizarConexionesLaborales, sin UI — reutilizable desde implementarCambiosNuevos(). */
+function _reorganizarConexionesLaboralesLogica_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var hoja = ss.getSheetByName('Conexiones Laborales');
+  if (!hoja) return 'AVISO: no se encontró la hoja "Conexiones Laborales".';
+
+  var lastRow = hoja.getLastRow();
+  var lastCol = hoja.getLastColumn();
+  if (lastCol < 1) return 'La hoja "Conexiones Laborales" está vacía — nada que reorganizar.';
+
+  var headersActuales = hoja.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) {
+    return (h || '').toString().trim();
+  });
+  var nuevoOrden = ESTRUCTURA_HOJAS['Conexiones Laborales'].columnas.map(function(c) { return c.nombre; });
+
+  var yaOrdenado = nuevoOrden.length === headersActuales.length &&
+    nuevoOrden.every(function(nombre, i) { return headersActuales[i] === nombre; });
+  if (yaOrdenado) {
+    return 'INFO: "Conexiones Laborales" ya estaba en el orden correcto — no se cambió nada.';
+  }
+
+  var datosViejos = lastRow >= 2 ? hoja.getRange(2, 1, lastRow - 1, lastCol).getValues() : [];
+
+  // Para cada columna del orden nuevo, ubicar su índice en el orden ACTUAL (-1 = no existía)
+  var indicesOrigen = nuevoOrden.map(function(nombre) { return headersActuales.indexOf(nombre); });
+
+  var datosReordenados = datosViejos.map(function(filaVieja) {
+    return indicesOrigen.map(function(idx) { return idx >= 0 ? filaVieja[idx] : ''; });
+  });
+
+  hoja.clearContents();
+  hoja.clearFormats();
+  var rangoHeaders = hoja.getRange(1, 1, 1, nuevoOrden.length);
+  rangoHeaders.setValues([nuevoOrden]);
+  rangoHeaders.setBackground('#e65100').setFontColor('#ffffff').setFontWeight('bold').setFontSize(11);
+  hoja.setFrozenRows(1);
+
+  if (datosReordenados.length > 0) {
+    hoja.getRange(2, 1, datosReordenados.length, nuevoOrden.length).setValues(datosReordenados);
+  }
+
+  ESTRUCTURA_HOJAS['Conexiones Laborales'].columnas.forEach(function(col, i) {
+    hoja.setColumnWidth(i + 1, col.ancho);
+  });
+  _aplicarColoresDropdowns(hoja, ESTRUCTURA_HOJAS['Conexiones Laborales'].columnas);
+
+  // Completar Cohorte donde falte, buscando en Graduados por Creamos ID
+  var colCohorte = _colPorEncabezado(hoja, 'Cohorte');
+  var colCreamosId = _colPorEncabezado(hoja, 'Creamos ID');
+  var rellenadas = 0;
+  if (colCohorte > 0 && colCreamosId > 0 && datosReordenados.length > 0) {
+    var idsActuales = hoja.getRange(2, colCreamosId, datosReordenados.length, 1).getValues();
+    var cohortesActuales = hoja.getRange(2, colCohorte, datosReordenados.length, 1).getValues();
+    for (var i = 0; i < idsActuales.length; i++) {
+      if ((cohortesActuales[i][0] || '').toString().trim()) continue; // ya tiene valor
+      var cid = (idsActuales[i][0] || '').toString().trim();
+      if (!cid) continue;
+      var datosGrad = _buscarGraduadoPorCreamosId(cid);
+      if (datosGrad && datosGrad.cohorte) {
+        hoja.getRange(i + 2, colCohorte).setValue(datosGrad.cohorte);
+        rellenadas++;
+      }
+    }
+  }
+
+  return 'OK: columnas reorganizadas (' + datosReordenados.length + ' fila(s) conservadas). ' +
+    'Cohorte completada para ' + rellenadas + ' fila(s) adicionales.';
+}
+
+/**
  * Agrega las columnas nuevas a hojas que ya existen, SIN borrar ni tocar
  * ningún dato existente:
- *  - "Conexiones Laborales": agrega "Cohorte" y "Fecha de envío" (si no
- *    existen ya) y completa la Cohorte de las filas existentes buscando en
- *    Graduados por Creamos ID. La Fecha de envío de filas viejas no se
- *    puede recuperar y queda en blanco (solo se llena para registros nuevos).
  *  - "Sesiones Acompañamiento": agrega "Derivación a Conexiones Laborales"
  *    (Sí/No). Las filas existentes quedan en blanco — no se marcan
  *    automáticamente, hay que marcarlas a mano si corresponde.
+ *  (Las columnas de "Conexiones Laborales" se manejan con
+ *  reorganizarConexionesLaborales(), que además las pone en el orden correcto.)
  */
 function agregarColumnasNuevas() {
   var mensaje = _agregarColumnasNuevasLogica_();
@@ -4466,53 +4626,6 @@ function agregarColumnasNuevas() {
 function _agregarColumnasNuevasLogica_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var resumen = [];
-
-  // ── Conexiones Laborales: Cohorte + Fecha de envío ────────────────────────
-  var hCon = ss.getSheetByName('Conexiones Laborales');
-  if (hCon) {
-    var colCohorte    = _colPorEncabezado(hCon, 'Cohorte');
-    var colFechaEnvio = _colPorEncabezado(hCon, 'Fecha de envío');
-
-    if (colCohorte < 1) {
-      colCohorte = hCon.getLastColumn() + 1;
-      hCon.getRange(1, colCohorte).setValue('Cohorte');
-      resumen.push('OK: columna "Cohorte" agregada en Conexiones Laborales.');
-    } else {
-      resumen.push('INFO: "Cohorte" ya existía en Conexiones Laborales.');
-    }
-
-    if (colFechaEnvio < 1) {
-      colFechaEnvio = hCon.getLastColumn() + 1;
-      hCon.getRange(1, colFechaEnvio).setValue('Fecha de envío');
-      resumen.push('OK: columna "Fecha de envío" agregada en Conexiones Laborales.');
-    } else {
-      resumen.push('INFO: "Fecha de envío" ya existía en Conexiones Laborales.');
-    }
-
-    hCon.getRange(1, 1, 1, hCon.getLastColumn())
-        .setBackground('#e65100').setFontColor('#ffffff').setFontWeight('bold').setFontSize(11);
-
-    // Completar Cohorte de las filas existentes, buscando en Graduados por Creamos ID
-    var lastRowCon = hCon.getLastRow();
-    if (lastRowCon >= 2) {
-      var idsCon = hCon.getRange(2, 1, lastRowCon - 1, 1).getValues();
-      var cohortesCon = hCon.getRange(2, colCohorte, lastRowCon - 1, 1).getValues();
-      var rellenadas = 0;
-      for (var i = 0; i < idsCon.length; i++) {
-        if ((cohortesCon[i][0] || '').toString().trim()) continue; // ya tiene valor
-        var cid = (idsCon[i][0] || '').toString().trim();
-        if (!cid) continue;
-        var datosGrad = _buscarGraduadoPorCreamosId(cid);
-        if (datosGrad && datosGrad.cohorte) {
-          hCon.getRange(i + 2, colCohorte).setValue(datosGrad.cohorte);
-          rellenadas++;
-        }
-      }
-      resumen.push('OK: Cohorte completada para ' + rellenadas + ' fila(s) existentes en Conexiones Laborales.');
-    }
-  } else {
-    resumen.push('AVISO: no se encontró la hoja "Conexiones Laborales".');
-  }
 
   // ── Sesiones Acompañamiento: Derivación a Conexiones Laborales ────────────
   var hSes = ss.getSheetByName('Sesiones Acompañamiento');
